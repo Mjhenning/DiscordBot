@@ -4,7 +4,6 @@ using Discord.WebSocket;
 using DiscordBot;
 using DiscordBot.Data;
 using Microsoft.Extensions.DependencyInjection;
-using System.Reflection;
 using DiscordBot.Modules;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +29,7 @@ ServiceProvider services = new ServiceCollection()
         x.GetRequiredService<DiscordSocketClient>()
     ))
     .AddSingleton<ReactionsData>()
+    .AddSingleton<ScheduleData>()
     .BuildServiceProvider();
 
 InteractionService interactions = services.GetRequiredService<InteractionService>();
@@ -62,14 +62,33 @@ interactions.Log += log =>
 
 client.Ready += async () =>
 {
-    await interactions.AddModulesAsync(Assembly.GetEntryAssembly(), services);
-
-    // Use RegisterCommandsToGuildAsync(guildId) during development for instant updates
-    // Switch to RegisterCommandsGloballyAsync() for production (up to 1hr propagation)
-    await interactions.RegisterCommandsGloballyAsync();
-
+    // //UNCOMMENT TO CLEAR OUT COMMANDS
+    //
+    // // Add this ONCE, run the bot, then remove it
+    //      await client.Rest.DeleteAllGlobalCommandsAsync();
+    //
+    //  // Also clear guild-specific commands
+    //      foreach (var guild in client.Guilds)
+    //      {
+    //          await guild.DeleteApplicationCommandsAsync();
+    //          Console.WriteLine($"[Info] Cleared commands for {guild.Name}");
+    //      }
+    
+    
+    
+    await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services);
+    
+    // // Use RegisterCommandsToGuildAsync(guildId) during development for instant updates
+    // // Switch to RegisterCommandsGloballyAsync() for production (up to 1hr propagation)
+    await interactions.RegisterCommandsToGuildAsync(Config.GuildId, deleteMissing: true);
+    
     Console.WriteLine($"[Info] Bot is ready — logged in as {client.CurrentUser.Username}#{client.CurrentUser.Discriminator}");
     Console.WriteLine($"[Info] Serving {client.Guilds.Count} guild(s)");
+    foreach (var guild in client.Guilds)
+    {
+        Console.WriteLine($"[Info] Serving {guild.Name} (ID: {guild.Id}) — {guild.MemberCount} members");
+    }
+    
     Console.WriteLine($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
 };
 
@@ -80,6 +99,10 @@ client.Ready += async () =>
 client.InteractionCreated += async interaction =>
 {
     SocketInteractionContext ctx = new SocketInteractionContext(client, interaction);
+    
+    // Log what's coming in to confirm routing
+    Console.WriteLine($"[Debug] Interaction received: {interaction.Type} — {(interaction is SocketMessageComponent c ? c.Data.CustomId : "N/A")}");
+    
     var result = await interactions.ExecuteCommandAsync(ctx, services);
 
     if (!result.IsSuccess)

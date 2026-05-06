@@ -1,8 +1,5 @@
-
-using Newtonsoft.Json;
-
 namespace DiscordBot.Data;
-
+using Newtonsoft.Json;
 public class ReactionsData
 {
     const string FilePath = "Data/reactions.json";
