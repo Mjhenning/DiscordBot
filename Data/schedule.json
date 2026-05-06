@@ -1,1 +1,22 @@
-[]
+{
+  "Entries": [
+    {
+      "Id": 1778075261266,
+      "Description": "Skylanders Spyro's Adventure Part 3!",
+      "ScheduledAt": "2026-05-06T20:00:00.0000000+00:00"
+    },
+    {
+      "Id": 1778075343537,
+      "Description": "Fortnite Friday / Poll!",
+      "ScheduledAt": "2026-05-08T20:00:00.0000000+00:00"
+    },
+    {
+      "Id": 1778075383139,
+      "Description": "Night In The Woods Part 2!",
+      "ScheduledAt": "2026-05-10T13:00:00.0000000+00:00"
+    }
+  ],
+  "MessageId": 1501643525702418512,
+  "ChannelId": 1488624519391478001,
+  "WeekStart": "2026-05-03T22:00:00.0000000+00:00"
+}

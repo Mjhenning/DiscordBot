@@ -1,3 +1,7 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ScheduleData.cs — updated
+// ─────────────────────────────────────────────────────────────────────────────
+
 namespace DiscordBot.Data;
 using Newtonsoft.Json;
 
@@ -7,34 +11,49 @@ public class ScheduleData
 
     public List<ScheduleEntry> ScheduleEntries { get; private set; } = new();
 
-    public ScheduleData()
-    {
-        Initialize();
-    }
+    // Persistent published message reference
+    public ulong PublishedMessageId  { get; private set; } = 0;
+    public ulong PublishedChannelId  { get; private set; } = 0;
+    public string WeekStart          { get; private set; } = ""; // ISO 8601 UTC — Monday of published week
+
+    public ScheduleData() => Initialize();
 
     void Initialize()
     {
         if (!File.Exists(FilePath))
         {
-            ScheduleEntries = new();
             Save();
             return;
         }
 
         string json = File.ReadAllText(FilePath);
-        ScheduleEntries = JsonConvert.DeserializeObject<List<ScheduleEntry>>(json) ?? new();
+        ScheduleStore? store = JsonConvert.DeserializeObject<ScheduleStore>(json);
+
+        if (store != null)
+        {
+            ScheduleEntries    = store.Entries    ?? new();
+            PublishedMessageId = store.MessageId;
+            PublishedChannelId = store.ChannelId;
+            WeekStart          = store.WeekStart  ?? "";
+        }
     }
 
     public void Save()
     {
-        string json = JsonConvert.SerializeObject(ScheduleEntries, Formatting.Indented);
+        ScheduleStore store = new()
+        {
+            Entries   = ScheduleEntries,
+            MessageId = PublishedMessageId,
+            ChannelId = PublishedChannelId,
+            WeekStart = WeekStart
+        };
+
+        string json = JsonConvert.SerializeObject(store, Formatting.Indented);
         File.WriteAllText(FilePath, json);
     }
 
     public ScheduleEntry? GetEntry(ulong id)
-    {
-        return ScheduleEntries.FirstOrDefault(x => x.Id == id);
-    }
+        => ScheduleEntries.FirstOrDefault(x => x.Id == id);
 
     public void AddEntry(ScheduleEntry entry)
     {
@@ -47,19 +66,63 @@ public class ScheduleData
         ScheduleEntries.RemoveAll(x => x.Id == id);
         Save();
     }
+
+    public void SetPublished(ulong messageId, ulong channelId, DateTimeOffset weekStart)
+    {
+        PublishedMessageId = messageId;
+        PublishedChannelId = channelId;
+        WeekStart          = weekStart.ToUniversalTime().ToString("o");
+        Save();
+    }
+
+    public void ClearPublished()
+    {
+        PublishedMessageId = 0;
+        PublishedChannelId = 0;
+        WeekStart          = "";
+        ScheduleEntries.Clear();
+        Save();
+    }
+
+    // Returns true if a message is published for the current week
+    public bool IsPublishedThisWeek()
+    {
+        if (PublishedMessageId == 0 || string.IsNullOrWhiteSpace(WeekStart))
+            return false;
+
+        DateTimeOffset stored = DateTimeOffset.Parse(WeekStart);
+        DateTimeOffset currentWeekStart = GetCurrentWeekStart();
+
+        return stored.Date == currentWeekStart.Date;
+    }
+
+    // Monday of the current UTC week
+    public static DateTimeOffset GetCurrentWeekStart()
+    {
+        DateTimeOffset today = DateTimeOffset.UtcNow;
+        int daysFromMonday = ((int)today.DayOfWeek + 6) % 7; // shift so Monday = 0
+        return today.AddDays(-daysFromMonday).Date;
+    }
+}
+
+// Wrapper so we can store entries + metadata in one JSON object
+public class ScheduleStore
+{
+    public List<ScheduleEntry> Entries   { get; set; } = new();
+    public ulong MessageId               { get; set; } = 0;
+    public ulong ChannelId               { get; set; } = 0;
+    public string WeekStart              { get; set; } = "";
 }
 
 public class ScheduleEntry
 {
-    public ulong Id           { get; set; } = 0;  // message ID or your own generated ID
+    public ulong  Id          { get; set; } = 0;
     public string Description { get; set; } = "";
-    public string ScheduledAt { get; set; } = "";  // stored as UTC ISO 8601
+    public string ScheduledAt { get; set; } = "";
 
-    // Convenience property — not serialized, just for use in code
     [JsonIgnore]
     public DateTimeOffset ScheduledAtParsed => DateTimeOffset.Parse(ScheduledAt);
 
-    // Convenience property for display
     [JsonIgnore]
     public string ScheduledAtDisplay => ScheduledAtParsed.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
 }

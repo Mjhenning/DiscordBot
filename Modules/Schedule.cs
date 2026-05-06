@@ -16,24 +16,40 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // /schedule add — pick a day, then fill in details via modal
+    // /schedule add — pick a day from remaining days this week, then modal
     // ─────────────────────────────────────────────────────────────────────────
 
-    [SlashCommand("add", "Add a stream day to the schedule")]
+    [SlashCommand("add", "Add a stream day to this week's schedule")]
     public async Task AddStart()
     {
-        // Build next 14 days as selectable options
         List<SelectMenuOptionBuilder> options = new();
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        for (int i = 0; i <= (7 - (int)DateTime.Today.DayOfWeek); i++)
+        // Get remaining days of the current week (Monday–Sunday)
+        DateTimeOffset weekStart = ScheduleData.GetCurrentWeekStart();
+        DateTimeOffset weekEnd   = weekStart.AddDays(7);
+
+        for (DateTimeOffset day = now.Date; day < weekEnd; day = day.AddDays(1))
         {
-            DateTimeOffset day = now.AddDays(i);
-            string label = day.ToString("dddd, MMMM d"); // "Monday, April 14"
-            string value = day.ToString("yyyy-MM-dd");   // stored value
+            // Skip days that already have an entry
+            string dayStr = day.ToString("yyyy-MM-dd");
+            bool alreadyAdded = _data.ScheduleEntries
+                .Any(e => e.ScheduledAtParsed.ToString("yyyy-MM-dd") == dayStr);
+
+            if (alreadyAdded) continue;
+
             options.Add(new SelectMenuOptionBuilder()
-                .WithLabel(label)
-                .WithValue(value));
+                .WithLabel(day.ToString("dddd, MMMM d"))
+                .WithValue(dayStr));
+        }
+
+        if (options.Count == 0)
+        {
+            await RespondAsync(
+                "All days this week already have entries, or the week is over. Use `/schedule remove` to free up a day.",
+                ephemeral: true
+            );
+            return;
         }
 
         MessageComponent menu = new ComponentBuilder()
@@ -46,24 +62,18 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             .Build();
 
         await RespondAsync(
-            "**Step 1:** Pick the day you'll be streaming.",
+            "Pick the day you'll be streaming this week:",
             components: menu,
             ephemeral: true
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Day selected — open modal for title + time
-    // ─────────────────────────────────────────────────────────────────────────
-
     [ComponentInteraction("schedule_day_select", ignoreGroupNames: true)]
     public async Task OnDaySelected(string[] selectedValues)
     {
-        string selectedDate = selectedValues[0]; // "yyyy-MM-dd"
-
-        // Parse the date to show in modal title
-        DateTimeOffset day = DateTimeOffset.Parse(selectedDate);
-        string dayLabel = day.ToString("dddd, MMMM d");
+        string selectedDate = selectedValues[0];
+        DateTimeOffset day  = DateTimeOffset.Parse(selectedDate);
+        string dayLabel     = day.ToString("dddd, MMMM d");
 
         await Context.Interaction.RespondWithModalAsync<ScheduleEntryModal>(
             $"schedule_entry_modal:{selectedDate}",
@@ -71,21 +81,15 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Modal submitted — save entry
-    // ─────────────────────────────────────────────────────────────────────────
-
     [ModalInteraction("schedule_entry_modal:*", ignoreGroupNames: true)]
     public async Task OnEntrySubmitted(string dateStr, ScheduleEntryModal modal)
     {
-        // Parse time from modal (expected: "10:00 PM")
-        // Combine with selected date into a full DateTimeOffset
         string combinedStr = $"{dateStr} {modal.Time.Trim()}";
 
         if (!DateTimeOffset.TryParse(combinedStr, out DateTimeOffset scheduledAt))
         {
             await RespondAsync(
-                $"❌ Couldn't parse the time **{modal.Time}**. Use a format like `10:00 PM` or `22:00`.",
+                $"❌ Couldn't parse **{modal.Time}**. Use a format like `10:00 PM` or `22:00`.",
                 ephemeral: true
             );
             return;
@@ -100,16 +104,19 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 
         _data.AddEntry(entry);
 
-        Console.WriteLine($"[Info] Schedule entry added: {entry.Description} on {entry.ScheduledAtDisplay}");
+        Console.WriteLine($"[Info] Schedule entry added: {entry.Description} — {entry.ScheduledAtDisplay}");
+
+        // Live-update published embed if one exists this week
+        await TryUpdatePublishedEmbed();
 
         await RespondAsync(
-            $"✅ Added **{entry.Description}** on <t:{entry.ScheduledAtParsed.ToUnixTimeSeconds()}:F>.",
+            $"✅ Added **{entry.Description}** — <t:{entry.ScheduledAtParsed.ToUnixTimeSeconds()}:F>.",
             ephemeral: true
         );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // /schedule remove — select from existing entries
+    // /schedule remove
     // ─────────────────────────────────────────────────────────────────────────
 
     [SlashCommand("remove", "Remove one or more schedule entries")]
@@ -162,11 +169,14 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             }
         }
 
+        // Live-update published embed if one exists this week
+        await TryUpdatePublishedEmbed();
+
         if (Context.Interaction is SocketMessageComponent component)
         {
             await component.UpdateAsync(props =>
             {
-                props.Content = $"✅ Removed **{removed}** schedule entry/entries.";
+                props.Content = $"✅ Removed **{removed}** entry/entries. Published schedule updated.";
                 props.Components = null;
             });
         }
@@ -177,18 +187,24 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // /schedule view — preview the embed
+    // /schedule view
     // ─────────────────────────────────────────────────────────────────────────
 
     [SlashCommand("view", "Preview the schedule embed")]
     public async Task View()
     {
+        if (_data.ScheduleEntries.Count == 0)
+        {
+            await RespondAsync("No entries yet. Use `/schedule add` to add some.", ephemeral: true);
+            return;
+        }
+
         Embed embed = BuildScheduleEmbed();
         await RespondAsync(embed: embed, ephemeral: true);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // /schedule publish — pick channel, then post with role ping
+    // /schedule publish
     // ─────────────────────────────────────────────────────────────────────────
 
     [SlashCommand("publish", "Post the schedule embed to a channel")]
@@ -197,6 +213,27 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         if (_data.ScheduleEntries.Count == 0)
         {
             await RespondAsync("There are no schedule entries to publish.", ephemeral: true);
+            return;
+        }
+
+        // Block re-publish if already published this week
+        if (_data.IsPublishedThisWeek())
+        {
+            await RespondAsync(
+                "📌 The schedule for this week is already published.\nUse `/schedule add` or `/schedule remove` to update it — the posted embed will update automatically.",
+                ephemeral: true
+            );
+            return;
+        }
+
+        // New week — clear out last week's entries and message ref before publishing
+        if (_data.PublishedMessageId != 0)
+        {
+            _data.ClearPublished(); // clears entries + message ref
+            await RespondAsync(
+                "🔄 New week detected — last week's schedule has been cleared. Use `/schedule add` to build this week's schedule first, then publish.",
+                ephemeral: true
+            );
             return;
         }
 
@@ -229,30 +266,58 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         }
 
         Embed embed = BuildScheduleEmbed();
-
-        // Ping the configured role — add ScheduleRoleId to your Config
         string roleMention = MentionUtils.MentionRole(Config.LiveRoleId);
 
-        await channel.SendMessageAsync(text: roleMention, embed: embed);
+        // Send and store the message ID + channel ID for future edits
+        IUserMessage posted = await channel.SendMessageAsync(text: roleMention, embed: embed);
+        _data.SetPublished(posted.Id, channelId, ScheduleData.GetCurrentWeekStart());
 
-        Console.WriteLine($"[Info] Schedule published to #{channel.Name} by {Context.User.Username}");
+        Console.WriteLine($"[Info] Schedule published to #{channel.Name} (msg: {posted.Id}) by {Context.User.Username}");
 
         if (Context.Interaction is SocketMessageComponent component)
         {
             await component.UpdateAsync(props =>
             {
-                props.Content = $"✅ Schedule published to <#{channelId}>.";
+                props.Content = $"✅ Schedule published to <#{channelId}>. Future add/remove changes will update it automatically.";
                 props.Components = null;
             });
         }
         else
         {
-            await RespondAsync($"✅ Schedule published to <#{channelId}>.", ephemeral: true);
+            await RespondAsync($"✅ Published to <#{channelId}>.", ephemeral: true);
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Embed builder — shared by view and publish
+    // Live-edit helper — silently updates the published embed after any change
+    // ─────────────────────────────────────────────────────────────────────────
+
+    async Task TryUpdatePublishedEmbed()
+    {
+        if (!_data.IsPublishedThisWeek()) return;
+        if (_data.PublishedMessageId == 0 || _data.PublishedChannelId == 0) return;
+
+        try
+        {
+            ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+            if (channel == null) return;
+
+            IUserMessage? message = await channel.GetMessageAsync(_data.PublishedMessageId) as IUserMessage;
+            if (message == null) return;
+
+            Embed updated = BuildScheduleEmbed();
+            await message.ModifyAsync(props => props.Embed = updated);
+
+            Console.WriteLine($"[Info] Published schedule embed updated (msg: {_data.PublishedMessageId})");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Warning] Failed to update published embed: {ex.Message}");
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Embed builder
     // ─────────────────────────────────────────────────────────────────────────
 
     Embed BuildScheduleEmbed()
@@ -261,10 +326,12 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             .OrderBy(e => e.ScheduledAtParsed)
             .ToList();
 
+        long nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
         EmbedBuilder builder = new EmbedBuilder()
             .WithTitle("Accessing Stream-schedule.txt...")
             .WithDescription("Status: active\nStream queries detected...\n\n—")
-            .WithColor(new Color(0x5865F2))  // Discord blurple — swap to your theme color
+            .WithColor(new Color(0x5865F2))
             .WithFooter($"System Active • 4/30/03, 3:00 AM");
 
         foreach (ScheduleEntry entry in entries)
@@ -272,7 +339,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             long unixSeconds = entry.ScheduledAtParsed.ToUnixTimeSeconds();
             builder.AddField(
                 $"⚠️ {entry.Description}",
-                $"<t:{unixSeconds}:F>",
+                $"> <t:{unixSeconds}:F>",
                 inline: false
             );
         }
@@ -290,10 +357,12 @@ public class ScheduleEntryModal : IModal
     public string Title => "Add Stream Entry";
 
     [InputLabel("Game / Stream Title")]
-    [ModalTextInput("schedule_description", placeholder: "Atomic Heart Part 3!! Let's go find some bunkers!")]
+    [ModalTextInput("schedule_description",
+        placeholder: "Atomic Heart Part 3!! Let's go find some bunkers!",
+        maxLength: 100)]
     public string Description { get; set; } = "";
 
-    [InputLabel("Start Time (e.g. 10:00 PM)")]
-    [ModalTextInput("schedule_time", placeholder: "10:00 PM")]
+    [InputLabel("Start Time (e.g. 10 PM or 22:00)")]
+    [ModalTextInput("schedule_time", placeholder: "10 PM")]
     public string Time { get; set; } = "";
 }
