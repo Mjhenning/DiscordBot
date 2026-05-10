@@ -1,3 +1,5 @@
+using TwitchLib.Api.Helix.Models.Videos.GetVideos;
+
 namespace DiscordBot.Modules;
 
 using Discord.WebSocket;
@@ -86,20 +88,19 @@ public class Twitch_Notifier
             null,
             null,
             null,
-            new List<string>() { Config.TwitchChannelName },
-            TwitchApi.Settings.AccessToken
+            new List<string>() { Config.TwitchChannelName }
         );
 
         GetUsersResponse? userResult = await TwitchApi.Helix.Users.GetUsersAsync(
             null,
-            new List<string>(){Config.TwitchChannelName},
-            TwitchApi.Settings.AccessToken
+            new List<string>(){Config.TwitchChannelName}
         );
         
         //TwitchSession.CurrentStream = result.Streams[0];
         
         
         TwitchSession.TwitchAvatarUrl = userResult.Users[0].ProfileImageUrl;
+        TwitchSession.UserId = result.Streams[0].UserId;
         TwitchSession.CurrentlyLive = true;
         TwitchSession.Title = result.Streams[0].Title;
         TwitchSession.GameName = result.Streams[0].GameName;
@@ -146,8 +147,49 @@ public class Twitch_Notifier
     
     async void OnStreamOffline(object? sender, StreamOfflineArgs args)
     {
+        TwitchSession.OfflineAt = DateTimeOffset.UtcNow;
+        
         TwitchSession.CurrentlyLive = false;
+        await CheckIfVodUp();
         await UpdateEmbed();
+
+        TwitchSession = new StreamSession();
+        TwitchVOD = new TwitchVOD();
+    }
+
+    async Task CheckIfVodUp()
+    {
+        while (!TwitchVOD.Viewable.Contains("public"))
+        {
+            DateTimeOffset startTime = DateTimeOffset.UtcNow;
+
+            GetVideosResponse? result = await TwitchApi.Helix.Videos.GetVideosAsync(
+                null,
+                TwitchSession.UserId,
+                null,
+                null,
+                null,
+                1
+            );
+
+            // Skip this iteration if Twitch hasn't created the VOD entry yet
+            if (result?.Videos == null || result.Videos.Length == 0)
+            {
+                Console.WriteLine("[Info] VOD not available yet, retrying...");
+            }
+            else
+            {
+                TwitchVOD.Url      = result.Videos[0].Url;
+                TwitchVOD.Duration = result.Videos[0].Duration;
+                TwitchVOD.Viewable = result.Videos[0].Viewable;
+            }
+        
+            TimeSpan elapsed = DateTime.UtcNow - startTime;
+            TimeSpan delay = TimeSpan.FromMinutes(1) - elapsed;
+
+            if (delay > TimeSpan.Zero)
+                await Task.Delay(delay);
+        }
     }
 
     //------------------------------UPDATE----------------------------------------
@@ -170,6 +212,17 @@ public class Twitch_Notifier
             DateTimeOffset startTime = DateTimeOffset.UtcNow;
 
             await UpdateEmbed();
+            
+            GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
+                null,
+                1,
+                null,
+                null,
+                null,
+                new List<string>() { Config.TwitchChannelName }
+            );
+            
+            TwitchSession.ViewerCount = result.Streams[0].ViewerCount;
             
             TimeSpan elapsed = DateTime.UtcNow - startTime;
             TimeSpan delay = TimeSpan.FromMinutes(1) - elapsed;
@@ -198,9 +251,9 @@ public class Twitch_Notifier
             .WithAuthor($"{userName} {(live? "is" : "was")} live on Twitch!", pfp, Config.TwitchChannelUrl)
             .WithTitle(title).WithUrl(Config.TwitchChannelUrl)
             .AddField("Game", $"> {game}", true)
-            .AddField($"{(live? "Viewers" : "VOD")}", $"> {(live? viewerCount : $"<a href=\"{vod.Url}\">{vod.Duration}</a>")}", true)
+            .AddField($"{(live? "Viewers" : "VOD")}", $"> {(live? viewerCount : $"[{vod.Duration}]({vod.Url})")}", true)
             .WithColor(new Color(0x5865F2))
-            .WithImageUrl(thumbnailUrl)
+            .WithImageUrl(live ? thumbnailUrl : null)
             .WithFooter($"{(live? $"{streamDuration}" : $"{streamDuration} | Offline at {timeOffline.ToString()}")}", "https://static.vecteezy.com/system/resources/previews/010/992/697/large_2x/social-media-twitch-realistic-icon-free-free-png.png");
 
         return builder.Build();
@@ -243,7 +296,7 @@ public class Twitch_Notifier
                 onlineDuration,
                 TwitchSession.ViewerCount,
                 TwitchSession.CurrentlyLive? null : TwitchVOD,
-                TwitchSession.CurrentlyLive? null : DateTimeOffset.UtcNow
+                TwitchSession.CurrentlyLive? null : TwitchSession.OfflineAt
             );
             await message.ModifyAsync(props => props.Embed = updated);
             Console.WriteLine($"[Info] Published twitch embed updated");
@@ -271,10 +324,12 @@ public class StreamSession //persistent until on ofline after on online and then
     public ulong PublishedChannelId  { get; set; } = 0;
     
     public string TwitchAvatarUrl { get; set; } = "";
+    public string UserId { get; set; } = "";
     public bool CurrentlyLive { get; set; } = false;
     public string Title { get; set; } = "";
     public string GameName { get; set; } = "";
     public string ThumbnailUrl { get; set; } = "";
     public int ViewerCount { get; set; } = 0;
     public DateTimeOffset StartedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset OfflineAt { get; set; } = DateTimeOffset.MinValue;
 }
