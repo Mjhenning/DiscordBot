@@ -294,25 +294,31 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 
     async Task TryUpdatePublishedEmbed()
     {
-        if (!_data.IsPublishedThisWeek()) return;
-        if (_data.PublishedMessageId == 0 || _data.PublishedChannelId == 0) return;
+        Console.WriteLine($"[Debug] TryUpdatePublishedEmbed called");
+        Console.WriteLine($"[Debug] IsPublishedThisWeek: {_data.IsPublishedThisWeek()}");
+        Console.WriteLine($"[Debug] MessageId: {_data.PublishedMessageId}, ChannelId: {_data.PublishedChannelId}");
+
+        if (!_data.IsPublishedThisWeek()) { Console.WriteLine("[Debug] Bailing — not published this week"); return; }
+        if (_data.PublishedMessageId == 0 || _data.PublishedChannelId == 0) { Console.WriteLine("[Debug] Bailing — missing IDs"); return; }
 
         try
         {
             ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+            Console.WriteLine($"[Debug] Channel: {channel?.Name ?? "NULL"}");
             if (channel == null) return;
 
             IUserMessage? message = await channel.GetMessageAsync(_data.PublishedMessageId) as IUserMessage;
+            Console.WriteLine($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
             if (message == null) return;
 
             Embed updated = BuildScheduleEmbed();
             await message.ModifyAsync(props => props.Embed = updated);
-
-            Console.WriteLine($"[Info] Published schedule embed updated (msg: {_data.PublishedMessageId})");
+            Console.WriteLine($"[Info] Published schedule embed updated");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Warning] Failed to update published embed: {ex.Message}");
+            Console.WriteLine($"[Warning] TryUpdatePublishedEmbed failed: {ex.Message}");
+            Console.WriteLine($"[Warning] {ex.StackTrace}");
         }
     }
 

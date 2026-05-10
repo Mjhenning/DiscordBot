@@ -71,7 +71,7 @@ public class ScheduleData
     {
         PublishedMessageId = messageId;
         PublishedChannelId = channelId;
-        WeekStart          = weekStart.ToUniversalTime().ToString("o");
+        WeekStart          = weekStart.Date.ToString("yyyy-MM-dd");
         Save();
     }
 
@@ -89,18 +89,16 @@ public class ScheduleData
     {
         if (PublishedMessageId == 0 || string.IsNullOrWhiteSpace(WeekStart))
             return false;
-
-        DateTimeOffset stored = DateTimeOffset.Parse(WeekStart);
-        DateTimeOffset currentWeekStart = GetCurrentWeekStart();
-
-        return stored.Date == currentWeekStart.Date;
+        
+        string currentWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
+        return WeekStart == currentWeekStart;
     }
 
     // Monday of the current UTC week
     public static DateTimeOffset GetCurrentWeekStart()
     {
         DateTimeOffset today = DateTimeOffset.UtcNow;
-        int daysFromMonday = ((int)today.DayOfWeek + 6) % 7; // shift so Monday = 0
+        int daysFromMonday = ((int)today.DayOfWeek + 6) % 7;
         return today.AddDays(-daysFromMonday).Date;
     }
 }

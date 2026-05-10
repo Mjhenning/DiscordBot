@@ -5,6 +5,7 @@ using DiscordBot;
 using DiscordBot.Data;
 using Microsoft.Extensions.DependencyInjection;
 using DiscordBot.Modules;
+using TwitchLib.EventSub.Websockets.Extensions;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // c# version 9+ does not use main class void structure, allows writing top level
@@ -30,6 +31,9 @@ ServiceProvider services = new ServiceCollection()
     ))
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
+    .AddTwitchLibEventSubWebsockets() //creates websocket to inject in twitch_notifier
+    .AddLogging() //Adds ILogger support
+    .AddSingleton<Twitch_Notifier>()
     .BuildServiceProvider();
 
 InteractionService interactions = services.GetRequiredService<InteractionService>();
@@ -74,9 +78,7 @@ client.Ready += async () =>
     //          Console.WriteLine($"[Info] Cleared commands for {guild.Name}");
     //      }
     
-    
-    
-    await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services);
+    await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services); //adds Schedule and ReactionROle because both derive from IInteractionModuleBase
     
     // // Use RegisterCommandsToGuildAsync(guildId) during development for instant updates
     // // Switch to RegisterCommandsGloballyAsync() for production (up to 1hr propagation)
@@ -90,6 +92,8 @@ client.Ready += async () =>
     }
     
     Console.WriteLine($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
+    
+    await services.GetRequiredService<Twitch_Notifier>().StartAsync(); //starts specific module Twitch_notifier
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,7 +107,7 @@ client.InteractionCreated += async interaction =>
     // Log what's coming in to confirm routing
     Console.WriteLine($"[Debug] Interaction received: {interaction.Type} — {(interaction is SocketMessageComponent c ? c.Data.CustomId : "N/A")}");
     
-    var result = await interactions.ExecuteCommandAsync(ctx, services);
+    var result = await interactions.ExecuteCommandAsync(ctx, services); //routes to correct module based on called slash command
 
     if (!result.IsSuccess)
         Console.WriteLine($"[Warning] Interaction failed: {result.Error} — {result.ErrorReason}");
@@ -186,7 +190,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
         if (session.WaitingForEmoji && session.MessageId == msg.Id)
         {
             // Capture exact emoji (unicode or custom)
-            session.Emoji = reaction.Emote.ToString();
+            session.Emoji = reaction.Emote?.ToString();
             session.WaitingForEmoji = false;
 
             Console.WriteLine($"[Setup] Captured emoji: {session.Emoji} for user {reaction.UserId}");
@@ -245,7 +249,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     // NORMAL REACTION ROLE LOGIC (production users)
     // ─────────────────────────────────────────────────────────────
 
-    string emoji = reaction.Emote?.ToString();
+    string? emoji = reaction.Emote?.ToString();
     if (string.IsNullOrWhiteSpace(emoji))
         return;
 
