@@ -1,4 +1,5 @@
 using TwitchLib.Api.Helix.Models.Videos.GetVideos;
+using TwitchLib.EventSub.Websockets.Core.EventArgs;
 
 namespace DiscordBot.Modules;
 
@@ -11,7 +12,6 @@ using TwitchLib.EventSub.Websockets;
 using TwitchLib.EventSub.Websockets.Core.EventArgs.Channel;
 using TwitchLib.EventSub.Websockets.Core.EventArgs.Stream;
 using TwitchLib.Api.Helix.Models.Streams.GetStreams;
-using Stream = TwitchLib.Api.Helix.Models.Streams.GetStreams.Stream;
 
 using Newtonsoft.Json;
 
@@ -35,12 +35,59 @@ public class Twitch_Notifier
     public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket) //constructs webhook event
     {
         _eventSubClient = eventSubClient;
+        
+        _eventSubClient.WebsocketConnected += OnWebsocketConnected;
+        
         _eventSubClient.StreamOnline += OnStreamOnline; 
         _eventSubClient.StreamOffline += OnStreamOffline;
         _eventSubClient.ChannelUpdate += OnChannelUpdate;
 
         _discordSocket = discordSocket;
     }
+    
+    async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
+    {
+        if (!e.IsRequestedReconnect)
+        {
+            // Register stream.online
+            await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                "stream.online",           // subscription type
+                "1",                       // version
+                new Dictionary<string, string>
+                {
+                    { "broadcaster_user_id", Config.TwitchUserId }
+                },
+                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                _eventSubClient.SessionId  // the session ID from the welcome message
+            );
+        
+            // Register stream.offline
+            await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                "stream.offline",           
+                "1",                       
+                new Dictionary<string, string>
+                {
+                    { "broadcaster_user_id", Config.TwitchUserId }
+                },
+                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                _eventSubClient.SessionId  
+            );
+            
+            // Register channel.update
+            await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                "channel.update",           
+                "2",                       
+                new Dictionary<string, string>
+                {
+                    { "broadcaster_user_id", Config.TwitchUserId }
+                },
+                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                _eventSubClient.SessionId  
+            );
+            
+        }
+    }
+    
 
     public async Task<string?> GetAppToken() //api call via post to get access token
     {
@@ -104,7 +151,9 @@ public class Twitch_Notifier
         TwitchSession.CurrentlyLive = true;
         TwitchSession.Title = result.Streams[0].Title;
         TwitchSession.GameName = result.Streams[0].GameName;
-        TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl;
+        TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl
+            .Replace("{width}", "1920")
+            .Replace("{height}", "1080");
         TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
         TwitchSession.StartedAt = new DateTimeOffset(result.Streams[0].StartedAt, TimeSpan.Zero);
         
@@ -211,8 +260,6 @@ public class Twitch_Notifier
         {
             DateTimeOffset startTime = DateTimeOffset.UtcNow;
 
-            await UpdateEmbed();
-            
             GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
                 null,
                 1,
@@ -223,6 +270,11 @@ public class Twitch_Notifier
             );
             
             TwitchSession.ViewerCount = result.Streams[0].ViewerCount;
+            TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl
+                .Replace("{width}", "1920")
+                .Replace("{height}", "1080");
+            
+            await UpdateEmbed();
             
             TimeSpan elapsed = DateTime.UtcNow - startTime;
             TimeSpan delay = TimeSpan.FromMinutes(1) - elapsed;
@@ -253,7 +305,7 @@ public class Twitch_Notifier
             .AddField("Game", $"> {game}", true)
             .AddField($"{(live? "Viewers" : "VOD")}", $"> {(live? viewerCount : $"[{vod.Duration}]({vod.Url})")}", true)
             .WithColor(new Color(0x5865F2))
-            .WithImageUrl(live ? thumbnailUrl : null)
+            .WithImageUrl(live ? $"{thumbnailUrl}?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}" : null)
             .WithFooter($"{(live? $"{streamDuration}" : $"{streamDuration} | Offline at {timeOffline.ToString()}")}", "https://static.vecteezy.com/system/resources/previews/010/992/697/large_2x/social-media-twitch-realistic-icon-free-free-png.png");
 
         return builder.Build();
