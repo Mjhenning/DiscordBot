@@ -22,6 +22,8 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("add", "Add a stream day to this week's schedule")]
     public async Task AddStart()
     {
+        _data.EnsureCurrentWeek();
+        
         List<SelectMenuOptionBuilder> options = new();
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
@@ -122,6 +124,8 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("remove", "Remove one or more schedule entries")]
     public async Task RemoveStart()
     {
+        _data.EnsureCurrentWeek();
+        
         var entries = _data.ScheduleEntries;
 
         if (entries.Count == 0)
@@ -193,6 +197,8 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("view", "Preview the schedule embed")]
     public async Task View()
     {
+        _data.EnsureCurrentWeek();
+        
         if (_data.ScheduleEntries.Count == 0)
         {
             await RespondAsync("No entries yet. Use `/schedule add` to add some.", ephemeral: true);
@@ -210,6 +216,8 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("publish", "Post the schedule embed to a channel")]
     public async Task PublishStart()
     {
+        _data.EnsureCurrentWeek();
+        
         if (_data.ScheduleEntries.Count == 0)
         {
             await RespondAsync("There are no schedule entries to publish.", ephemeral: true);
@@ -221,17 +229,6 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         {
             await RespondAsync(
                 "📌 The schedule for this week is already published.\nUse `/schedule add` or `/schedule remove` to update it — the posted embed will update automatically.",
-                ephemeral: true
-            );
-            return;
-        }
-
-        // New week — clear out last week's entries and message ref before publishing
-        if (_data.PublishedMessageId != 0)
-        {
-            _data.ClearPublished(); // clears entries + message ref
-            await RespondAsync(
-                "🔄 New week detected — last week's schedule has been cleared. Use `/schedule add` to build this week's schedule first, then publish.",
                 ephemeral: true
             );
             return;

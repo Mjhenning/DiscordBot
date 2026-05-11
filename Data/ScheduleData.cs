@@ -53,16 +53,24 @@ public class ScheduleData
     }
 
     public ScheduleEntry? GetEntry(ulong id)
-        => ScheduleEntries.FirstOrDefault(x => x.Id == id);
+    {
+        EnsureCurrentWeek();
+        
+        return ScheduleEntries.FirstOrDefault(x => x.Id == id);
+    }
 
     public void AddEntry(ScheduleEntry entry)
     {
+        EnsureCurrentWeek();
+        
         ScheduleEntries.Add(entry);
         Save();
     }
 
     public void RemoveEntry(ulong id)
     {
+        EnsureCurrentWeek();
+        
         ScheduleEntries.RemoveAll(x => x.Id == id);
         Save();
     }
@@ -87,6 +95,8 @@ public class ScheduleData
     // Returns true if a message is published for the current week
     public bool IsPublishedThisWeek()
     {
+        EnsureCurrentWeek();
+        
         if (PublishedMessageId == 0 || string.IsNullOrWhiteSpace(WeekStart))
             return false;
         
@@ -100,6 +110,23 @@ public class ScheduleData
         DateTimeOffset today = DateTimeOffset.UtcNow;
         int daysFromMonday = ((int)today.DayOfWeek + 6) % 7;
         return today.AddDays(-daysFromMonday).Date;
+    }
+    
+    public void EnsureCurrentWeek()
+    {
+        string currentWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
+
+        // No active week stored
+        if (string.IsNullOrWhiteSpace(WeekStart))
+            return;
+
+        // Same week → nothing to do
+        if (WeekStart == currentWeekStart)
+            return;
+
+        Console.WriteLine("[Info] Week rollover detected — clearing previous schedule");
+
+        ClearPublished();
     }
 }
 
