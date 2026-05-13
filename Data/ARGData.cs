@@ -7,8 +7,6 @@ public class ArgTerminalSession
     public string Cwd { get; set; }
     public string LastAction { get; set; }
     
-    int activeUsers {get; set;}
-    
     public List<string> ActionHistory { get; set; }
 }
 

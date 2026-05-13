@@ -5,7 +5,6 @@ using DiscordBot.Data;
 
 namespace DiscordBot.Modules;
 
-[Group("schedule", "Manage stream schedule")]
 public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 {
     readonly ScheduleData _data;
@@ -14,12 +13,44 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     {
         _data = data;
     }
+    
+    [SlashCommand("schedule", "Manage the stream schedule")]
+    public async Task ScheduleMenu()
+    {
+        _data.EnsureCurrentWeek();
+
+        MessageComponent buttons = new ComponentBuilder()
+            .WithButton("➕ Add",     "schedule_btn_add",     ButtonStyle.Primary)
+            .WithButton("🗑️ Remove",  "schedule_btn_remove",  ButtonStyle.Danger)
+            .WithButton("👁️ View",    "schedule_btn_view",    ButtonStyle.Secondary)
+            .WithButton("📢 Publish", "schedule_btn_publish", ButtonStyle.Success)
+            .Build();
+
+        await RespondAsync(
+            "**Stream Schedule** — what would you like to do?",
+            components: buttons,
+            ephemeral: true
+        );
+    }
+
+    [ComponentInteraction("schedule_btn_add",     ignoreGroupNames: true)]
+    public Task OnBtnAdd()     => AddStart();
+
+    [ComponentInteraction("schedule_btn_remove",  ignoreGroupNames: true)]
+    public Task OnBtnRemove()  => RemoveStart();
+
+    [ComponentInteraction("schedule_btn_view",    ignoreGroupNames: true)]
+    public Task OnBtnView()    => View();
+
+    [ComponentInteraction("schedule_btn_publish", ignoreGroupNames: true)]
+    public Task OnBtnPublish() => PublishStart();
+    
+    
 
     // ─────────────────────────────────────────────────────────────────────────
     // /schedule add — pick a day from remaining days this week, then modal
     // ─────────────────────────────────────────────────────────────────────────
-
-    [SlashCommand("add", "Add a stream day to this week's schedule")]
+    
     public async Task AddStart()
     {
         _data.EnsureCurrentWeek();
@@ -48,7 +79,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         if (options.Count == 0)
         {
             await RespondAsync(
-                "All days this week already have entries, or the week is over. Use `/schedule remove` to free up a day.",
+                "Use the 🗑️ Remove button in /schedule to free up a day.",
                 ephemeral: true
             );
             return;
@@ -120,8 +151,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     // ─────────────────────────────────────────────────────────────────────────
     // /schedule remove
     // ─────────────────────────────────────────────────────────────────────────
-
-    [SlashCommand("remove", "Remove one or more schedule entries")]
+    
     public async Task RemoveStart()
     {
         _data.EnsureCurrentWeek();
@@ -193,8 +223,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     // ─────────────────────────────────────────────────────────────────────────
     // /schedule view
     // ─────────────────────────────────────────────────────────────────────────
-
-    [SlashCommand("view", "Preview the schedule embed")]
+    
     public async Task View()
     {
         _data.EnsureCurrentWeek();
@@ -212,8 +241,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     // ─────────────────────────────────────────────────────────────────────────
     // /schedule publish
     // ─────────────────────────────────────────────────────────────────────────
-
-    [SlashCommand("publish", "Post the schedule embed to a channel")]
+    
     public async Task PublishStart()
     {
         _data.EnsureCurrentWeek();

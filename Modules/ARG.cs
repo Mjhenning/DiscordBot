@@ -1,8 +1,20 @@
+using Discord;
+using Discord.Interactions;
+using Discord.WebSocket;
+using DiscordBot.Data;
+
 namespace DiscordBot.Modules;
 
-public class ARG
+[Group("system", "Access AETHER-OS filesystem")]
+public class ARG : InteractionModuleBase<SocketInteractionContext>
 {
+    
+    int activeUsers {get; set;}
 
-    
-    
+
+    [SlashCommand("login", "Login to or start a terminal session")]
+    public async Task TerminalStart()
+    {
+        
+    }
 }
