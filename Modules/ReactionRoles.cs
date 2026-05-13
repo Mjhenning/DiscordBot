@@ -18,26 +18,26 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         _data = data;
     }
     
-    [SlashCommand("schedule", "Manage the stream schedule")]
+    [SlashCommand("reactionrole", "Manage your Reaction Roles")]
     public async Task ScheduleMenu()
     {
 
         MessageComponent buttons = new ComponentBuilder()
-            .WithButton("➕ Add",     "schedule_btn_add",     ButtonStyle.Primary)
-            .WithButton("🗑️ Remove",  "schedule_btn_remove",  ButtonStyle.Danger)
+            .WithButton("➕ Add",     "rr_btn_add",     ButtonStyle.Primary)
+            .WithButton("🗑️ Remove",  "rr_btn_remove",  ButtonStyle.Danger)
             .Build();
 
         await RespondAsync(
-            "**Stream Schedule** — what would you like to do?",
+            "**Reaction Roles** — what would you like to do?",
             components: buttons,
             ephemeral: true
         );
     }
 
-    [ComponentInteraction("schedule_btn_add",     ignoreGroupNames: true)]
+    [ComponentInteraction("rr_btn_add",     ignoreGroupNames: true)]
     public Task OnBtnAdd()     => SetupStart();
 
-    [ComponentInteraction("schedule_btn_remove",  ignoreGroupNames: true)]
+    [ComponentInteraction("rr_btn_remove",  ignoreGroupNames: true)]
     public Task OnBtnRemove()  => DeleteStart();
     
 

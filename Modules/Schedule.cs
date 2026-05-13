@@ -14,7 +14,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         _data = data;
     }
     
-    [SlashCommand("schedule", "Manage the stream schedule")]
+    [SlashCommand("streamSchedule", "Manage the stream schedule")]
     public async Task ScheduleMenu()
     {
         _data.EnsureCurrentWeek();
