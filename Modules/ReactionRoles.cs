@@ -4,7 +4,6 @@ using Discord.WebSocket;
 using DiscordBot.Data;
 namespace DiscordBot.Modules;
 
-[Group("reactionrole", "Manage reaction roles")]
 public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContext>
 {
     // In-memory setup session per user — keyed by userId
@@ -18,12 +17,34 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
     {
         _data = data;
     }
+    
+    [SlashCommand("schedule", "Manage the stream schedule")]
+    public async Task ScheduleMenu()
+    {
+
+        MessageComponent buttons = new ComponentBuilder()
+            .WithButton("➕ Add",     "schedule_btn_add",     ButtonStyle.Primary)
+            .WithButton("🗑️ Remove",  "schedule_btn_remove",  ButtonStyle.Danger)
+            .Build();
+
+        await RespondAsync(
+            "**Stream Schedule** — what would you like to do?",
+            components: buttons,
+            ephemeral: true
+        );
+    }
+
+    [ComponentInteraction("schedule_btn_add",     ignoreGroupNames: true)]
+    public Task OnBtnAdd()     => SetupStart();
+
+    [ComponentInteraction("schedule_btn_remove",  ignoreGroupNames: true)]
+    public Task OnBtnRemove()  => DeleteStart();
+    
 
     // ─────────────────────────────────────────────────────────────────────────
     // STEP 1 — Slash command entry point: show a channel select menu
     // ─────────────────────────────────────────────────────────────────────────
-
-    [SlashCommand("create", "Set up a reaction role on a message")]
+    
     public async Task SetupStart()
     {
         // Create (or reset) a session for this user
@@ -301,8 +322,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
     // ─────────────────────────────────────────────────────────────────────────
     // /reactionrole delete — show a select menu of all saved entries to remove
     // ─────────────────────────────────────────────────────────────────────────
-
-    [SlashCommand("delete", "Remove a reaction role entry")]
+    
     public async Task DeleteStart()
     {
         var entries = _data.ReactionMessages;
