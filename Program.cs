@@ -5,6 +5,7 @@ using DiscordBot;
 using DiscordBot.Data;
 using Microsoft.Extensions.DependencyInjection;
 using DiscordBot.Modules;
+using TwitchLib.Api;
 using TwitchLib.EventSub.Websockets.Extensions;
 
 
@@ -42,6 +43,7 @@ ServiceProvider services = new ServiceCollection()
     ))
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
+    .AddSingleton<TwitchAPI>()
     .AddSingleton(logFile) 
     .AddTwitchLibEventSubWebsockets() //creates websocket to inject in twitch_notifier
     .AddLogging() //Adds ILogger support

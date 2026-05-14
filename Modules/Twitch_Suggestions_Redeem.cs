@@ -13,7 +13,7 @@ public class TwitchSuggestionsPoster
 {
     readonly EventSubWebsocketClient _eventSubClient;
     private readonly DiscordSocketClient _discordSocket;
-    static readonly TwitchAPI TwitchApi = new();
+    private readonly TwitchAPI TwitchApi;
     
     private readonly StreamWriter _log;
     
@@ -23,9 +23,9 @@ public class TwitchSuggestionsPoster
         _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
     }
 
-    public TwitchSuggestionsPoster(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket,
-        StreamWriter log)
+    public TwitchSuggestionsPoster(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, StreamWriter log, TwitchAPI twitchApi)
     {
+        TwitchApi = twitchApi;
         _eventSubClient = eventSubClient;
         _log = log;
         

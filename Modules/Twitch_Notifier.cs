@@ -27,7 +27,7 @@ public class Twitch_Notifier
     
     static StreamSession TwitchSession = new();
     static TwitchVOD TwitchVOD = new();
-    static readonly TwitchAPI TwitchApi = new();
+    readonly TwitchAPI TwitchApi;
     
     static readonly HttpClient HttpClient = new HttpClient(){BaseAddress = new Uri("https://id.twitch.tv/oauth2/token")};
 
@@ -37,8 +37,9 @@ public class Twitch_Notifier
         _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
     }
 
-    public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, StreamWriter log)
+    public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, StreamWriter log, TwitchAPI twitchApi)
     {
+        TwitchApi = twitchApi;
         _eventSubClient = eventSubClient;
         _log = log;
         
