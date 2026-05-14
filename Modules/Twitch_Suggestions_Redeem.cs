@@ -1,11 +1,10 @@
 using Discord;
 using Discord.WebSocket;
 using TwitchLib.Api;
-using TwitchLib.Api.Helix.Models.ChannelPoints.GetCustomRewardRedemption;
 using TwitchLib.Api.Helix.Models.Users.GetUsers;
+using TwitchLib.EventSub.Core.EventArgs.Channel;
 using TwitchLib.EventSub.Websockets;
 using TwitchLib.EventSub.Websockets.Core.EventArgs;
-using TwitchLib.EventSub.Websockets.Core.EventArgs.Channel;
 
 namespace DiscordBot.Modules;
 
@@ -36,7 +35,7 @@ public class TwitchSuggestionsPoster
         _discordSocket.InteractionCreated += OnInteractionCreated;
     }
     
-    async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
+    async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
         if (!e.IsRequestedReconnect)
         {
@@ -63,9 +62,9 @@ public class TwitchSuggestionsPoster
         }
     }
 
-    async void OnRewardRedemptionUpdated(object? sender, ChannelPointsCustomRewardRedemptionArgs args)
+    async Task OnRewardRedemptionUpdated(object? sender, ChannelPointsCustomRewardRedemptionArgs args)
     {
-        var redemption = args.Notification.Payload.Event;
+        var redemption = args.Payload.Event;
         Log($"[Info] Redemption event received — Status: {redemption.Status}, User: {redemption.UserName}");
 
         if (redemption.Status != "fulfilled")

@@ -3,9 +3,9 @@ using TwitchLib.EventSub.Websockets.Core.EventArgs;
 using TwitchLib.Api;
 using TwitchLib.Api.Helix.Models.Users.GetUsers;
 using TwitchLib.EventSub.Websockets;
-using TwitchLib.EventSub.Websockets.Core.EventArgs.Channel;
-using TwitchLib.EventSub.Websockets.Core.EventArgs.Stream;
 using TwitchLib.Api.Helix.Models.Streams.GetStreams;
+using TwitchLib.EventSub.Core.EventArgs.Channel;
+using TwitchLib.EventSub.Core.EventArgs.Stream;
 
 namespace DiscordBot.Modules;
 using Discord.WebSocket;
@@ -50,22 +50,9 @@ public class Twitch_Notifier
         _eventSubClient.ChannelUpdate += OnChannelUpdate;
 
         _discordSocket = discordSocket;
-        
-        _eventSubClient.WebsocketConnected    += (s, e) => Log("[Info] Websocket connected");
-        _eventSubClient.WebsocketDisconnected += (s, e) => Log("[Warning] Websocket disconnected");
-        _eventSubClient.ErrorOccurred         += (s, e) => Log($"[Error] Websocket error: {e.Message}");
-        
-        _eventSubClient.ErrorOccurred += (s, e) => 
-        {
-            Log($"[Error] Websocket error type: {e.GetType().FullName}");
-            foreach (var prop in e.GetType().GetProperties())
-            {
-                Log($"[Error] {prop.Name}: {prop.GetValue(e)}");
-            }
-        };
     }
     
-    async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
+    async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
         if (!e.IsRequestedReconnect)
         {
@@ -132,7 +119,7 @@ public class Twitch_Notifier
 
     // ─── ONLINE ──────────────────────────────────────────────────────────────
 
-    async void OnStreamOnline(object? sender, StreamOnlineArgs args)
+    async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
     {
         GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
             null, 1, null, null, null,
@@ -191,7 +178,7 @@ public class Twitch_Notifier
     
     // ─── OFFLINE ─────────────────────────────────────────────────────────────
     
-    async void OnStreamOffline(object? sender, StreamOfflineArgs args)
+    async Task OnStreamOffline(object? sender, StreamOfflineArgs args)
     {
         TwitchSession.OfflineAt      = DateTimeOffset.UtcNow;
         TwitchSession.CurrentlyLive  = false;
@@ -234,10 +221,10 @@ public class Twitch_Notifier
 
     // ─── UPDATE ───────────────────────────────────────────────────────────────
     
-    async void OnChannelUpdate(object? sender, ChannelUpdateArgs args)
+    async Task OnChannelUpdate(object? sender, ChannelUpdateArgs args)
     {
-        TwitchSession.GameName = args.Notification.Payload.Event.CategoryName;
-        TwitchSession.Title    = args.Notification.Payload.Event.Title;
+        TwitchSession.GameName = args.Payload.Event.CategoryName;
+        TwitchSession.Title    = args.Payload.Event.Title;
         
         await UpdateEmbed();
     }
