@@ -25,20 +25,28 @@ public class Twitch_Notifier
 {
     readonly EventSubWebsocketClient _eventSubClient;
     private readonly DiscordSocketClient _discordSocket;
+    private readonly StreamWriter _log;
     
     static StreamSession TwitchSession = new();
     static TwitchVOD TwitchVOD = new();
     static readonly TwitchAPI TwitchApi = new();
     
-    static readonly HttpClient HttpClient = new HttpClient(){BaseAddress = new Uri("https://id.twitch.tv/oauth2/token")}; //gives it a base-address to access
+    static readonly HttpClient HttpClient = new HttpClient(){BaseAddress = new Uri("https://id.twitch.tv/oauth2/token")};
 
-    public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket) //constructs webhook event
+    void Log(string msg)
+    {
+        Console.WriteLine(msg);
+        _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
+    }
+
+    public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, StreamWriter log)
     {
         _eventSubClient = eventSubClient;
+        _log = log;
         
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
         
-        _eventSubClient.StreamOnline += OnStreamOnline; 
+        _eventSubClient.StreamOnline  += OnStreamOnline; 
         _eventSubClient.StreamOffline += OnStreamOffline;
         _eventSubClient.ChannelUpdate += OnChannelUpdate;
 
@@ -49,113 +57,91 @@ public class Twitch_Notifier
     {
         if (!e.IsRequestedReconnect)
         {
-            // Register stream.online
             await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
-                "stream.online",           // subscription type
-                "1",                       // version
-                new Dictionary<string, string>
-                {
-                    { "broadcaster_user_id", Config.TwitchUserId }
-                },
+                "stream.online",
+                "1",
+                new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
                 TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
-                _eventSubClient.SessionId  // the session ID from the welcome message
+                _eventSubClient.SessionId
             );
         
-            // Register stream.offline
             await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
                 "stream.offline",           
                 "1",                       
-                new Dictionary<string, string>
-                {
-                    { "broadcaster_user_id", Config.TwitchUserId }
-                },
+                new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
                 TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
                 _eventSubClient.SessionId  
             );
             
-            // Register channel.update
             await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
                 "channel.update",           
                 "2",                       
-                new Dictionary<string, string>
-                {
-                    { "broadcaster_user_id", Config.TwitchUserId }
-                },
+                new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
                 TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
                 _eventSubClient.SessionId  
             );
-            
         }
     }
     
-
-    public async Task<string?> GetAppToken() //api call via post to get access token
+    public async Task<string?> GetAppToken()
     {
-        FormUrlEncodedContent tokenRequest = new FormUrlEncodedContent(new[] //sets up the structure to feed post request
+        FormUrlEncodedContent tokenRequest = new FormUrlEncodedContent(new[]
         {
-            new KeyValuePair<string, string>("client_id", Config.TwitchClientId),
+            new KeyValuePair<string, string>("client_id",     Config.TwitchClientId),
             new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
-            new KeyValuePair<string, string>("grant_type", "client_credentials"),
+            new KeyValuePair<string, string>("grant_type",    "client_credentials"),
         });
 
         TwitchTokenResponse response = new TwitchTokenResponse();
-        try //try this
+        try
         {
             var asyncResponse = await HttpClient.PostAsync(HttpClient.BaseAddress, tokenRequest);
             string json = await asyncResponse.Content.ReadAsStringAsync();
-       
             response = JsonConvert.DeserializeObject<TwitchTokenResponse>(json) ?? new TwitchTokenResponse();
         }
-        catch (Exception e) //else catch exception and log
+        catch (Exception e)
         {
-            Console.WriteLine($"[Error] {e.GetType().Name}: {e.Message}");
-            Console.WriteLine($"[Error] Inner: {e.InnerException?.Message}");
+            Log($"[Error] {e.GetType().Name}: {e.Message}");
+            Log($"[Error] Inner: {e.InnerException?.Message}");
         }
         return response?.AccessToken != "" ? response?.AccessToken : null;
     }
 
-    public async Task StartAsync() //connects to twitch
+    public async Task StartAsync()
     {
         string? _token = await GetAppToken();
-        Console.WriteLine($"[Info] Twitch app token fetched: {(_token != null ? "success" : "failed")}");
+        Log($"[Info] Twitch app token fetched: {(_token != null ? "success" : "failed")}");
 
-        TwitchApi.Settings.ClientId = Config.TwitchClientId;
+        TwitchApi.Settings.ClientId    = Config.TwitchClientId;
         TwitchApi.Settings.AccessToken = _token;
         
         await _eventSubClient.ConnectAsync();
     }
 
-    //------------------------------ONLINE----------------------------------------
-    
+    // ─── ONLINE ──────────────────────────────────────────────────────────────
+
     async void OnStreamOnline(object? sender, StreamOnlineArgs args)
     {
         GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
-            null,
-            1,
-            null,
-            null,
-            null,
+            null, 1, null, null, null,
             new List<string>() { Config.TwitchChannelName }
         );
 
         GetUsersResponse? userResult = await TwitchApi.Helix.Users.GetUsersAsync(
             null,
-            new List<string>(){Config.TwitchChannelName}
+            new List<string>() { Config.TwitchChannelName }
         );
         
-        //TwitchSession.CurrentStream = result.Streams[0];
-        
-        
         TwitchSession.TwitchAvatarUrl = userResult.Users[0].ProfileImageUrl;
-        TwitchSession.UserId = result.Streams[0].UserId;
-        TwitchSession.CurrentlyLive = true;
-        TwitchSession.Title = result.Streams[0].Title;
-        TwitchSession.GameName = result.Streams[0].GameName;
-        TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl
+        TwitchSession.UserId          = result.Streams[0].UserId;
+        TwitchSession.CurrentlyLive   = true;
+        TwitchSession.Title           = result.Streams[0].Title;
+        TwitchSession.GameName        = result.Streams[0].GameName;
+        TwitchSession.ThumbnailUrl    = result.Streams[0].ThumbnailUrl
             .Replace("{width}", "1920")
             .Replace("{height}", "1080");
         TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
-        TwitchSession.StartedAt = new DateTimeOffset(result.Streams[0].StartedAt, TimeSpan.Zero);
+        TwitchSession.StartedAt    = new DateTimeOffset(result.Streams[0].StartedAt, TimeSpan.Zero);
         
         await OnStreamReceived();
     }
@@ -164,9 +150,9 @@ public class Twitch_Notifier
     {
         ITextChannel? channel = _discordSocket.GetChannel(Config.TwitchNotifyChannelId) as ITextChannel;
         
-        if (channel == null) //if no channel log and return
+        if (channel == null)
         {
-            Console.WriteLine("[Warning] Could not find Twitch notify channel");
+            Log("[Warning] Could not find Twitch notify channel");
             return;
         }
 
@@ -179,31 +165,30 @@ public class Twitch_Notifier
             TwitchSession.ThumbnailUrl,
             "Just started.",
             TwitchSession.ViewerCount
-            );
+        );
         string roleMention = MentionUtils.MentionRole(Config.LiveRoleId);
         
-        // Send and store the message ID + channel ID for future edits
         IUserMessage posted = await channel.SendMessageAsync(text: roleMention, embed: embed);
         TwitchSession.PublishedChannelId = channel.Id;
         TwitchSession.PublishedMessageId = posted.Id;
 
-        Console.WriteLine($"[Info] Notification published to #{channel.Name} (msg: {posted.Id})");
+        Log($"[Info] Notification published to #{channel.Name} (msg: {posted.Id})");
         
         _ = Task.Run(async () => await StartLiveUpdates());
     }
     
-    //------------------------------OFFLINE----------------------------------------
+    // ─── OFFLINE ─────────────────────────────────────────────────────────────
     
     async void OnStreamOffline(object? sender, StreamOfflineArgs args)
     {
-        TwitchSession.OfflineAt = DateTimeOffset.UtcNow;
-        
-        TwitchSession.CurrentlyLive = false;
+        TwitchSession.OfflineAt      = DateTimeOffset.UtcNow;
+        TwitchSession.CurrentlyLive  = false;
+
         await CheckIfVodUp();
         await UpdateEmbed();
 
         TwitchSession = new StreamSession();
-        TwitchVOD = new TwitchVOD();
+        TwitchVOD     = new TwitchVOD();
     }
 
     async Task CheckIfVodUp()
@@ -213,18 +198,12 @@ public class Twitch_Notifier
             DateTimeOffset startTime = DateTimeOffset.UtcNow;
 
             GetVideosResponse? result = await TwitchApi.Helix.Videos.GetVideosAsync(
-                null,
-                TwitchSession.UserId,
-                null,
-                null,
-                null,
-                1
+                null, TwitchSession.UserId, null, null, null, 1
             );
 
-            // Skip this iteration if Twitch hasn't created the VOD entry yet
             if (result?.Videos == null || result.Videos.Length == 0)
             {
-                Console.WriteLine("[Info] VOD not available yet, retrying...");
+                Log("[Info] VOD not available yet, retrying...");
             }
             else
             {
@@ -234,25 +213,24 @@ public class Twitch_Notifier
             }
         
             TimeSpan elapsed = DateTime.UtcNow - startTime;
-            TimeSpan delay = TimeSpan.FromMinutes(1) - elapsed;
+            TimeSpan delay   = TimeSpan.FromMinutes(1) - elapsed;
 
             if (delay > TimeSpan.Zero)
                 await Task.Delay(delay);
         }
     }
 
-    //------------------------------UPDATE----------------------------------------
+    // ─── UPDATE ───────────────────────────────────────────────────────────────
     
     async void OnChannelUpdate(object? sender, ChannelUpdateArgs args)
     {
         TwitchSession.GameName = args.Notification.Payload.Event.CategoryName;
-        TwitchSession.Title = args.Notification.Payload.Event.Title;
+        TwitchSession.Title    = args.Notification.Payload.Event.Title;
         
         await UpdateEmbed();
     }
     
-    
-    //------------------------------HELPERS----------------------------------------
+    // ─── HELPERS ──────────────────────────────────────────────────────────────
     
     async Task StartLiveUpdates()
     {
@@ -261,15 +239,11 @@ public class Twitch_Notifier
             DateTimeOffset startTime = DateTimeOffset.UtcNow;
 
             GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
-                null,
-                1,
-                null,
-                null,
-                null,
+                null, 1, null, null, null,
                 new List<string>() { Config.TwitchChannelName }
             );
             
-            TwitchSession.ViewerCount = result.Streams[0].ViewerCount;
+            TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
             TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl
                 .Replace("{width}", "1920")
                 .Replace("{height}", "1080");
@@ -277,12 +251,10 @@ public class Twitch_Notifier
             await UpdateEmbed();
             
             TimeSpan elapsed = DateTime.UtcNow - startTime;
-            TimeSpan delay = TimeSpan.FromMinutes(1) - elapsed;
+            TimeSpan delay   = TimeSpan.FromMinutes(1) - elapsed;
 
             if (delay > TimeSpan.Zero)
-            {
                 await Task.Delay(delay);
-            }
         }
     }
     
@@ -294,28 +266,30 @@ public class Twitch_Notifier
         string game,
         string thumbnailUrl,
         string streamDuration,
-        int viewerCount = 0,
-        TwitchVOD? vod = null,
+        int viewerCount      = 0,
+        TwitchVOD? vod       = null,
         DateTimeOffset? timeOffline = null
     )
     {
         EmbedBuilder builder = new EmbedBuilder()
-            .WithAuthor($"{userName} {(live? "is" : "was")} live on Twitch!", pfp, Config.TwitchChannelUrl)
+            .WithAuthor($"{userName} {(live ? "is" : "was")} live on Twitch!", pfp, Config.TwitchChannelUrl)
             .WithTitle(title).WithUrl(Config.TwitchChannelUrl)
             .AddField("Game", $"> {game}", true)
-            .AddField($"{(live? "Viewers" : "VOD")}", $"> {(live? viewerCount : $"[{vod.Duration}]({vod.Url})")}", true)
+            .AddField($"{(live ? "Viewers" : "VOD")}", $"> {(live ? viewerCount : $"[{vod.Duration}]({vod.Url})")}", true)
             .WithColor(new Color(0x5865F2))
             .WithImageUrl(live ? $"{thumbnailUrl}?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}" : null)
-            .WithFooter($"{(live? $"{streamDuration}" : $"{streamDuration} | Offline at {timeOffline.ToString()}")}", "https://static.vecteezy.com/system/resources/previews/010/992/697/large_2x/social-media-twitch-realistic-icon-free-free-png.png");
+            .WithFooter(
+                $"{(live ? streamDuration : $"{streamDuration} | Offline at {timeOffline}")}",
+                "https://static.vecteezy.com/system/resources/previews/010/992/697/large_2x/social-media-twitch-realistic-icon-free-free-png.png"
+            );
 
         return builder.Build();
     }
 
     async Task UpdateEmbed()
     {
-        TimeSpan duration = DateTimeOffset.UtcNow - TwitchSession.StartedAt.ToUniversalTime();
-
-        string onlineDuration = "Just started.";
+        TimeSpan duration      = DateTimeOffset.UtcNow - TwitchSession.StartedAt.ToUniversalTime();
+        string onlineDuration  = "Just started.";
         
         if (duration != TimeSpan.Zero)
         {
@@ -331,11 +305,11 @@ public class Twitch_Notifier
         try
         {
             ITextChannel? channel = _discordSocket.GetChannel(TwitchSession.PublishedChannelId) as ITextChannel;
-            Console.WriteLine($"[Debug] Channel: {channel?.Name ?? "NULL"}");
+            Log($"[Debug] Channel: {channel?.Name ?? "NULL"}");
             if (channel == null) return;
 
             IUserMessage? message = await channel.GetMessageAsync(TwitchSession.PublishedMessageId) as IUserMessage;
-            Console.WriteLine($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
+            Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
             if (message == null) return;
 
             Embed updated = BuildTwitchEmbed(
@@ -347,41 +321,39 @@ public class Twitch_Notifier
                 TwitchSession.ThumbnailUrl,
                 onlineDuration,
                 TwitchSession.ViewerCount,
-                TwitchSession.CurrentlyLive? null : TwitchVOD,
-                TwitchSession.CurrentlyLive? null : TwitchSession.OfflineAt
+                TwitchSession.CurrentlyLive ? null : TwitchVOD,
+                TwitchSession.CurrentlyLive ? null : TwitchSession.OfflineAt
             );
             await message.ModifyAsync(props => props.Embed = updated);
-            Console.WriteLine($"[Info] Published twitch embed updated");
+            Log($"[Info] Published twitch embed updated");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Warning] TryUpdatePublishedEmbed failed: {ex.Message}");
-            Console.WriteLine($"[Warning] {ex.StackTrace}");
+            Log($"[Warning] TryUpdatePublishedEmbed failed: {ex.Message}");
+            Log($"[Warning] {ex.StackTrace}");
         }
-        
     }
 }
 
-
 public class TwitchVOD
 {
-    public string Url { get; set; } = "";
+    public string Url      { get; set; } = "";
     public string Duration { get; set; } = "";
     public string Viewable { get; set; } = "";
 }
 
-public class StreamSession //persistent until on ofline after on online and then it clears out for next stream
+public class StreamSession
 {
-    public ulong PublishedMessageId  { get; set; } = 0;
-    public ulong PublishedChannelId  { get; set; } = 0;
+    public ulong PublishedMessageId { get; set; } = 0;
+    public ulong PublishedChannelId { get; set; } = 0;
     
     public string TwitchAvatarUrl { get; set; } = "";
-    public string UserId { get; set; } = "";
-    public bool CurrentlyLive { get; set; } = false;
-    public string Title { get; set; } = "";
-    public string GameName { get; set; } = "";
-    public string ThumbnailUrl { get; set; } = "";
-    public int ViewerCount { get; set; } = 0;
-    public DateTimeOffset StartedAt { get; set; } = DateTimeOffset.UtcNow;
-    public DateTimeOffset OfflineAt { get; set; } = DateTimeOffset.MinValue;
+    public string UserId          { get; set; } = "";
+    public bool   CurrentlyLive   { get; set; } = false;
+    public string Title           { get; set; } = "";
+    public string GameName        { get; set; } = "";
+    public string ThumbnailUrl    { get; set; } = "";
+    public int    ViewerCount     { get; set; } = 0;
+    public DateTimeOffset StartedAt  { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset OfflineAt  { get; set; } = DateTimeOffset.MinValue;
 }

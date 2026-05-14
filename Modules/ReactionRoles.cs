@@ -2,29 +2,34 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using DiscordBot.Data;
+
 namespace DiscordBot.Modules;
 
 public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContext>
 {
-    // In-memory setup session per user — keyed by userId
-    // Stores partial data while the user works through the UI steps
     public static readonly Dictionary<ulong, ReactionSetupSession> Sessions = new();
 
     readonly ReactionsData _data;
+    readonly StreamWriter  _log;
 
-    // Discord.NET's DI system injects ReactionsData for you (register it in your service provider)
-    public ReactionRolesModule(ReactionsData data)
+    void Log(string msg)
+    {
+        Console.WriteLine(msg);
+        _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
+    }
+
+    public ReactionRolesModule(ReactionsData data, StreamWriter log)
     {
         _data = data;
+        _log  = log;
     }
     
     [SlashCommand("reactionrole", "Manage your Reaction Roles")]
     public async Task ScheduleMenu()
     {
-
         MessageComponent buttons = new ComponentBuilder()
-            .WithButton("➕ Add",     "rr_btn_add",     ButtonStyle.Primary)
-            .WithButton("🗑️ Remove",  "rr_btn_remove",  ButtonStyle.Danger)
+            .WithButton("➕ Add",    "rr_btn_add",    ButtonStyle.Primary)
+            .WithButton("🗑️ Remove", "rr_btn_remove", ButtonStyle.Danger)
             .Build();
 
         await RespondAsync(
@@ -34,28 +39,22 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    [ComponentInteraction("rr_btn_add",     ignoreGroupNames: true)]
-    public Task OnBtnAdd()     => SetupStart();
+    [ComponentInteraction("rr_btn_add",    ignoreGroupNames: true)]
+    public Task OnBtnAdd()    => SetupStart();
 
-    [ComponentInteraction("rr_btn_remove",  ignoreGroupNames: true)]
-    public Task OnBtnRemove()  => DeleteStart();
+    [ComponentInteraction("rr_btn_remove", ignoreGroupNames: true)]
+    public Task OnBtnRemove() => DeleteStart();
     
+    // ─── STEP 1 ───────────────────────────────────────────────────────────────
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // STEP 1 — Slash command entry point: show a channel select menu
-    // ─────────────────────────────────────────────────────────────────────────
-    
     public async Task SetupStart()
     {
-        // Create (or reset) a session for this user
         Sessions[Context.User.Id] = new ReactionSetupSession();
 
-        // ChannelSelectMenuBuilder lets the user pick any text channel in the guild
-        // Docs: SelectMenuBuilder / ChannelSelectMenuBuilder under Discord.ComponentBuilder
         MessageComponent menu = new ComponentBuilder()
             .WithSelectMenu(new SelectMenuBuilder()
-                .WithCustomId("rr_channel")               // ID we listen for in ComponentInteraction below
-                .WithType(ComponentType.ChannelSelect)    // Renders as a channel picker — no manual population needed
+                .WithCustomId("rr_channel")
+                .WithType(ComponentType.ChannelSelect)
                 .WithPlaceholder("Select the channel")
                 .WithMinValues(1)
                 .WithMaxValues(1))
@@ -64,18 +63,15 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         await RespondAsync(
             "**Step 1:** Choose the channel that contains your target message.",
             components: menu,
-            ephemeral: true // ✅ this locks the whole interaction into ephemeral mode
+            ephemeral: true
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // STEP 2 — User picked a channel; fetch 5 most recent messages & show them
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── STEP 2 ───────────────────────────────────────────────────────────────
 
-    [ComponentInteraction("rr_channel", ignoreGroupNames: true)]  // Fires when the channel select menu is submitted
+    [ComponentInteraction("rr_channel", ignoreGroupNames: true)]
     public async Task OnChannelSelected(string[] selectedValues)
     {
-        // selectedValues[0] is the channel ID as a string
         ulong channelId = ulong.Parse(selectedValues[0]);
 
         if (!Sessions.TryGetValue(Context.User.Id, out ReactionSetupSession? session))
@@ -86,8 +82,6 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
 
         session.ChannelId = channelId;
 
-        // Retrieve the channel from the guild — cast to ITextChannel to access messages
-        // Docs: SocketGuild.GetChannel → cast to ITextChannel → GetMessagesAsync
         ITextChannel? channel = Context.Guild.GetChannel(channelId) as ITextChannel;
         if (channel == null)
         {
@@ -95,11 +89,8 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             return;
         }
 
-        // GetMessagesAsync(limit) — returns the most recent N messages, newest first
         var messages = await channel.GetMessagesAsync(5).FlattenAsync();
 
-        // Build a select menu where each option is a message, labelled by its timestamp
-        // The Value we store is the message's ID (ulong) as a string — we parse it back later
         List<SelectMenuOptionBuilder> options = messages.Select(m => new SelectMenuOptionBuilder()
             .WithLabel($"{m.Author.Username} • {m.Timestamp.ToLocalTime():yyyy-MM-dd HH:mm}")
             .WithValue(m.Id.ToString()))
@@ -129,11 +120,9 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // STEP 3 — User picked a message; ask user to react with specific emoji
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── STEP 3 ───────────────────────────────────────────────────────────────
 
-    [ComponentInteraction("rr_message", ignoreGroupNames: true)]  // Fires when the message select menu is submitted
+    [ComponentInteraction("rr_message", ignoreGroupNames: true)]
     public async Task OnMessageSelected(string[] selectedValues)
     {
         if (!Sessions.TryGetValue(Context.User.Id, out ReactionSetupSession? session))
@@ -142,10 +131,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             return;
         }
 
-        // Save chosen target message
-        session.MessageId = ulong.Parse(selectedValues[0]);
-
-        // Mark session as waiting for emoji reaction input
+        session.MessageId      = ulong.Parse(selectedValues[0]);
         session.WaitingForEmoji = true;
 
         await DeferAsync(ephemeral: true);
@@ -156,11 +142,9 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // STEP 4 — Modal submitted; show role multi-selects (add & remove)
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── STEP 4 ───────────────────────────────────────────────────────────────
 
-    [ModalInteraction("rr_emoji_modal")]  // Fires when the modal is submitted
+    [ModalInteraction("rr_emoji_modal")]
     public async Task OnEmojiSubmitted(ReactionEmojiModal modal)
     {
         if (!Sessions.TryGetValue(Context.User.Id, out ReactionSetupSession? session))
@@ -171,12 +155,10 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
 
         session.Emoji = modal.Emoji.Trim();
 
-        // Build role options from the guild's role list
-        // Filter out @everyone (Id == GuildId) and bot-managed roles
         List<SelectMenuOptionBuilder> roles = Context.Guild.Roles
             .Where(r => r.Id != Context.Guild.Id && !r.IsManaged)
             .OrderByDescending(r => r.Position)
-            .Take(25)  // SelectMenu max options is 25 — Discord API hard limit
+            .Take(25)
             .Select(r => new SelectMenuOptionBuilder()
                 .WithLabel(r.Name)
                 .WithValue(r.Id.ToString()))
@@ -188,7 +170,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
                 .WithPlaceholder("Roles to ADD when reacted")
                 .WithOptions(roles)
                 .WithMinValues(0)
-                .WithMaxValues(roles.Count))  // Allow selecting multiple
+                .WithMaxValues(roles.Count))
             .WithSelectMenu(new SelectMenuBuilder()
                 .WithCustomId("rr_roles_remove")
                 .WithPlaceholder("Roles to REMOVE when reacted")
@@ -207,9 +189,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Role selection handlers — just update session, no response yet
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── ROLE SELECTION ───────────────────────────────────────────────────────
 
     [ComponentInteraction("rr_roles_add", ignoreGroupNames: true)]
     public async Task OnRolesAddSelected(string[] selectedValues)
@@ -220,7 +200,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
                 .Select(ulong.Parse)
                 .ToList();
 
-        await DeferAsync(ephemeral: true);  // Acknowledge without sending a new message
+        await DeferAsync(ephemeral: true);
     }
 
     [ComponentInteraction("rr_roles_remove", ignoreGroupNames: true)]
@@ -235,9 +215,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         await DeferAsync(ephemeral: true);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // STEP 5 — Confirm button: validate, save, react to message
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── STEP 5 — CONFIRM ─────────────────────────────────────────────────────
 
     [ComponentInteraction("rr_confirm", ignoreGroupNames: true)]
     public async Task OnConfirm()
@@ -254,17 +232,15 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             return;
         }
 
-        // Save entry
         _data.AddEntry(new ReactionEntry
         {
-            Message = session.MessageId,
-            Channel = session.ChannelId,
-            Emoji = session.Emoji,
-            RolesToAdd = session.RolesToAdd,
+            Message       = session.MessageId,
+            Channel       = session.ChannelId,
+            Emoji         = session.Emoji,
+            RolesToAdd    = session.RolesToAdd,
             RolesToRemove = session.RolesToRemove
         });
 
-        // Add bot reaction to target message
         ITextChannel? channel = Context.Guild.GetChannel(session.ChannelId) as ITextChannel;
         if (channel != null)
         {
@@ -281,34 +257,29 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
 
         Sessions.Remove(Context.User.Id);
 
-        // IMPORTANT: this MUST be UpdateAsync for button interactions
         if (Context.Interaction is SocketMessageComponent component)
         {
             await component.UpdateAsync(props =>
             {
-                props.Content =
-                    $"✅ Reaction role saved!\nReact with {session.Emoji} on the message to trigger it.";
-                props.Components = null; // removes Step 4 UI cleanly
+                props.Content    = $"✅ Reaction role saved!\nReact with {session.Emoji} on the message to trigger it.";
+                props.Components = null;
             });
 
-            // 🔥 auto-cleanup after user sees it
             _ = Task.Run(async () =>
             {
                 await Task.Delay(4000);
-
                 try
                 {
                     await component.DeleteOriginalResponseAsync();
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[Warning] Failed to delete confirmation message: {ex.Message}");
+                    Log($"[Warning] Failed to delete confirmation message: {ex.Message}");
                 }
             });
         }
         else
         {
-            // fallback safety (rare case)
             await RespondAsync(
                 $"✅ Reaction role saved!\nReact with {session.Emoji} on the message to trigger it.",
                 ephemeral: true
@@ -316,12 +287,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         }
     }
     
-    
-    
-    
-    // ─────────────────────────────────────────────────────────────────────────
-    // /reactionrole delete — show a select menu of all saved entries to remove
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── DELETE START ─────────────────────────────────────────────────────────
     
     public async Task DeleteStart()
     {
@@ -348,7 +314,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         if (options.Count > 25)
         {
             options = options.Take(25).ToList();
-            Console.WriteLine("[Warning] More than 25 reaction role entries — only showing first 25 in delete menu");
+            Log("[Warning] More than 25 reaction role entries — only showing first 25 in delete menu");
         }
 
         MessageComponent menu = new ComponentBuilder()
@@ -367,14 +333,11 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Delete — user picked an entry; confirm before removing
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── DELETE SELECT ────────────────────────────────────────────────────────
 
     [ComponentInteraction("rr_delete_select", ignoreGroupNames: true)]
     public async Task OnDeleteSelected(string[] selectedValues)
     {
-        // Parse all selected entries
         List<(ulong messageId, string emoji)> toDelete = new();
 
         foreach (string value in selectedValues)
@@ -390,11 +353,8 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             return;
         }
 
-        // Build a summary of what will be deleted
         string summary = string.Join("\n", toDelete.Select(e => $"• **{e.emoji}** on message `{e.messageId}`"));
 
-        // Encode all selections into the confirm button's custom ID
-        // Format: rr_delete_confirm_multi — actual data passed via session
         if (!Sessions.TryGetValue(Context.User.Id, out ReactionSetupSession? session))
         {
             session = new ReactionSetupSession();
@@ -404,7 +364,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
 
         MessageComponent components = new ComponentBuilder()
             .WithButton("Yes, delete all", "rr_delete_confirm_multi", ButtonStyle.Danger)
-            .WithButton("Cancel", "rr_delete_cancel", ButtonStyle.Secondary)
+            .WithButton("Cancel",          "rr_delete_cancel",        ButtonStyle.Secondary)
             .Build();
 
         await RespondAsync(
@@ -414,9 +374,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Delete — confirmed; remove from data and clean up bot reaction
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── DELETE CONFIRM ───────────────────────────────────────────────────────
 
     [ComponentInteraction("rr_delete_confirm_multi", ignoreGroupNames: true)]
     public async Task OnDeleteConfirmedMulti()
@@ -438,7 +396,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             _data.RemoveEntry(messageId, emoji);
             deleted++;
 
-            Console.WriteLine($"[Info] Reaction role deleted — message {messageId}, emoji {emoji} by {Context.User.Username}");
+            Log($"[Info] Reaction role deleted — message {messageId}, emoji {emoji} by {Context.User.Username}");
 
             try
             {
@@ -458,7 +416,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Warning] Could not remove bot reaction during delete: {ex.Message}");
+                Log($"[Warning] Could not remove bot reaction during delete: {ex.Message}");
             }
         }
 
@@ -468,7 +426,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         {
             await component.UpdateAsync(props =>
             {
-                props.Content = $"✅ Deleted **{deleted}** reaction role(s).";
+                props.Content    = $"✅ Deleted **{deleted}** reaction role(s).";
                 props.Components = null;
             });
         }
@@ -478,9 +436,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Delete — cancelled
-    // ─────────────────────────────────────────────────────────────────────────
+    // ─── DELETE CANCEL ────────────────────────────────────────────────────────
 
     [ComponentInteraction("rr_delete_cancel", ignoreGroupNames: true)]
     public async Task OnDeleteCancelled()
@@ -489,7 +445,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         {
             await component.UpdateAsync(props =>
             {
-                props.Content = "Deletion cancelled.";
+                props.Content    = "Deletion cancelled.";
                 props.Components = null;
             });
         }
@@ -500,10 +456,6 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Modal data class — Discord.NET maps modal fields to properties automatically
-// Property name must match the TextInput CustomId
-// ─────────────────────────────────────────────────────────────────────────────
 public class ReactionEmojiModal : IModal
 {
     public string Title => "Reaction Role — Emoji";
@@ -513,16 +465,13 @@ public class ReactionEmojiModal : IModal
     public string Emoji { get; set; } = "";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Session model — holds state between UI steps for one user
-// ─────────────────────────────────────────────────────────────────────────────
 public class ReactionSetupSession
 {
     public List<(ulong messageId, string emoji)>? PendingDeletes { get; set; }
-    public bool WaitingForEmoji { get; set; } //reaction capture state
-    public ulong ChannelId  { get; set; }
-    public ulong MessageId  { get; set; }
-    public string? Emoji     { get; set; } = "";
+    public bool   WaitingForEmoji { get; set; }
+    public ulong  ChannelId       { get; set; }
+    public ulong  MessageId       { get; set; }
+    public string? Emoji          { get; set; } = "";
     public List<ulong> RolesToAdd    { get; set; } = new();
     public List<ulong> RolesToRemove { get; set; } = new();
 }

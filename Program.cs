@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using DiscordBot.Modules;
 using TwitchLib.EventSub.Websockets.Extensions;
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // c# version 9+ does not use main class void structure, allows writing top level
 // statements - essentially code that runs directly without a class wrapper
@@ -19,6 +20,14 @@ DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
                    | GatewayIntents.GuildMembers,
     LogLevel = LogSeverity.Info
 });
+
+StreamWriter logFile = new StreamWriter("bot-log.txt", append: false) { AutoFlush = true };
+
+void Log(string msg)
+{
+    Log(msg);
+    logFile.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Service provider — registers singletons for DI injection into modules
@@ -44,21 +53,8 @@ ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
 // => {} is a lambda meaning an anonymous function
 // ─────────────────────────────────────────────────────────────────────────────
 
-client.Log += log =>
-{
-    Console.WriteLine($"[{log.Severity}] {log.Source}: {log.Message}");
-    if (log.Exception != null)
-        Console.WriteLine($"    Exception: {log.Exception}");
-    return Task.CompletedTask;
-};
-
-interactions.Log += log =>
-{
-    Console.WriteLine($"[{log.Severity}] Interactions/{log.Source}: {log.Message}");
-    if (log.Exception != null)
-        Console.WriteLine($"    Exception: {log.Exception}");
-    return Task.CompletedTask;
-};
+client.Log += log => { Log($"[{log.Severity}] {log.Source}: {log.Message}"); if (log.Exception != null) Log($"    Exception: {log.Exception}"); return Task.CompletedTask; };
+interactions.Log += log => { Log($"[{log.Severity}] Interactions/{log.Source}: {log.Message}"); if (log.Exception != null) Log($"    Exception: {log.Exception}"); return Task.CompletedTask; };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ready — registers slash commands and logs startup info
@@ -75,7 +71,7 @@ client.Ready += async () =>
     //      foreach (var guild in client.Guilds)
     //      {
     //          await guild.DeleteApplicationCommandsAsync();
-    //          Console.WriteLine($"[Info] Cleared commands for {guild.Name}");
+    //          Log($"[Info] Cleared commands for {guild.Name}");
     //      }
     
     await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services); //adds Schedule and ReactionROle because both derive from IInteractionModuleBase
@@ -84,14 +80,14 @@ client.Ready += async () =>
     // // Switch to RegisterCommandsGloballyAsync() for production (up to 1hr propagation)
     await interactions.RegisterCommandsToGuildAsync(Config.GuildId, deleteMissing: true);
     
-    Console.WriteLine($"[Info] Bot is ready — logged in as {client.CurrentUser.Username}#{client.CurrentUser.Discriminator}");
-    Console.WriteLine($"[Info] Serving {client.Guilds.Count} guild(s)");
+    Log($"[Info] Bot is ready — logged in as {client.CurrentUser.Username}#{client.CurrentUser.Discriminator}");
+    Log($"[Info] Serving {client.Guilds.Count} guild(s)");
     foreach (var guild in client.Guilds)
     {
-        Console.WriteLine($"[Info] Serving {guild.Name} (ID: {guild.Id}) — {guild.MemberCount} members");
+        Log($"[Info] Serving {guild.Name} (ID: {guild.Id}) — {guild.MemberCount} members");
     }
     
-    Console.WriteLine($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
+    Log($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
     
     await services.GetRequiredService<Twitch_Notifier>().StartAsync(); //starts specific module Twitch_notifier
 };
@@ -105,12 +101,12 @@ client.InteractionCreated += async interaction =>
     SocketInteractionContext ctx = new SocketInteractionContext(client, interaction);
     
     // Log what's coming in to confirm routing
-    Console.WriteLine($"[Debug] Interaction received: {interaction.Type} — {(interaction is SocketMessageComponent c ? c.Data.CustomId : "N/A")}");
+    Log($"[Debug] Interaction received: {interaction.Type} — {(interaction is SocketMessageComponent c ? c.Data.CustomId : "N/A")}");
     
     var result = await interactions.ExecuteCommandAsync(ctx, services); //routes to correct module based on called slash command
 
     if (!result.IsSuccess)
-        Console.WriteLine($"[Warning] Interaction failed: {result.Error} — {result.ErrorReason}");
+        Log($"[Warning] Interaction failed: {result.Error} — {result.ErrorReason}");
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -119,17 +115,17 @@ client.InteractionCreated += async interaction =>
 
 client.UserJoined += async member =>
 {
-    Console.WriteLine($"[Info] {member.Username} joined {member.Guild.Name}");
+    Log($"[Info] {member.Username} joined {member.Guild.Name}");
 
     SocketRole role = member.Guild.GetRole(Config.AutoRoleId);
     if (role != null)
     {
         await member.AddRoleAsync(role, new RequestOptions { AuditLogReason = "Auto role for new member" });
-        Console.WriteLine($"[Info] Auto role '{role.Name}' assigned to {member.Username}");
+        Log($"[Info] Auto role '{role.Name}' assigned to {member.Username}");
     }
     else
     {
-        Console.WriteLine($"[Warning] Auto role ID {Config.AutoRoleId} not found in {member.Guild.Name}");
+        Log($"[Warning] Auto role ID {Config.AutoRoleId} not found in {member.Guild.Name}");
     }
 
     if (member.Guild.GetChannel(Config.WelcomeChannelId) is IMessageChannel channel)
@@ -138,11 +134,11 @@ client.UserJoined += async member =>
             .Replace("{user}", member.Mention)
             .Replace("{server}", member.Guild.Name);
         await channel.SendMessageAsync(msg);
-        Console.WriteLine($"[Info] Welcome message sent for {member.Username}");
+        Log($"[Info] Welcome message sent for {member.Username}");
     }
     else
     {
-        Console.WriteLine($"[Warning] Welcome channel ID {Config.WelcomeChannelId} not found");
+        Log($"[Warning] Welcome channel ID {Config.WelcomeChannelId} not found");
     }
 };
 
@@ -168,7 +164,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     IMessageChannel? resolvedChannel = await channelRef.GetOrDownloadAsync();
     if (resolvedChannel is not IGuildChannel guildChannel)
     {
-        Console.WriteLine("[Warning] ReactionAdded: reaction was not in a guild channel");
+        Log("[Warning] ReactionAdded: reaction was not in a guild channel");
         return;
     }
 
@@ -193,7 +189,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
             session.Emoji = reaction.Emote?.ToString();
             session.WaitingForEmoji = false;
 
-            Console.WriteLine($"[Setup] Captured emoji: {session.Emoji} for user {reaction.UserId}");
+            Log($"[Setup] Captured emoji: {session.Emoji} for user {reaction.UserId}");
 
             // Clean up user's setup reaction for cleaner UX
             try
@@ -204,7 +200,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Warning] Failed to remove setup reaction: {ex.Message}");
+                Log($"[Warning] Failed to remove setup reaction: {ex.Message}");
             }
 
             // ─────────────────────────────────────────────────────────────
@@ -259,11 +255,11 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     SocketGuildUser? member = guild.GetUser(reaction.UserId);
     if (member == null)
     {
-        Console.WriteLine($"[Warning] ReactionAdded: could not resolve member {reaction.UserId}");
+        Log($"[Warning] ReactionAdded: could not resolve member {reaction.UserId}");
         return;
     }
 
-    Console.WriteLine($"[Info] Reaction role triggered by {member.Username} on message {msg.Id} with {reaction.Emote}");
+    Log($"[Info] Reaction role triggered by {member.Username} on message {msg.Id} with {reaction.Emote}");
 
     // ─────────────────────────────────────────────────────────────
     // ROLE HANDLING
@@ -272,13 +268,13 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     if (entry.RolesToAdd.Count > 0)
     {
         await member.AddRolesAsync(entry.RolesToAdd);
-        Console.WriteLine($"[Info] Added {entry.RolesToAdd.Count} role(s) to {member.Username}");
+        Log($"[Info] Added {entry.RolesToAdd.Count} role(s) to {member.Username}");
     }
 
     if (entry.RolesToRemove.Count > 0)
     {
         await member.RemoveRolesAsync(entry.RolesToRemove);
-        Console.WriteLine($"[Info] Removed {entry.RolesToRemove.Count} role(s) from {member.Username}");
+        Log($"[Info] Removed {entry.RolesToRemove.Count} role(s) from {member.Username}");
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -292,7 +288,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[Warning] Failed to remove reaction: {ex.Message}");
+        Log($"[Warning] Failed to remove reaction: {ex.Message}");
     }
 };
 
@@ -300,8 +296,8 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
 // Login and run — verifies token and blocks forever
 // ─────────────────────────────────────────────────────────────────────────────
 
-Console.WriteLine("[Info] Logging in...");
+Log("[Info] Logging in...");
 await client.LoginAsync(TokenType.Bot, Config.BotToken);
 await client.StartAsync();
-Console.WriteLine("[Info] Bot started — waiting for events");
+Log("[Info] Bot started — waiting for events");
 await Task.Delay(Timeout.Infinite);
