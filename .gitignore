@@ -1,3 +1,26 @@
-Config.cs
+# Secrets / local config
+#Config.cs
+
+# Build output
 bin/
 obj/
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# Visual Studio
+.vs/
+
+# Logs
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Publish output
+publish/
+
+# Test output
+TestResults/
