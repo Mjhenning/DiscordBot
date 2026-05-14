@@ -43,8 +43,6 @@ public class Twitch_Notifier
         _eventSubClient = eventSubClient;
         _log = log;
         
-        Log($"[Info] SuggestionsPoster/Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
-        
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
         
         _eventSubClient.StreamOnline  += OnStreamOnline; 
@@ -116,7 +114,9 @@ public class Twitch_Notifier
         TwitchApi.Settings.ClientId    = Config.TwitchClientId;
         TwitchApi.Settings.AccessToken = _token;
         
+        Log($"[Info] Calling ConnectAsync — token null: {TwitchApi.Settings.AccessToken == null}");
         await _eventSubClient.ConnectAsync();
+        Log($"[Info] ConnectAsync returned");
     }
 
     // ─── ONLINE ──────────────────────────────────────────────────────────────

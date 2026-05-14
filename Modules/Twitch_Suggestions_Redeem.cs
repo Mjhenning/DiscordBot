@@ -29,8 +29,6 @@ public class TwitchSuggestionsPoster
         _eventSubClient = eventSubClient;
         _log = log;
         
-        Log($"[Info] SuggestionsPoster/Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
-        
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
         _eventSubClient.ChannelPointsCustomRewardRedemptionUpdate += OnRewardRedemptionUpdated;
         
