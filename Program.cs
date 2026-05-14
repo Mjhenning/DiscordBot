@@ -109,6 +109,7 @@ client.Ready += async () =>
     _ = Task.Run(async () =>
     {
         services.GetRequiredService<TwitchSuggestionsPoster>();
+        services.GetRequiredService<TwitchSuggestionsPoster>().StartAsync();
         await services.GetRequiredService<Twitch_Notifier>().StartAsync();
     });
 };

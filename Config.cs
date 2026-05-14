@@ -20,6 +20,7 @@ public static class Config
 
     public const ulong TwitchNotifyChannelId = 1487776641248792778;
     public const ulong LiveRoleId = 1488566096935260221;
+    public const string BroadcasterRefreshToken = "txymqu9mmqlb1cn0alfmma7q5uqalcu5rvg2uy8mcbvx6yojeo";
 
 
     public const string SuggestRewardId = "f379d2f4-202d-48fd-929a-bb830a2f3a32";

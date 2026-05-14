@@ -1,5 +1,6 @@
 using Discord;
 using Discord.WebSocket;
+using Newtonsoft.Json;
 using TwitchLib.Api;
 using TwitchLib.Api.Helix.Models.Users.GetUsers;
 using TwitchLib.EventSub.Core.EventArgs.Channel;
@@ -11,10 +12,13 @@ namespace DiscordBot.Modules;
 public class TwitchSuggestionsPoster
 {
     readonly EventSubWebsocketClient _eventSubClient;
-    private readonly DiscordSocketClient _discordSocket;
-    private readonly TwitchAPI TwitchApi;
+    readonly DiscordSocketClient _discordSocket;
+    readonly TwitchAPI TwitchApi;
     
-    private readonly StreamWriter _log;
+    readonly StreamWriter _log;
+    
+    readonly HttpClient _http = new() { BaseAddress = new Uri("https://id.twitch.tv/oauth2/token") };
+    string _userAccessToken = "";
     
     void Log(string msg)
     {
@@ -35,13 +39,41 @@ public class TwitchSuggestionsPoster
         _discordSocket.InteractionCreated += OnInteractionCreated;
     }
     
+    public async Task StartAsync()
+    {
+        FormUrlEncodedContent request = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("client_id",     Config.TwitchClientId),
+            new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
+            new KeyValuePair<string, string>("grant_type",    "refresh_token"),
+            new KeyValuePair<string, string>("refresh_token", Config.BroadcasterRefreshToken),
+        });
+
+        try
+        {
+            var response = await _http.PostAsync(_http.BaseAddress, request);
+            string json  = await response.Content.ReadAsStringAsync();
+            var parsed   = JsonConvert.DeserializeObject<TwitchTokenResponse>(json);
+            _userAccessToken = parsed?.AccessToken ?? "";
+            Log($"[Info] SuggestionsPoster user token fetched: {(_userAccessToken != "" ? "success" : "failed")}");
+        }
+        catch (Exception e)
+        {
+            Log($"[Error] SuggestionsPoster token fetch failed: {e.Message}");
+        }
+    }
+    
     async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
         if (!e.IsRequestedReconnect)
         {
             try
             {
-                await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                var userApi = new TwitchAPI();
+                userApi.Settings.ClientId    = Config.TwitchClientId;
+                userApi.Settings.AccessToken = _userAccessToken;
+
+                await userApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
                     "channel.channel_points_custom_reward_redemption.update",
                     "1",
                     new Dictionary<string, string>
