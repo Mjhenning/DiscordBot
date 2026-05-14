@@ -106,8 +106,8 @@ client.Ready += async () =>
     
     Log($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
     
-    await services.GetRequiredService<Twitch_Notifier>().StartAsync(); //starts specific module Twitch_notifier
     services.GetRequiredService<TwitchSuggestionsPoster>();
+    await services.GetRequiredService<Twitch_Notifier>().StartAsync(); //starts specific module Twitch_notifier
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

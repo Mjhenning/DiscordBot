@@ -48,7 +48,7 @@ public class TwitchSuggestionsPoster
                     { "broadcaster_user_id", Config.TwitchUserId },
                     { "reward_id", Config.SuggestRewardId}
                 },
-                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Webhook,
+                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
                 _eventSubClient.SessionId
             );
         }
