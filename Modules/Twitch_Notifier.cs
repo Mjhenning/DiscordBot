@@ -1,17 +1,15 @@
 using TwitchLib.Api.Helix.Models.Videos.GetVideos;
 using TwitchLib.EventSub.Websockets.Core.EventArgs;
-
-namespace DiscordBot.Modules;
-
-using Discord.WebSocket;
-using Discord;
-
 using TwitchLib.Api;
 using TwitchLib.Api.Helix.Models.Users.GetUsers;
 using TwitchLib.EventSub.Websockets;
 using TwitchLib.EventSub.Websockets.Core.EventArgs.Channel;
 using TwitchLib.EventSub.Websockets.Core.EventArgs.Stream;
 using TwitchLib.Api.Helix.Models.Streams.GetStreams;
+
+namespace DiscordBot.Modules;
+using Discord.WebSocket;
+using Discord;
 
 using Newtonsoft.Json;
 

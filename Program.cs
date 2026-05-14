@@ -46,6 +46,7 @@ ServiceProvider services = new ServiceCollection()
     .AddTwitchLibEventSubWebsockets() //creates websocket to inject in twitch_notifier
     .AddLogging() //Adds ILogger support
     .AddSingleton<Twitch_Notifier>()
+    .AddSingleton<TwitchSuggestionsPoster>()
     .BuildServiceProvider();
 
 InteractionService interactions = services.GetRequiredService<InteractionService>();
@@ -104,6 +105,7 @@ client.Ready += async () =>
     Log($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
     
     await services.GetRequiredService<Twitch_Notifier>().StartAsync(); //starts specific module Twitch_notifier
+    services.GetRequiredService<TwitchSuggestionsPoster>();
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +114,10 @@ client.Ready += async () =>
 
 client.InteractionCreated += async interaction =>
 {
+    
+    // Let button components be handled by their own registered handlers
+    if (interaction is SocketMessageComponent) return;
+    
     SocketInteractionContext ctx = new SocketInteractionContext(client, interaction);
     
     // Log what's coming in to confirm routing

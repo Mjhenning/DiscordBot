@@ -21,6 +21,10 @@ public static class Config
     public const ulong TwitchNotifyChannelId = 1487776641248792778;
     public const ulong LiveRoleId = 1488566096935260221;
 
+
+    public const string SuggestRewardId = "f379d2f4-202d-48fd-929a-bb830a2f3a32";
+    public const ulong SuggestionChannelId = 1504438238058905732;
+
     // -----------------------------
     // Welcome / Auto Role
     // -----------------------------
