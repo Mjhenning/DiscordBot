@@ -43,6 +43,8 @@ public class Twitch_Notifier
         _eventSubClient = eventSubClient;
         _log = log;
         
+        Log($"[Info] SuggestionsPoster/Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
+        
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
         
         _eventSubClient.StreamOnline  += OnStreamOnline; 
@@ -54,7 +56,6 @@ public class Twitch_Notifier
     
     async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
-        Log($"[Info] EventSubWebsocketClient instance hash: {_eventSubClient.GetHashCode()}");
         if (!e.IsRequestedReconnect)
         {
             await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(

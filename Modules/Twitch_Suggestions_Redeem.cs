@@ -29,8 +29,9 @@ public class TwitchSuggestionsPoster
         _eventSubClient = eventSubClient;
         _log = log;
         
+        Log($"[Info] SuggestionsPoster/Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
+        
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
-        Log("[Info] SuggestionsPoster WebsocketConnected handler attached");
         _eventSubClient.ChannelPointsCustomRewardRedemptionUpdate += OnRewardRedemptionUpdated;
         
         _discordSocket = discordSocket;
@@ -39,8 +40,6 @@ public class TwitchSuggestionsPoster
     
     async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
-        Log($"[Info] EventSubWebsocketClient instance hash: {_eventSubClient.GetHashCode()}");
-    
         if (!e.IsRequestedReconnect)
         {
             try
