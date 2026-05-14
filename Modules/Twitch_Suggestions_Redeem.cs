@@ -39,7 +39,7 @@ public class TwitchSuggestionsPoster
     
     async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
-        Log($"[Info] SuggestionsPoster WebsocketConnected fired — IsReconnect: {e.IsRequestedReconnect}");
+        Log($"[Info] EventSubWebsocketClient instance hash: {_eventSubClient.GetHashCode()}");
     
         if (!e.IsRequestedReconnect)
         {
