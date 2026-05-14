@@ -112,7 +112,7 @@ public class TwitchSuggestionsPoster
             new List<string>() { userName }
         );
 
-        await PostToDiscord(userName, redemption.UserInput, userResult.Users[0].ProfileImageUrl, $"www.twitch.tv/{userName}");
+        await PostToDiscord(userName, redemption.UserInput, userResult.Users[0].ProfileImageUrl, $"https://www.twitch.tv/{userName}");
     }
 
     async Task PostToDiscord(string user, string input, string avatarUrl, string userUrl = "")
@@ -124,11 +124,8 @@ public class TwitchSuggestionsPoster
             .WithButton("Mark Complete", "suggestion_complete", ButtonStyle.Success)
             .Build();
 
-        Log($"[Info] Componenets sucessfully setup for embed");
-
         Embed embed = BuildTwitchEmbed(user, input, avatarUrl, userUrl);
-
-        Log($"[Info] EMbed created");
+        
         IUserMessage posted = await channel.SendMessageAsync(embed: embed, components: components);
 
         Log($"[Info] Suggestion published to #{channel.Name} (msg: {posted.Id})");
