@@ -54,6 +54,15 @@ public class Twitch_Notifier
         _eventSubClient.WebsocketConnected    += (s, e) => Log("[Info] Websocket connected");
         _eventSubClient.WebsocketDisconnected += (s, e) => Log("[Warning] Websocket disconnected");
         _eventSubClient.ErrorOccurred         += (s, e) => Log($"[Error] Websocket error: {e.Message}");
+        
+        _eventSubClient.ErrorOccurred += (s, e) => 
+        {
+            Log($"[Error] Websocket error type: {e.GetType().FullName}");
+            foreach (var prop in e.GetType().GetProperties())
+            {
+                Log($"[Error] {prop.Name}: {prop.GetValue(e)}");
+            }
+        };
     }
     
     async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
