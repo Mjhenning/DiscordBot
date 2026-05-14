@@ -25,8 +25,10 @@ StreamWriter logFile = new StreamWriter("bot-log.txt", append: false) { AutoFlus
 
 void Log(string msg)
 {
-    Log(msg);
-    logFile.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
+    string line = $"[{DateTime.UtcNow:HH:mm:ss}] {msg}";
+    logFile.WriteLine(line);
+    logFile.Flush();
+    System.Console.WriteLine(line); // explicit System.Console to avoid any ambiguity
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,6 +42,7 @@ ServiceProvider services = new ServiceCollection()
     ))
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
+    .AddSingleton(logFile) 
     .AddTwitchLibEventSubWebsockets() //creates websocket to inject in twitch_notifier
     .AddLogging() //Adds ILogger support
     .AddSingleton<Twitch_Notifier>()
@@ -53,8 +56,19 @@ ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
 // => {} is a lambda meaning an anonymous function
 // ─────────────────────────────────────────────────────────────────────────────
 
-client.Log += log => { Log($"[{log.Severity}] {log.Source}: {log.Message}"); if (log.Exception != null) Log($"    Exception: {log.Exception}"); return Task.CompletedTask; };
-interactions.Log += log => { Log($"[{log.Severity}] Interactions/{log.Source}: {log.Message}"); if (log.Exception != null) Log($"    Exception: {log.Exception}"); return Task.CompletedTask; };
+client.Log += log =>
+{
+    Log($"[{log.Severity}] {log.Source}: {log.Message}");
+    if (log.Exception != null) Log($"    Exception: {log.Exception}");
+    return Task.CompletedTask;
+};
+
+interactions.Log += log =>
+{
+    Log($"[{log.Severity}] Interactions/{log.Source}: {log.Message}");
+    if (log.Exception != null) Log($"    Exception: {log.Exception}");
+    return Task.CompletedTask;
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ready — registers slash commands and logs startup info
