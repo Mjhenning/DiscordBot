@@ -114,9 +114,7 @@ public class Twitch_Notifier
         TwitchApi.Settings.ClientId    = Config.TwitchClientId;
         TwitchApi.Settings.AccessToken = _token;
         
-        Log($"[Info] Calling ConnectAsync — token null: {TwitchApi.Settings.AccessToken == null}");
         await _eventSubClient.ConnectAsync();
-        Log($"[Info] ConnectAsync returned");
     }
 
     // ─── ONLINE ──────────────────────────────────────────────────────────────

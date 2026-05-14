@@ -108,6 +108,9 @@ client.Ready += async () =>
     
     services.GetRequiredService<TwitchSuggestionsPoster>();
     await services.GetRequiredService<Twitch_Notifier>().StartAsync();
+    
+    await Task.Delay(3000); // give websocket time to actually connect
+    Log("[Info] 3 seconds after ConnectAsync");
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
