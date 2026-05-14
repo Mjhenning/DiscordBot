@@ -111,6 +111,8 @@ public class TwitchSuggestionsPoster
             null,
             new List<string>() { userName }
         );
+        
+        Log($"[Info] User Avatar URL Grabbed — user is '{userResult.Users[0].ProfileImageUrl}', not fulfilled");
 
         await PostToDiscord(userName, redemption.UserInput, userResult.Users[0].ProfileImageUrl, $"www.twitch.tv/{userName}");
     }
