@@ -111,8 +111,6 @@ public class TwitchSuggestionsPoster
             null,
             new List<string>() { userName }
         );
-        
-        Log($"[Info] User Avatar URL Grabbed — user is '{userResult.Users[0].ProfileImageUrl}', not fulfilled");
 
         await PostToDiscord(userName, redemption.UserInput, userResult.Users[0].ProfileImageUrl, $"www.twitch.tv/{userName}");
     }
@@ -126,17 +124,15 @@ public class TwitchSuggestionsPoster
             .WithButton("Mark Complete", "suggestion_complete", ButtonStyle.Success)
             .Build();
 
+        Log($"[Info] Componenets sucessfully setup for embed");
+
         Embed embed = BuildTwitchEmbed(user, input, avatarUrl, userUrl);
+
+        Log($"[Info] EMbed created");
         IUserMessage posted = await channel.SendMessageAsync(embed: embed, components: components);
 
         Log($"[Info] Suggestion published to #{channel.Name} (msg: {posted.Id})");
     }
-    
-    
-    
-    
-    
-    
     
     Embed BuildTwitchEmbed(
         string userName,
