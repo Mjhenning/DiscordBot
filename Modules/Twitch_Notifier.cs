@@ -50,6 +50,10 @@ public class Twitch_Notifier
         _eventSubClient.ChannelUpdate += OnChannelUpdate;
 
         _discordSocket = discordSocket;
+        
+        _eventSubClient.WebsocketConnected    += (s, e) => Log("[Info] Websocket connected");
+        _eventSubClient.WebsocketDisconnected += (s, e) => Log("[Warning] Websocket disconnected");
+        _eventSubClient.ErrorOccurred         += (s, e) => Log($"[Error] Websocket error: {e.Message}");
     }
     
     async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
