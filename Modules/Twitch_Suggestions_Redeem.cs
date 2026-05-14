@@ -38,27 +38,43 @@ public class TwitchSuggestionsPoster
     
     async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
+        Log($"[Info] SuggestionsPoster WebsocketConnected fired — IsReconnect: {e.IsRequestedReconnect}");
+    
         if (!e.IsRequestedReconnect)
         {
-            await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
-                "channel.channel_points_custom_reward_redemption.update",
-                "1",
-                new Dictionary<string, string>
-                {
-                    { "broadcaster_user_id", Config.TwitchUserId },
-                    { "reward_id", Config.SuggestRewardId}
-                },
-                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
-                _eventSubClient.SessionId
-            );
+            try
+            {
+                await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                    "channel.channel_points_custom_reward_redemption.update",
+                    "1",
+                    new Dictionary<string, string>
+                    {
+                        { "broadcaster_user_id", Config.TwitchUserId },
+                        { "reward_id", Config.SuggestRewardId }
+                    },
+                    TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                    _eventSubClient.SessionId
+                );
+                Log("[Info] SuggestionsPoster EventSub subscription created successfully");
+            }
+            catch (Exception ex)
+            {
+                Log($"[Error] SuggestionsPoster subscription failed: {ex.Message}");
+                Log($"[Error] Inner: {ex.InnerException?.Message}");
+            }
         }
     }
 
     async void OnRewardRedemptionUpdated(object? sender, ChannelPointsCustomRewardRedemptionArgs args)
     {
         var redemption = args.Notification.Payload.Event;
+        Log($"[Info] Redemption event received — Status: {redemption.Status}, User: {redemption.UserName}");
 
-        if (redemption.Status != "fulfilled") return;
+        if (redemption.Status != "fulfilled")
+        {
+            Log($"[Info] Skipping — status is '{redemption.Status}', not fulfilled");
+            return;
+        }
         
         string userName  = redemption.UserName;
         
