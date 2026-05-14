@@ -106,9 +106,7 @@ client.Ready += async () =>
     
     Log($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
     
-    Log("[Info] Resolving TwitchSuggestionsPoster...");
     services.GetRequiredService<TwitchSuggestionsPoster>();
-    Log("[Info] TwitchSuggestionsPoster resolved");
     await services.GetRequiredService<Twitch_Notifier>().StartAsync();
 };
 

@@ -54,6 +54,7 @@ public class Twitch_Notifier
     
     async void OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
+        Log($"[Info] Notifier WebsocketConnected fired — SessionId: {_eventSubClient.SessionId}");
         if (!e.IsRequestedReconnect)
         {
             await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(

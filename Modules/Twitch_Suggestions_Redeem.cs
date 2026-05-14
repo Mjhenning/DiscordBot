@@ -30,6 +30,7 @@ public class TwitchSuggestionsPoster
         _log = log;
         
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
+        Log("[Info] SuggestionsPoster WebsocketConnected handler attached");
         _eventSubClient.ChannelPointsCustomRewardRedemptionUpdate += OnRewardRedemptionUpdated;
         
         _discordSocket = discordSocket;
