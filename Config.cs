@@ -19,7 +19,7 @@ public static class Config
     public const string TwitchChannelUrl = "https://www.twitch.tv/f0xta1l";
 
     public const ulong TwitchNotifyChannelId = 1487776641248792778;
-    public const ulong LiveRoleId = 1488566096935260221;
+    public const ulong LiveRoleId = 1487773080251142225;
     public const string BroadcasterRefreshToken = "txymqu9mmqlb1cn0alfmma7q5uqalcu5rvg2uy8mcbvx6yojeo";
 
 

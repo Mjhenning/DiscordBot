@@ -121,7 +121,8 @@ client.InteractionCreated += async interaction =>
 {
     
     // Let button components be handled by their own registered handlers
-    if (interaction is SocketMessageComponent) return;
+    if (interaction is SocketMessageComponent component && component.Data.CustomId == "suggestion_complete") 
+        return;
     
     SocketInteractionContext ctx = new SocketInteractionContext(client, interaction);
     
