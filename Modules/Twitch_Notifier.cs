@@ -43,47 +43,92 @@ public class Twitch_Notifier
         _eventSubClient = eventSubClient;
         _log = log;
         
-        _eventSubClient.WebsocketConnected += OnWebsocketConnected;
+        Log("[Info] Twitch_Notifier constructor called");
+        Log($"[Info] Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
+        
+        _eventSubClient.WebsocketConnected    += OnWebsocketConnected;
+        _eventSubClient.WebsocketDisconnected += (s, e) =>
+        {
+            Log("[Warning] Notifier websocket disconnected");
+            return Task.CompletedTask;
+        };
+
+        _eventSubClient.ErrorOccurred += (s, e) =>
+        {
+            Log("[Error] Notifier websocket error occurred");
+            foreach (var prop in e.GetType().GetProperties())
+                Log($"[Error]   {prop.Name}: {prop.GetValue(e)}");
+            return Task.CompletedTask;
+        };
         
         _eventSubClient.StreamOnline  += OnStreamOnline; 
         _eventSubClient.StreamOffline += OnStreamOffline;
         _eventSubClient.ChannelUpdate += OnChannelUpdate;
 
         _discordSocket = discordSocket;
+        
+        Log("[Info] Twitch_Notifier constructor complete — all handlers attached");
     }
     
     async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
+        Log($"[Info] Notifier OnWebsocketConnected fired — IsReconnect: {e.IsRequestedReconnect}, SessionId: {_eventSubClient.SessionId}");
+        
         if (!e.IsRequestedReconnect)
         {
-            await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
-                "stream.online",
-                "1",
-                new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
-                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
-                _eventSubClient.SessionId
-            );
+            try
+            {
+                Log("[Info] Creating stream.online subscription...");
+                await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                    "stream.online",
+                    "1",
+                    new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
+                    TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                    _eventSubClient.SessionId
+                );
+                Log("[Info] stream.online subscription created");
+            }
+            catch (Exception ex) { Log($"[Error] stream.online subscription failed: {ex.Message}"); }
         
-            await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
-                "stream.offline",           
-                "1",                       
-                new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
-                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
-                _eventSubClient.SessionId  
-            );
+            try
+            {
+                Log("[Info] Creating stream.offline subscription...");
+                await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                    "stream.offline",           
+                    "1",                       
+                    new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
+                    TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                    _eventSubClient.SessionId  
+                );
+                Log("[Info] stream.offline subscription created");
+            }
+            catch (Exception ex) { Log($"[Error] stream.offline subscription failed: {ex.Message}"); }
             
-            await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
-                "channel.update",           
-                "2",                       
-                new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
-                TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
-                _eventSubClient.SessionId  
-            );
+            try
+            {
+                Log("[Info] Creating channel.update subscription...");
+                await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                    "channel.update",           
+                    "2",                       
+                    new Dictionary<string, string> { { "broadcaster_user_id", Config.TwitchUserId } },
+                    TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                    _eventSubClient.SessionId  
+                );
+                Log("[Info] channel.update subscription created");
+            }
+            catch (Exception ex) { Log($"[Error] channel.update subscription failed: {ex.Message}"); }
+            
+            Log("[Info] Notifier OnWebsocketConnected complete");
+        }
+        else
+        {
+            Log("[Info] Reconnect detected — skipping subscription creation");
         }
     }
     
     public async Task<string?> GetAppToken()
     {
+        Log("[Info] Fetching app token...");
         FormUrlEncodedContent tokenRequest = new FormUrlEncodedContent(new[]
         {
             new KeyValuePair<string, string>("client_id",     Config.TwitchClientId),
@@ -95,6 +140,7 @@ public class Twitch_Notifier
         try
         {
             var asyncResponse = await HttpClient.PostAsync(HttpClient.BaseAddress, tokenRequest);
+            Log($"[Info] Token HTTP status: {asyncResponse.StatusCode}");
             string json = await asyncResponse.Content.ReadAsStringAsync();
             response = JsonConvert.DeserializeObject<TwitchTokenResponse>(json) ?? new TwitchTokenResponse();
         }
@@ -108,52 +154,78 @@ public class Twitch_Notifier
 
     public async Task StartAsync()
     {
+        Log("[Info] Notifier StartAsync called");
+        
         string? _token = await GetAppToken();
         Log($"[Info] Twitch app token fetched: {(_token != null ? "success" : "failed")}");
 
         TwitchApi.Settings.ClientId    = Config.TwitchClientId;
         TwitchApi.Settings.AccessToken = _token;
         
+        Log("[Info] TwitchApi credentials set — calling ConnectAsync");
         await _eventSubClient.ConnectAsync();
+        Log("[Info] ConnectAsync returned");
     }
 
     // ─── ONLINE ──────────────────────────────────────────────────────────────
 
     async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
     {
-        GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
-            null, 1, null, null, null,
-            new List<string>() { Config.TwitchChannelName }
-        );
+        Log("[Info] OnStreamOnline fired");
+        try
+        {
+            GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
+                null, 1, null, null, null,
+                new List<string>() { Config.TwitchChannelName }
+            );
+            Log($"[Info] GetStreams returned {result?.Streams?.Length ?? 0} stream(s)");
 
-        GetUsersResponse? userResult = await TwitchApi.Helix.Users.GetUsersAsync(
-            null,
-            new List<string>() { Config.TwitchChannelName }
-        );
-        
-        TwitchSession.TwitchAvatarUrl = userResult.Users[0].ProfileImageUrl;
-        TwitchSession.UserId          = result.Streams[0].UserId;
-        TwitchSession.CurrentlyLive   = true;
-        TwitchSession.Title           = result.Streams[0].Title;
-        TwitchSession.GameName        = result.Streams[0].GameName;
-        TwitchSession.ThumbnailUrl    = result.Streams[0].ThumbnailUrl
-            .Replace("{width}", "1920")
-            .Replace("{height}", "1080");
-        TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
-        TwitchSession.StartedAt    = new DateTimeOffset(result.Streams[0].StartedAt, TimeSpan.Zero);
-        
-        await OnStreamReceived();
+            if (result?.Streams == null || result.Streams.Length == 0)
+            {
+                Log("[Warning] OnStreamOnline: no streams returned, aborting");
+                return;
+            }
+
+            GetUsersResponse? userResult = await TwitchApi.Helix.Users.GetUsersAsync(
+                null,
+                new List<string>() { Config.TwitchChannelName }
+            );
+            Log($"[Info] GetUsers returned {userResult?.Users?.Length ?? 0} user(s)");
+            
+            TwitchSession.TwitchAvatarUrl = userResult.Users[0].ProfileImageUrl;
+            TwitchSession.UserId          = result.Streams[0].UserId;
+            TwitchSession.CurrentlyLive   = true;
+            TwitchSession.Title           = result.Streams[0].Title;
+            TwitchSession.GameName        = result.Streams[0].GameName;
+            TwitchSession.ThumbnailUrl    = result.Streams[0].ThumbnailUrl
+                .Replace("{width}", "1920")
+                .Replace("{height}", "1080");
+            TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
+            TwitchSession.StartedAt    = new DateTimeOffset(result.Streams[0].StartedAt, TimeSpan.Zero);
+            
+            Log($"[Info] Session populated — Title: {TwitchSession.Title}, Game: {TwitchSession.GameName}, Viewers: {TwitchSession.ViewerCount}");
+            
+            await OnStreamReceived();
+        }
+        catch (Exception ex)
+        {
+            Log($"[Error] OnStreamOnline failed: {ex.Message}");
+            Log($"[Error] {ex.StackTrace}");
+        }
     }
     
     async Task OnStreamReceived()
     {
+        Log("[Info] OnStreamReceived called");
         ITextChannel? channel = _discordSocket.GetChannel(Config.TwitchNotifyChannelId) as ITextChannel;
         
         if (channel == null)
         {
-            Log("[Warning] Could not find Twitch notify channel");
+            Log($"[Warning] Could not find Twitch notify channel (ID: {Config.TwitchNotifyChannelId})");
             return;
         }
+
+        Log($"[Info] Posting to #{channel.Name}");
 
         Embed embed = BuildTwitchEmbed(
             Config.TwitchChannelName,
@@ -180,14 +252,18 @@ public class Twitch_Notifier
     
     async Task OnStreamOffline(object? sender, StreamOfflineArgs args)
     {
+        Log("[Info] OnStreamOffline fired");
         TwitchSession.OfflineAt      = DateTimeOffset.UtcNow;
         TwitchSession.CurrentlyLive  = false;
 
+        Log("[Info] Checking for VOD...");
         await CheckIfVodUp();
+        Log("[Info] VOD check complete, updating embed...");
         await UpdateEmbed();
 
         TwitchSession = new StreamSession();
         TwitchVOD     = new TwitchVOD();
+        Log("[Info] Session reset");
     }
 
     async Task CheckIfVodUp()
@@ -209,6 +285,7 @@ public class Twitch_Notifier
                 TwitchVOD.Url      = result.Videos[0].Url;
                 TwitchVOD.Duration = result.Videos[0].Duration;
                 TwitchVOD.Viewable = result.Videos[0].Viewable;
+                Log($"[Info] VOD found — Viewable: {TwitchVOD.Viewable}, Duration: {TwitchVOD.Duration}");
             }
         
             TimeSpan elapsed = DateTime.UtcNow - startTime;
@@ -223,6 +300,7 @@ public class Twitch_Notifier
     
     async Task OnChannelUpdate(object? sender, ChannelUpdateArgs args)
     {
+        Log($"[Info] OnChannelUpdate fired — Title: {args.Payload.Event.Title}, Game: {args.Payload.Event.CategoryName}");
         TwitchSession.GameName = args.Payload.Event.CategoryName;
         TwitchSession.Title    = args.Payload.Event.Title;
         
@@ -233,6 +311,7 @@ public class Twitch_Notifier
     
     async Task StartLiveUpdates()
     {
+        Log("[Info] StartLiveUpdates loop started");
         while (TwitchSession.CurrentlyLive)
         {
             DateTimeOffset startTime = DateTimeOffset.UtcNow;
@@ -242,10 +321,17 @@ public class Twitch_Notifier
                 new List<string>() { Config.TwitchChannelName }
             );
             
-            TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
-            TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl
-                .Replace("{width}", "1920")
-                .Replace("{height}", "1080");
+            if (result?.Streams == null || result.Streams.Length == 0)
+            {
+                Log("[Warning] StartLiveUpdates: GetStreams returned no results");
+            }
+            else
+            {
+                TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
+                TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl
+                    .Replace("{width}", "1920")
+                    .Replace("{height}", "1080");
+            }
             
             await UpdateEmbed();
             
@@ -255,6 +341,7 @@ public class Twitch_Notifier
             if (delay > TimeSpan.Zero)
                 await Task.Delay(delay);
         }
+        Log("[Info] StartLiveUpdates loop ended — stream no longer live");
     }
     
     Embed BuildTwitchEmbed(
