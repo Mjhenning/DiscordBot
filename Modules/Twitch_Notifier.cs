@@ -126,14 +126,15 @@ public class Twitch_Notifier
         }
     }
     
-    public async Task<string?> GetAppToken()
+    public async Task<string?> GetUserToken()
     {
-        Log("[Info] Fetching app token...");
+        Log("[Info] Fetching user token...");
         FormUrlEncodedContent tokenRequest = new FormUrlEncodedContent(new[]
         {
             new KeyValuePair<string, string>("client_id",     Config.TwitchClientId),
             new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
-            new KeyValuePair<string, string>("grant_type",    "client_credentials"),
+            new KeyValuePair<string, string>("grant_type",    "refresh_token"),
+            new KeyValuePair<string, string>("refresh_token", Config.BroadcasterRefreshToken),
         });
 
         TwitchTokenResponse response = new TwitchTokenResponse();
@@ -155,13 +156,13 @@ public class Twitch_Notifier
     public async Task StartAsync()
     {
         Log("[Info] Notifier StartAsync called");
-        
-        string? _token = await GetAppToken();
-        Log($"[Info] Twitch app token fetched: {(_token != null ? "success" : "failed")}");
+    
+        string? _token = await GetUserToken();
+        Log($"[Info] Twitch user token fetched: {(_token != null ? "success" : "failed")}");
 
         TwitchApi.Settings.ClientId    = Config.TwitchClientId;
         TwitchApi.Settings.AccessToken = _token;
-        
+    
         Log("[Info] TwitchApi credentials set — calling ConnectAsync");
         await _eventSubClient.ConnectAsync();
         Log("[Info] ConnectAsync returned");
