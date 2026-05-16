@@ -22,7 +22,7 @@ DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
     LogLevel = LogSeverity.Info
 });
 
-StreamWriter logFile = new StreamWriter("bot-log.txt", append: false) { AutoFlush = true };
+StreamWriter logFile = new StreamWriter("bot-log.txt", append: true) { AutoFlush = true };
 
 void Log(string msg)
 {

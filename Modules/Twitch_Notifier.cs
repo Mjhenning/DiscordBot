@@ -238,7 +238,7 @@ public class Twitch_Notifier
             "Just started.",
             TwitchSession.ViewerCount
         );
-        string roleMention = MentionUtils.MentionRole(Config.LiveRoleId);
+        string roleMention = "@everyone";
         
         IUserMessage posted = await channel.SendMessageAsync(text: roleMention, embed: embed);
         TwitchSession.PublishedChannelId = channel.Id;
@@ -254,17 +254,25 @@ public class Twitch_Notifier
     async Task OnStreamOffline(object? sender, StreamOfflineArgs args)
     {
         Log("[Info] OnStreamOffline fired");
-        TwitchSession.OfflineAt      = DateTimeOffset.UtcNow;
-        TwitchSession.CurrentlyLive  = false;
+        TwitchSession.OfflineAt     = DateTimeOffset.UtcNow;
+        TwitchSession.CurrentlyLive = false;
 
-        Log("[Info] Checking for VOD...");
-        await CheckIfVodUp();
-        Log("[Info] VOD check complete, updating embed...");
+        // Update embed to offline state immediately, without VOD
+        Log("[Info] Updating embed to offline state...");
         await UpdateEmbed();
 
-        TwitchSession = new StreamSession();
-        TwitchVOD     = new TwitchVOD();
-        Log("[Info] Session reset");
+        // Check for VOD in the background, update again when ready
+        _ = Task.Run(async () =>
+        {
+            Log("[Info] Starting background VOD check...");
+            await CheckIfVodUp();
+            Log("[Info] VOD ready, updating embed with VOD link...");
+            await UpdateEmbed();
+
+            TwitchSession = new StreamSession();
+            TwitchVOD     = new TwitchVOD();
+            Log("[Info] Session reset");
+        });
     }
 
     async Task CheckIfVodUp()

@@ -283,7 +283,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         }
 
         Embed embed        = BuildScheduleEmbed();
-        string roleMention = MentionUtils.MentionRole(Config.LiveRoleId);
+        string roleMention = "@everyone";
 
         IUserMessage posted = await channel.SendMessageAsync(text: roleMention, embed: embed);
         _data.SetPublished(posted.Id, channelId, ScheduleData.GetCurrentWeekStart());
