@@ -49,6 +49,8 @@ ServiceProvider services = new ServiceCollection()
     .AddLogging() //Adds ILogger support
     .AddSingleton<Twitch_Notifier>()
     .AddSingleton<TwitchSuggestionsPoster>()
+    .AddSingleton<ArgFilesystem>()
+    .AddSingleton<ArgTerminalData>()
     .BuildServiceProvider();
 
 InteractionService interactions = services.GetRequiredService<InteractionService>();
