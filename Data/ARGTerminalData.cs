@@ -108,6 +108,20 @@ public class ArgTerminalData
         }
     }
     
+    public int BumpCoherence(int amount)
+    {
+        if (amount != 0)
+        {
+            string json = File.ReadAllText(StateFilePath);
+            dynamic state = JsonConvert.DeserializeObject<dynamic>(json)!;
+            state.coherence += amount;
+            return state.coherence;
+        }
+        
+        return 0;
+    }
+    
+    
     public bool Login(ulong userId)
     {
         if (LoggedInUsers.Contains(userId)) return false;

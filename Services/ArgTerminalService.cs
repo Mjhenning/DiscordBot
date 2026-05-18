@@ -2,6 +2,7 @@ using Discord;
 using Discord.WebSocket;
 using DiscordBot.Data;
 using System.Text;
+using Discord.Interactions;
 using DiscordBot.Modules;
 
 namespace DiscordBot.Services;
@@ -160,19 +161,54 @@ public class ArgTerminalService
 
         await message.ModifyAsync(props => props.Embed = embed);
     }
+    public async Task UpdateExistingEmbedWButtons(ITextChannel? channel, Embed embed, ulong messageId, Dictionary<String, String> Btns) {
+        if (channel == null)
+            return;
+
+        IUserMessage? message =
+            await channel.GetMessageAsync(messageId) as IUserMessage;
+
+        if (message == null)
+            return;
+        
+        ComponentBuilder builder = new();
+
+        foreach (KeyValuePair<string, string> btn in Btns)
+        {
+            builder.WithButton(
+                label: btn.Key,
+                customId: btn.Value,
+                style: ButtonStyle.Secondary
+            );
+        }
+
+        MessageComponent buttons = builder.Build();
+
+        await message.ModifyAsync(props =>
+        {
+            props.Embed = embed;
+            props.Components = buttons;
+        });
+    }
     public async Task<IUserMessage> SendNewEmbed(ITextChannel? channel, Embed embed)
     {
         return await channel.SendMessageAsync(embed: embed);
     }
     
-    // ─── BUTTONS ────────────────────────────────────────────────────
-    // [ComponentInteraction("terminal_btn_nav",     ignoreGroupNames: true)]
-    // public Task OnBtnNavigate()     => NavigateToFolder();
-    //
-    // [ComponentInteraction("terminal_btn_read", ignoreGroupNames: true)]
-    // public Task OnBtnRead() => ReadFile();
-    //
-    // [ComponentInteraction("terminal_read_exit", ignoreGroupNames: true)]
-    // public Task OnBtnReadExit() => ReadExit();
-    
+    public async Task<IUserMessage> SendNewEmbedWButtons (ITextChannel? channel, Embed embed, Dictionary<String, String> Btns)
+    {
+        ComponentBuilder builder = new();
+
+        foreach (KeyValuePair<string, string> btn in Btns)
+        {
+            builder.WithButton(
+                label: btn.Key,
+                customId: btn.Value,
+                style: ButtonStyle.Secondary
+            );
+        }
+
+        MessageComponent buttons = builder.Build();
+        return await channel.SendMessageAsync(embed: embed, components: buttons);
+    }
 }

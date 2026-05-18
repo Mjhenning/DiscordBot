@@ -67,12 +67,22 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         if (_data.PublishedTMessageId != 0)
         {
             Log($"[Debug] Updating existing terminal embed (ID: {_data.PublishedTMessageId})");
-            await _terminal.UpdateExistingEmbed(channel, terminalEmbed, _data.PublishedTMessageId);
+            await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId, new Dictionary<string, string>()
+            {
+                {"Navigate", "terminal_btn_nav"},
+                {"Read", "terminal_btn_read"},
+                {"Ping", "terminal_btn_ping"}
+            });
         }
         else
         {
             Log($"[Debug] No existing terminal embed — posting new");
-            postedTerminal = await _terminal.SendNewEmbed(channel, terminalEmbed);
+            postedTerminal = await _terminal.SendNewEmbedWButtons(channel, terminalEmbed, new Dictionary<string, string>()
+            {
+                {"Navigate", "terminal_btn_nav"},
+                {"Read", "terminal_btn_read"},
+                {"Ping", "terminal_btn_ping"}
+            });
             Log($"[Debug] Terminal embed posted with ID: {postedTerminal.Id}");
             _data.SetPublished(postedTerminal.Id, channel.Id, ARGEmbed_Type.Terminal);
         }
@@ -119,4 +129,43 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     }
     
     bool IsLoggedIn() => _data.LoggedInUsers.Contains(Context.User.Id);
+    
+    
+    // ─── BUTTONS ────────────────────────────────────────────────────
+    [ComponentInteraction("terminal_btn_nav",     ignoreGroupNames: true)]
+    public Task OnBtnNavigate()     => NavigateToFolder();
+    
+    [ComponentInteraction("terminal_btn_read", ignoreGroupNames: true)]
+    public Task OnBtnRead() => ReadFile();
+    
+    [ComponentInteraction("terminal_btn_read_exit", ignoreGroupNames: true)]
+    public Task OnBtnReadExit() => ReadExit();
+    
+    [ComponentInteraction("terminal_btn_ping", ignoreGroupNames: true)]
+    public Task OnBtnPing() => Ping();
+
+    public async Task NavigateToFolder()
+    {
+        //open menu to enter directory / file structure and navigate to their and update embed
+    }
+
+    public async Task ReadFile()
+    {
+        //open menu to enter filename and update read embed
+    }
+
+    public async Task ReadExit()
+    {
+        //blanks out read embed to idle state and removes button
+    }
+
+    public async Task Ping()
+    {
+        //bumps coherence with 2%
+        _data.BumpCoherence(2);
+
+        await RespondAsync(
+            $"{Context.User.Username} has successfully broken down built up bitrot by 2%! 🫧",
+            ephemeral: true);
+    }
 }
