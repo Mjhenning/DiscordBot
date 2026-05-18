@@ -34,10 +34,16 @@ public class ArgTerminalService
         _data.activeUsers = 0;
 
         SocketGuild? guild = _client.GetGuild(Config.GuildId);
-        
+
         if (guild == null)
         {
             Log("[Warning] Guild not found");
+            return;
+        }
+
+        if (_data.PublishedChannelId == 0)
+        {
+            Log("[Debug] No published channel set");
             return;
         }
 
@@ -45,20 +51,29 @@ public class ArgTerminalService
             guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
 
         if (channel == null)
+        {
+            Log("[Warning] Published channel not found");
             return;
+        }
 
         Embed terminalEmbed = BuildTerminalEmbed();
         Embed readEmbed     = BuildReadEmbed();
 
-        await UpdateExistingEmbed(
-            channel,
-            terminalEmbed,
-            _data.PublishedTMessageId);
+        if (_data.PublishedTMessageId != 0)
+        {
+            await UpdateExistingEmbed(
+                channel,
+                terminalEmbed,
+                _data.PublishedTMessageId);
+        }
 
-        await UpdateExistingEmbed(
-            channel,
-            readEmbed,
-            _data.PublishedRMessageId);
+        if (_data.PublishedRMessageId != 0)
+        {
+            await UpdateExistingEmbed(
+                channel,
+                readEmbed,
+                _data.PublishedRMessageId);
+        }
     }
     string RenderDirectory(FsNode node, int coherence)
     {
