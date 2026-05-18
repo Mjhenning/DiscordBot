@@ -167,21 +167,50 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
     public async Task ReadFile()
     {
+        // Log($"[Debug] Building Read file embed...");
+        //
+        // Embed readEmbed = _terminal.BuildReadEmbed();
+        // ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+        //
+        // Log($"[Debug] Updating existing read embed (ID: {_data.PublishedRMessageId})");
+        // await _terminal.UpdateExistingEmbedWButtons(channel, readEmbed, _data.PublishedRMessageId, new Dictionary<string, string>()
+        // {
+        //     {"Exit", "terminal_btn_read_exit"}
+        // });
+        
         //open menu to enter filename and update read embed
     }
 
     public async Task ReadExit()
     {
         //blanks out read embed to idle state and removes button
+        
+        Log($"[Debug] Building Read file embed...");
+        
+        Embed readEmbed = _terminal.BuildReadEmbed();
+        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+        
+        Log($"[Debug] Updating existing read embed (ID: {_data.PublishedRMessageId})");
+        await _terminal.UpdateExistingEmbed(channel, readEmbed, _data.PublishedRMessageId);
     }
 
     public async Task Ping()
     {
         //bumps coherence with 2%
         _data.BumpCoherence(2);
+        
+        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+        
+        Embed terminalEmbed = _terminal.BuildTerminalEmbed();
+        
+        Log($"[Debug] Updating existing terminal embed (ID: {_data.PublishedTMessageId})");
+        await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId, new Dictionary<string, string>()
+        {
+            {"Navigate", "terminal_btn_nav"},
+            {"Read", "terminal_btn_read"},
+            {"Ping", "terminal_btn_ping"}
+        });
 
-        await RespondAsync(
-            $"{Context.User.Username} has successfully broken down built up bitrot by 2%! 🫧",
-            ephemeral: true);
+        await RespondAsync($"{Context.User.Username} has successfully broken down built up bitrot by 2%! 🫧", ephemeral: true);
     }
 }
