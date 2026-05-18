@@ -31,13 +31,19 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("login", "Login to continue with or start a terminal session")]
     public async Task TerminalStart()
 {
+    
+    await DeferAsync(ephemeral: true);
+    
     Log($"[Info] /login called by {Context.User.Username}");
 
     bool loggedIn = _data.Login(Context.User.Id);
     if (!loggedIn)
     {
         Log($"[Debug] {Context.User.Username} already logged in");
-        await RespondAsync("You're already logged in to the terminal. 🫧", ephemeral: true);
+        await ModifyOriginalResponseAsync(msg =>
+        {
+            msg.Content = "You're already logged in to the terminal. 🫧";
+        });
         return;
     }
 
@@ -51,7 +57,10 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         if (channel == null)
         {
             Log($"[Warning] Could not resolve channel {_data.PublishedChannelId} as ITextChannel");
-            await RespondAsync("Terminal channel unavailable.", ephemeral: true);
+            await ModifyOriginalResponseAsync(msg =>
+            {
+                msg.Content = "Terminal channel unavailable.";
+            });
             return;
         }
 
@@ -102,12 +111,19 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         }
 
         Log($"[Info] /login complete for {Context.User.Username} — terminal session active");
-        await RespondAsync($"🫧 {Context.User.Username} has successfully logged into the AETHER-OS. Don't do anything rash ⚠️", ephemeral: true);
+        await ModifyOriginalResponseAsync(msg =>
+        {
+            msg.Content =
+                $"🫧 {Context.User.Username} has successfully logged into the AETHER-OS. Don't do anything rash ⚠️";
+        });
     }
     else
     {
         Log($"[Warning] No published channel set — cannot post terminal embeds");
-        await RespondAsync("No published channel set.", ephemeral: true);
+        await ModifyOriginalResponseAsync(msg =>
+        {
+            msg.Content = "No published channel set.";
+        });
     }
 }
 
