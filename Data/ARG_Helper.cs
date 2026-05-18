@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace DiscordBot.Modules;
+namespace DiscordBot.Data;
 
 public class ArgFilesystem
 {

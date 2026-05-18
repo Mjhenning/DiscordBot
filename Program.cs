@@ -5,6 +5,7 @@ using DiscordBot;
 using DiscordBot.Data;
 using Microsoft.Extensions.DependencyInjection;
 using DiscordBot.Modules;
+using DiscordBot.Services;
 using TwitchLib.Api;
 using TwitchLib.EventSub.Websockets.Extensions;
 
@@ -51,6 +52,7 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<TwitchSuggestionsPoster>()
     .AddSingleton<ArgFilesystem>()
     .AddSingleton<ArgTerminalData>()
+    .AddSingleton<ArgTerminalService>()
     .BuildServiceProvider();
 
 InteractionService interactions = services.GetRequiredService<InteractionService>();
@@ -107,6 +109,12 @@ client.Ready += async () =>
     }
     
     Log($"[Info] Registered {interactions.SlashCommands.Count} slash command(s)");
+    
+    ArgTerminalService terminal =
+        services.GetRequiredService<ArgTerminalService>();
+
+    await terminal.ResetSession();
+    Log("[Info] Terminal session reset");
     
     _ = Task.Run(async () =>
     {

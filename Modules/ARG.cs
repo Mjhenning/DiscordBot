@@ -3,6 +3,7 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using DiscordBot.Data;
+using DiscordBot.Services;
 
 namespace DiscordBot.Modules;
 
@@ -11,165 +12,111 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     readonly ArgTerminalData _data;
     readonly ArgFilesystem _fs;
     readonly StreamWriter _log;
+    readonly ArgTerminalService _terminal;
     
-    public ARG(ArgTerminalData data, ArgFilesystem fs, StreamWriter log)
+    public ARG(
+        ArgTerminalData data,
+        ArgFilesystem fs,
+        StreamWriter log,
+        ArgTerminalService terminal)
     {
         _data = data;
-        _fs   = fs;
+        _fs = fs;
         _log = log;
+        _terminal = terminal;
     }
 
     void Log(string msg) { Console.WriteLine(msg); _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}"); }
 
     [SlashCommand("login", "Login to continue with or start a terminal session")]
     public async Task TerminalStart()
+{
+    Log($"[Info] /login called by {Context.User.Username}");
+
+    bool loggedIn = _data.Login(Context.User.Id);
+    if (!loggedIn)
     {
-        Log($"[Info] /system login called by {Context.User.Username}");
-
-        _data.activeUsers++;
-
-        if (_data.PublishedChannelId != 0) //if assigned channel
-        {
-            ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
-            
-            Embed terminalEmbed = BuildTerminalEmbed();
-            Embed readEmbed       = BuildReadEmbed();
-
-            IUserMessage postedTerminal;
-            IUserMessage postedRead;
-
-            if (_data.PublishedRMessageId != 0) 
-                await UpdateExistingEmbed(channel, readEmbed, _data.PublishedRMessageId);
-            else
-            {
-                postedRead = await SendNewEmbed(channel, readEmbed);
-                _data.SetPublished(postedRead.Id, channel.Id, ARGEmbed_Type.ReadOutput);
-            }
-
-            if (_data.PublishedTMessageId != 0) 
-                await UpdateExistingEmbed(channel, terminalEmbed, _data.PublishedTMessageId);
-            else
-            {
-                postedTerminal = await SendNewEmbed(channel, terminalEmbed);
-                _data.SetPublished(postedTerminal.Id, channel.Id, ARGEmbed_Type.Terminal);
-            }
-        }
-        
+        Log($"[Debug] {Context.User.Username} already logged in");
+        await RespondAsync("You're already logged in to the terminal. 🫧", ephemeral: true);
+        return;
     }
+
+    Log($"[Debug] activeUsers after login: {_data.activeUsers}");
+
+    if (_data.PublishedChannelId != 0)
+    {
+        Log($"[Debug] Published channel found: {_data.PublishedChannelId}");
+        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+
+        if (channel == null)
+        {
+            Log($"[Warning] Could not resolve channel {_data.PublishedChannelId} as ITextChannel");
+            await RespondAsync("Terminal channel unavailable.", ephemeral: true);
+            return;
+        }
+
+        Log($"[Debug] Building embeds...");
+        Embed terminalEmbed = _terminal.BuildTerminalEmbed();
+        Embed readEmbed = _terminal.BuildReadEmbed();
+        Log($"[Debug] Embeds built successfully");
+
+        IUserMessage postedTerminal;
+        IUserMessage postedRead;
+
+        // ── Terminal embed first ────────────────────────────────────────
+        if (_data.PublishedTMessageId != 0)
+        {
+            Log($"[Debug] Updating existing terminal embed (ID: {_data.PublishedTMessageId})");
+            await _terminal.UpdateExistingEmbed(channel, terminalEmbed, _data.PublishedTMessageId);
+        }
+        else
+        {
+            Log($"[Debug] No existing terminal embed — posting new");
+            postedTerminal = await _terminal.SendNewEmbed(channel, terminalEmbed);
+            Log($"[Debug] Terminal embed posted with ID: {postedTerminal.Id}");
+            _data.SetPublished(postedTerminal.Id, channel.Id, ARGEmbed_Type.Terminal);
+        }
+
+        // ── Read embed second ───────────────────────────────────────────
+        if (_data.PublishedRMessageId != 0)
+        {
+            Log($"[Debug] Updating existing read embed (ID: {_data.PublishedRMessageId})");
+            await _terminal.UpdateExistingEmbed(channel, readEmbed, _data.PublishedRMessageId);
+        }
+        else
+        {
+            Log($"[Debug] No existing read embed — posting new");
+            postedRead = await _terminal.SendNewEmbed(channel, readEmbed);
+            Log($"[Debug] Read embed posted with ID: {postedRead.Id}");
+            _data.SetPublished(postedRead.Id, channel.Id, ARGEmbed_Type.ReadOutput);
+        }
+
+        Log($"[Info] /login complete for {Context.User.Username} — terminal session active");
+        await RespondAsync($"🫧 {Context.User.Username} has successfully logged into the AETHER-OS. Don't do anything rash ⚠️", ephemeral: true);
+    }
+    else
+    {
+        Log($"[Warning] No published channel set — cannot post terminal embeds");
+        await RespondAsync("No published channel set.", ephemeral: true);
+    }
+}
 
     [SlashCommand("logout", "logout to stop interacting with terminal")]
     public async Task Disconnect()
     {
-        Log($"[Info] /disconnect called by {Context.User.Username}");
-        _data.activeUsers--;
-    }
-    
-    // ─── EMBED BUILDER ────────────────────────────────────────────────────────
+        Log($"[Info] /logout called by {Context.User.Username}");
 
-    Embed BuildTerminalEmbed()
-    {
-        int coherence = _data.GetCoherence();
-
-        // resolve current directory node
-        FsNode currentNode;
-        if (string.IsNullOrEmpty(_data.Cwd) || _data.Cwd == "/")
+        bool loggedOut = _data.Logout(Context.User.Id);
+        if (!loggedOut)
         {
-            currentNode = _fs.Root;
-        }
-        else
-        {
-            string fullPath = Path.Combine(_fs.RootPath, _data.Cwd.TrimStart('/'));
-            _fs.PathIndex.TryGetValue(fullPath, out FsNode? found);
-            currentNode = found ?? _fs.Root;
+            Log($"[Debug] {Context.User.Username} was not logged in");
+            await RespondAsync($"{Context.User.Username} you haven't connected yet!", ephemeral: true);
+            return;
         }
 
-        string listing = RenderDirectory(currentNode, coherence);
-
-        EmbedBuilder builder = new EmbedBuilder()
-            .WithAuthor("AETHER-OS // TERMINAL SESSION",
-                "https://images.icon-icons.com/213/PNG/256/Mac_Terminal-01_25118.png")
-            .WithTitle("---------------------------------------")
-            .WithDescription(
-                $"📁 {(_data.Cwd == "" ? "/" : _data.Cwd)}\n" +
-                listing +
-                $"\n**------------------------------------------**" +
-                $"\n🔌 Active connections: {_data.activeUsers}" +
-                $"\n⚡ Last action: {_data.LastAction ?? "none"}" +
-                $"\n💾 Coherence: {coherence}%" +
-                $"\n**------------------------------------------**")
-            .WithColor(new Color(0xffffff))
-            .WithFooter("System Active • 4/30/03, 3:00 AM");
-
-        return builder.Build();
-    }
-
-    Embed BuildReadEmbed()
-    {
-        int coherence = _data.GetCoherence();
-
-        string description = string.IsNullOrEmpty(_data.ReadMessageContent)
-            ? "*no file loaded*"
-            : _data.ReadMessageContent.Replace("{coherence}", coherence.ToString());
-
-        EmbedBuilder builder = new EmbedBuilder()
-            .WithAuthor(
-                $"AETHER-OS // {(string.IsNullOrEmpty(_data.ReadMessageFile) ? "IDLE" : _data.ReadMessageFile)}",
-                "https://images.icon-icons.com/54/PNG/256/windowviewdetailscreen_ventana_vista_detall_10768.png")
-            .WithTitle("---------------------------------------")
-            .WithDescription(
-                description +
-                $"\n\n**------------------------------------------**")
-            .WithColor(new Color(0xffffff))
-            .WithFooter("System Active • 4/30/03, 3:00 AM");
-
-        return builder.Build();
-    }
-
-    async Task UpdateExistingEmbed(ITextChannel? channel, Embed embed, ulong messageId)
-    {
-        IUserMessage? message = await channel.GetMessageAsync(messageId) as IUserMessage;
-        Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
-        if (message == null) return;
-        
-        await message.ModifyAsync(props => props.Embed = embed);
-    }
-
-    async Task<IUserMessage> SendNewEmbed(ITextChannel? channel, Embed embed)
-    {
-        return await channel.SendMessageAsync(embed: embed);
+        Log($"[Debug] activeUsers after logout: {_data.activeUsers}");
+        await RespondAsync($"{Context.User.Username} has successfully logged out of the AETHER-OS. Sad to see you go! 🫧", ephemeral: true);
     }
     
-    // ─── DIRECTORY HELPERS ────────────────────────────────────────────────────────
-    
-    string RenderDirectory(FsNode node, int coherence)
-    {
-        StringBuilder sb = new();
-
-        foreach (FsNode child in node.Children.Values)
-        {
-            if (child.IsDirectory)
-            {
-                sb.AppendLine($"📁 /{child.Name}/");
-            }
-            else
-            {
-                if (child.UnlockedAtCoherence.HasValue && coherence < child.UnlockedAtCoherence.Value)
-                    continue;
-
-                sb.AppendLine(child.Corrupted
-                    ? $"📄 {child.Filename} [CORRUPTED]"
-                    : $"📄 {child.Filename}");
-            }
-        }
-
-        return sb.Length > 0 ? sb.ToString() : "*empty*";
-    }
-    
-    string RenderFileContent(FsNode node, int coherence)
-    {
-        if (node.Content == null) return "*no content*";
-
-        return string.Join("\n", node.Content)
-            .Replace("{coherence}", coherence.ToString());
-    }
+    bool IsLoggedIn() => _data.LoggedInUsers.Contains(Context.User.Id);
 }

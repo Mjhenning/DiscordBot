@@ -16,18 +16,18 @@ public class ArgTerminalData
     public ulong PublishedChannelId  { get; private set; } = 0;
     public ulong PublishedTMessageId  { get; private set; } = 0;
     public ulong PublishedRMessageId  { get; set; } = 0;
-    
-    public int coherence { get; set; } = 0;
 
     public string Cwd { get; set; } = "";
     public string ReadMessageFile{ get; set; } = "";
     public string ReadMessageContent { get; set; } = "";
-    
-    public string LastAction { get; set; }
+
+    public string LastAction { get; set; } = "";
     
     public int activeUsers = 0;
     
-    public List<string> ActionHistory { get; set; }
+    public HashSet<ulong> LoggedInUsers { get; private set; } = new();
+
+    public List<string> ActionHistory { get; set; } = new List<string>();
     
     
     public ArgTerminalData() => Initialize();
@@ -106,6 +106,22 @@ public class ArgTerminalData
         {
             return 0;
         }
+    }
+    
+    public bool Login(ulong userId)
+    {
+        if (LoggedInUsers.Contains(userId)) return false;
+        LoggedInUsers.Add(userId);
+        activeUsers = LoggedInUsers.Count;
+        return true;
+    }
+
+    public bool Logout(ulong userId)
+    {
+        if (!LoggedInUsers.Contains(userId)) return false;
+        LoggedInUsers.Remove(userId);
+        activeUsers = LoggedInUsers.Count;
+        return true;
     }
 
 }
