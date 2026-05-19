@@ -142,20 +142,13 @@ public FsNode GetCurrentNode(string cwd)
     if (string.IsNullOrWhiteSpace(cwd) || cwd == "/")
         return Root;
 
-    // normalize — remove leading slash, combine with root
-    string relative = cwd.TrimStart('/');
-    string fullPath = Path.Combine(RootPath, relative);
+    string fullPath = Path.Combine(
+        RootPath,
+        cwd.TrimStart('/'));
 
-    Console.WriteLine($"[ARG:FS] GetCurrentNode cwd='{cwd}' fullPath='{fullPath}' exists={PathIndex.ContainsKey(fullPath)}");
-
-    if (PathIndex.TryGetValue(fullPath, out FsNode? node))
-        return node;
-
-    // log all keys for debugging
-    Console.WriteLine($"[ARG:FS] PathIndex keys: {string.Join(", ", PathIndex.Keys)}");
-    
-    Console.WriteLine($"[ARG:FS] WARNING: path not found, falling back to root");
-    return Root;
+    return PathIndex.TryGetValue(fullPath, out FsNode? node)
+        ? node
+        : Root;
 }
 
 public List<FsNode> GetDirectories(string cwd)
