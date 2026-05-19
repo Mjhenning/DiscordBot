@@ -117,6 +117,15 @@ public class ArgTerminalService
                 Path.Combine(_fs.RootPath, _data.Cwd.TrimStart('/'));
 
             _fs.PathIndex.TryGetValue(fullPath, out FsNode? found);
+            
+            Console.WriteLine($"[DEBUG] cwd={_data.Cwd}");
+            Console.WriteLine($"[DEBUG] fullPath={fullPath}");
+            Console.WriteLine($"[DEBUG] found={found != null}");
+
+            foreach (string key in _fs.PathIndex.Keys)
+            {
+                Console.WriteLine($"KEY: {key}");
+            }
 
             currentNode = found ?? _fs.Root;
         }
