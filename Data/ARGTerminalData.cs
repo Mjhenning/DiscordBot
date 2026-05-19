@@ -37,9 +37,6 @@ public class ArgTerminalData
     public List<string> ActionHistory { get; set; } = new List<string>();
     
     public TerminalInteractionMode InteractionMode { get; set; }
-
-    public string PendingPath { get; set; } = "";
-    public string PendingFilePath { get; set; } = "";
     
     
     public ArgTerminalData() => Initialize();

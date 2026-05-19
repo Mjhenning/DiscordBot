@@ -307,12 +307,10 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             ephemeral: true);
     }
     
-    [ComponentInteraction("terminal_btn_confirm_read", ignoreGroupNames: true)]
-    public async Task ConfirmRead()
+    [ComponentInteraction("terminal_read_select", ignoreGroupNames: true)]
+    public async Task OnReadFileSelected(string selected)
     {
-        if (!_fs.PathIndex.TryGetValue(
-                _data.PendingFilePath,
-                out FsNode? node))
+        if (!_fs.PathIndex.TryGetValue(selected, out FsNode? node))
         {
             await RespondAsync(
                 "File no longer exists.",
@@ -337,7 +335,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         _data.ReadMessageContent = content;
 
         _data.LastAction =
-            $"read {_data.ReadMessageFile}";
+            $"{Context.User.Username} read {_data.ReadMessageFile}";
 
         _data.Save();
 
