@@ -124,12 +124,17 @@ public class ArgTerminalData
     public int BumpCoherence(int amount)
     {
         if (amount == 0) return 0;
-    
+
         string json   = File.ReadAllText(StateFilePath);
         dynamic state = JsonConvert.DeserializeObject<dynamic>(json)!;
-        state.coherence = Math.Min(100, (int)(state.coherence ?? 0) + amount);
-        File.WriteAllText(StateFilePath, JsonConvert.SerializeObject(state, Formatting.Indented));
-        return (int)state.coherence;
+        int current   = (int)(state.coherence ?? 0);
+        int updated   = Math.Min(100, current + amount);
+        state.coherence = updated;
+    
+        string written = JsonConvert.SerializeObject(state, Formatting.Indented);
+        Console.WriteLine($"[ARG] Writing coherence: {written}"); // temp debug
+        File.WriteAllText(StateFilePath, written);
+        return updated;
     }
     
     

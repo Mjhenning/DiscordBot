@@ -213,13 +213,10 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     {
         string newPath;
 
-        // parent navigation
         if (selected == "PARENT")
         {
             FsNode current = _fs.GetCurrentNode(_data.Cwd);
-
-            newPath = current.Parent == null ||
-                      current.Parent == _fs.Root
+            newPath = current.Parent == null || current.Parent == _fs.Root
                 ? "/"
                 : current.Parent.FullPath
                     .Replace(_fs.RootPath, "")
@@ -232,72 +229,22 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
                 .Replace("\\", "/");
         }
 
-        _data.PendingPath = newPath;
-
-        ComponentBuilder buttons = new();
-
-        buttons.WithButton(
-            "Confirm",
-            "terminal_btn_confirm_nav",
-            ButtonStyle.Success);
-
-        buttons.WithButton(
-            "Cancel",
-            "terminal_btn_cancel",
-            ButtonStyle.Secondary);
-
-        await RespondAsync(
-            $"Navigate to `{newPath}` ?",
-            components: buttons.Build(),
-            ephemeral: true);
-    }
-    
-    [ComponentInteraction("terminal_btn_confirm_nav", ignoreGroupNames: true)]
-    public async Task ConfirmNavigation()
-    {
-        _data.Cwd = _data.PendingPath;
-
-        _data.LastAction =
-            $"navigated to {_data.Cwd}";
-
+        _data.Cwd       = newPath;
+        _data.LastAction = $"{Context.User.Username} navigated to {newPath}";
         _data.Save();
 
-        ITextChannel? channel =
-            Context.Guild.GetChannel(
-                    _data.PublishedChannelId)
-                as ITextChannel;
+        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+        Embed terminalEmbed   = _terminal.BuildTerminalEmbed();
 
-        Embed terminalEmbed =
-            _terminal.BuildTerminalEmbed();
-
-        await _terminal.UpdateExistingEmbedWButtons(
-            channel,
-            terminalEmbed,
-            _data.PublishedTMessageId,
-            new Dictionary<string, string>()
+        await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId,
+            new Dictionary<string, string>
             {
-                {"Navigate", "terminal_btn_nav"},
-                {"Read", "terminal_btn_read"},
-                {"Ping", "terminal_btn_ping"}
+                { "Navigate", "terminal_btn_nav" },
+                { "Read",     "terminal_btn_read" },
+                { "Ping",     "terminal_btn_ping" }
             });
 
-        await RespondAsync(
-            $"Directory changed to `{_data.Cwd}`",
-            ephemeral: true);
-    }
-    
-    [ComponentInteraction("terminal_btn_cancel", ignoreGroupNames: true)]
-    public async Task CancelInteraction()
-    {
-        _data.InteractionMode =
-            TerminalInteractionMode.None;
-
-        _data.PendingPath = "";
-        _data.PendingFilePath = "";
-
-        await RespondAsync(
-            "Operation cancelled.",
-            ephemeral: true);
+        await RespondAsync($"Moved to `{newPath}`", ephemeral: true);
     }
 
     
@@ -357,33 +304,6 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         await RespondAsync(
             $"Current Directory: `{_data.Cwd}`",
             components: menu,
-            ephemeral: true);
-    }
-    
-    [ComponentInteraction("terminal_read_select", ignoreGroupNames: true)]
-    public async Task OnReadFileSelected(string selected)
-    {
-        _data.PendingFilePath = selected;
-
-        string relativePath = selected
-            .Replace(_fs.RootPath, "")
-            .Replace("\\", "/");
-
-        ComponentBuilder buttons = new();
-
-        buttons.WithButton(
-            "Open File",
-            "terminal_btn_confirm_read",
-            ButtonStyle.Success);
-
-        buttons.WithButton(
-            "Cancel",
-            "terminal_btn_cancel",
-            ButtonStyle.Secondary);
-
-        await RespondAsync(
-            $"Open `{relativePath}` ?",
-            components: buttons.Build(),
             ephemeral: true);
     }
     
