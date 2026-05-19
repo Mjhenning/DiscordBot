@@ -25,163 +25,163 @@ public class ArgFilesystem
     }
     
     void BuildTree(string dirPath, FsNode parent)
+{
+    foreach (string dir in Directory.EnumerateDirectories(dirPath))
     {
-        foreach (string dir in Directory.EnumerateDirectories(dirPath))
+        string name = Path.GetFileName(dir);
+        FsNode node = new()
         {
-            string name = Path.GetFileName(dir);
-            FsNode node = new()
-            {
-                Name        = name,
-                FullPath    = dir,
-                IsDirectory = true,
-                Parent      = parent
-            };
+            Name        = name,
+            FullPath    = dir,
+            IsDirectory = true,
+            Parent      = parent
+        };
 
-            parent.Children[name] = node;
-            PathIndex[Normalize(dir)] = node;
-            BuildTree(dir, node);
-        }
-
-        foreach (string file in Directory.EnumerateFiles(dirPath, "*.json"))
-        {
-            ParseAndAddFile(file, parent);
-        }
+        parent.Children[name] = node;
+        PathIndex[dir]        = node;
+        BuildTree(dir, node);
     }
 
-    void ParseAndAddFile(string filePath, FsNode parent)
+    foreach (string file in Directory.EnumerateFiles(dirPath, "*.json"))
     {
+        ParseAndAddFile(file, parent);
+    }
+}
+
+void ParseAndAddFile(string filePath, FsNode parent)
+{
+    try
+    {
+        string raw      = File.ReadAllText(filePath);
+        FsFileContent? json = JsonConvert.DeserializeObject<FsFileContent>(raw);
+        if (json == null) return;
+
+        FsNode node = new()
+        {
+            Name                = Path.GetFileName(filePath),
+            FullPath            = filePath,
+            IsDirectory         = false,
+            Parent              = parent,
+            Filename            = json.Filename,
+            Corrupted           = json.Corrupted,
+            UnlockedAtCoherence = json.UnlockedAtCoherence,
+            Content             = json.Content
+        };
+
+        parent.Children[node.Name] = node;
+        PathIndex[filePath]        = node;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[ARG] Failed to parse {filePath}: {ex.Message}");
+    }
+}
+
+void WatchForChanges()
+{
+    FileSystemWatcher watcher = new(FsRoot)
+    {
+        IncludeSubdirectories = true,
+        NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+        Filter = "*.json"
+    };
+
+    watcher.Changed += (_, e) =>
+    {
+        if (!PathIndex.TryGetValue(e.FullPath, out FsNode? node) || node.IsDirectory) return;
         try
         {
-            string raw      = File.ReadAllText(filePath);
+            string raw = File.ReadAllText(e.FullPath);
             FsFileContent? json = JsonConvert.DeserializeObject<FsFileContent>(raw);
             if (json == null) return;
 
+            node.Filename            = json.Filename;
+            node.Corrupted           = json.Corrupted;
+            node.UnlockedAtCoherence = json.UnlockedAtCoherence;
+            node.Content             = json.Content;
+        }
+        catch { /* file mid-write, ignore */ }
+    };
+
+    watcher.Created += (_, e) =>
+    {
+        string? parentPath = Path.GetDirectoryName(e.FullPath);
+        if (parentPath == null) return;
+        if (!PathIndex.TryGetValue(parentPath, out FsNode? parent)) return;
+
+        if (Directory.Exists(e.FullPath))
+        {
             FsNode node = new()
             {
-                Name                = Path.GetFileName(filePath),
-                FullPath            = filePath,
-                IsDirectory         = false,
-                Parent              = parent,
-                Filename            = json.Filename,
-                Corrupted           = json.Corrupted,
-                UnlockedAtCoherence = json.UnlockedAtCoherence,
-                Content             = json.Content
+                Name        = Path.GetFileName(e.FullPath),
+                FullPath    = e.FullPath,
+                IsDirectory = true,
+                Parent      = parent
             };
-
             parent.Children[node.Name] = node;
-            PathIndex[Normalize(filePath)] = node;
+            PathIndex[e.FullPath]      = node;
         }
-        catch (Exception ex)
+        else if (e.FullPath.EndsWith(".json"))
         {
-            Console.WriteLine($"[ARG] Failed to parse {filePath}: {ex.Message}");
+            ParseAndAddFile(e.FullPath, parent);
         }
-    }
+    };
 
-    void WatchForChanges()
+    watcher.Deleted += (_, e) =>
     {
-        FileSystemWatcher watcher = new(FsRoot)
-        {
-            IncludeSubdirectories = true,
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
-            Filter = "*.json"
-        };
+        if (!PathIndex.TryGetValue(e.FullPath, out FsNode? node)) return;
+        node.Parent?.Children.Remove(node.Name);
+        PathIndex.Remove(e.FullPath);
+    };
 
-        watcher.Changed += (_, e) =>
-        {
-            if (!PathIndex.TryGetValue(e.FullPath, out FsNode? node) || node.IsDirectory) return;
-            try
-            {
-                string raw = File.ReadAllText(e.FullPath);
-                FsFileContent? json = JsonConvert.DeserializeObject<FsFileContent>(raw);
-                if (json == null) return;
+    watcher.EnableRaisingEvents = true;
+}
 
-                node.Filename            = json.Filename;
-                node.Corrupted           = json.Corrupted;
-                node.UnlockedAtCoherence = json.UnlockedAtCoherence;
-                node.Content             = json.Content;
-            }
-            catch { /* file mid-write, ignore */ }
-        };
+public FsNode GetCurrentNode(string cwd)
+{
+    if (string.IsNullOrWhiteSpace(cwd) || cwd == "/")
+        return Root;
 
-        watcher.Created += (_, e) =>
-        {
-            string? parentPath = Path.GetDirectoryName(e.FullPath);
-            if (parentPath == null) return;
-            if (!PathIndex.TryGetValue(parentPath, out FsNode? parent)) return;
+    // normalize — remove leading slash, combine with root
+    string relative = cwd.TrimStart('/');
+    string fullPath = Path.Combine(RootPath, relative);
 
-            if (Directory.Exists(e.FullPath))
-            {
-                FsNode node = new()
-                {
-                    Name        = Path.GetFileName(e.FullPath),
-                    FullPath    = e.FullPath,
-                    IsDirectory = true,
-                    Parent      = parent
-                };
-                parent.Children[node.Name] = node;
-                PathIndex[e.FullPath]      = node;
-            }
-            else if (e.FullPath.EndsWith(".json"))
-            {
-                ParseAndAddFile(e.FullPath, parent);
-            }
-        };
+    Console.WriteLine($"[ARG:FS] GetCurrentNode cwd='{cwd}' fullPath='{fullPath}' exists={PathIndex.ContainsKey(fullPath)}");
 
-        watcher.Deleted += (_, e) =>
-        {
-            if (!PathIndex.TryGetValue(e.FullPath, out FsNode? node)) return;
-            node.Parent?.Children.Remove(node.Name);
-            PathIndex.Remove(e.FullPath);
-        };
+    if (PathIndex.TryGetValue(fullPath, out FsNode? node))
+        return node;
 
-        watcher.EnableRaisingEvents = true;
-    }
+    // log all keys for debugging
+    Console.WriteLine($"[ARG:FS] PathIndex keys: {string.Join(", ", PathIndex.Keys)}");
+    
+    Console.WriteLine($"[ARG:FS] WARNING: path not found, falling back to root");
+    return Root;
+}
 
-    public FsNode GetCurrentNode(string cwd)
-    {
-        if (string.IsNullOrWhiteSpace(cwd) || cwd == "/")
-            return Root;
+public List<FsNode> GetDirectories(string cwd)
+{
+    FsNode node = GetCurrentNode(cwd);
 
-        string fullPath = Normalize(Path.Combine(
-            RootPath,
-            cwd.TrimStart('/')));
+    return node.Children.Values
+        .Where(c => c.IsDirectory)
+        .OrderBy(c => c.Name)
+        .ToList();
+}
 
-        return PathIndex.TryGetValue(fullPath, out FsNode? node)
-            ? node
-            : Root;
-    }
+public List<FsNode> GetReadableFiles(string cwd, int coherence)
+{
+    FsNode node = GetCurrentNode(cwd);
 
-    public List<FsNode> GetDirectories(string cwd)
-    {
-        FsNode node = GetCurrentNode(cwd);
-
-        return node.Children.Values
-            .Where(c => c.IsDirectory)
-            .OrderBy(c => c.Name)
-            .ToList();
-    }
-
-    public List<FsNode> GetReadableFiles(string cwd, int coherence)
-    {
-        FsNode node = GetCurrentNode(cwd);
-
-        return node.Children.Values
-            .Where(c =>
-                !c.IsDirectory &&
-                (
-                    !c.UnlockedAtCoherence.HasValue ||
-                    coherence >= c.UnlockedAtCoherence.Value
-                ))
-            .OrderBy(c => c.Filename)
-            .ToList();
-    }
-
-    string Normalize(string path)
-    {
-        return path
-            .Replace("\\", "/")
-            .TrimEnd('/');
-    }
+    return node.Children.Values
+        .Where(c =>
+            !c.IsDirectory &&
+            (
+                !c.UnlockedAtCoherence.HasValue ||
+                coherence >= c.UnlockedAtCoherence.Value
+            ))
+        .OrderBy(c => c.Filename)
+        .ToList();
+}
 }
 
 public class FsNode

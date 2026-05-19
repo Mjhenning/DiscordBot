@@ -23,12 +23,6 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     }
 
     void Log(string msg) { Console.WriteLine(msg); _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}"); }
-    string Normalize(string path)
-    {
-        return path
-            .Replace("\\", "/")
-            .TrimEnd('/');
-    }
 
     [SlashCommand("login", "Login to continue with or start a terminal session")]
     public async Task TerminalStart()
@@ -222,45 +216,27 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         if (selected == "PARENT")
         {
             FsNode current = _fs.GetCurrentNode(_data.Cwd);
-
-            if (current.Parent == null)
-            {
-                newPath = "/";
-            }
-            else
-            {
-                newPath = current.Parent.FullPath
+            newPath = current.Parent == null || current.Parent == _fs.Root
+                ? "/"
+                : current.Parent.FullPath
                     .Replace(_fs.RootPath, "")
                     .Replace("\\", "/");
-
-                if (string.IsNullOrWhiteSpace(newPath))
-                    newPath = "/";
-            }
         }
         else
         {
-            newPath = Normalize(selected)
-                .Replace(Normalize(_fs.RootPath), "")
+            newPath = selected
+                .Replace(_fs.RootPath, "")
                 .Replace("\\", "/");
-
-            if (string.IsNullOrWhiteSpace(newPath))
-                newPath = "/";
         }
 
-        _data.Cwd = newPath;
+        _data.Cwd       = newPath;
         _data.LastAction = $"{Context.User.Username} navigated to {newPath}";
         _data.Save();
 
-        ITextChannel? channel =
-            Context.Guild.GetChannel(_data.PublishedChannelId)
-                as ITextChannel;
+        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+        Embed terminalEmbed   = _terminal.BuildTerminalEmbed();
 
-        Embed terminalEmbed = _terminal.BuildTerminalEmbed();
-
-        await _terminal.UpdateExistingEmbedWButtons(
-            channel,
-            terminalEmbed,
-            _data.PublishedTMessageId,
+        await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId,
             new Dictionary<string, string>
             {
                 { "Navigate", "terminal_btn_nav" },
