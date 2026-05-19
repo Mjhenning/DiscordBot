@@ -14,11 +14,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     readonly StreamWriter _log;
     readonly ArgTerminalService _terminal;
     
-    public ARG(
-        ArgTerminalData data,
-        ArgFilesystem fs,
-        StreamWriter log,
-        ArgTerminalService terminal)
+    public ARG(ArgTerminalData data, ArgFilesystem fs, StreamWriter log, ArgTerminalService terminal)
     {
         _data = data;
         _fs = fs;
@@ -154,63 +150,367 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("terminal_btn_read", ignoreGroupNames: true)]
     public Task OnBtnRead() => ReadFile();
     
-    [ComponentInteraction("terminal_btn_read_exit", ignoreGroupNames: true)]
-    public Task OnBtnReadExit() => ReadExit();
-    
     [ComponentInteraction("terminal_btn_ping", ignoreGroupNames: true)]
     public Task OnBtnPing() => Ping();
+    
+    
+    
 
     public async Task NavigateToFolder()
     {
-        //open menu to enter directory / file structure and navigate to their and update embed
+        if (!IsLoggedIn()) //if logged in
+        {
+            await RespondAsync(
+                "You must login first.",
+                ephemeral: true);
+
+            return;
+        }
+
+        _data.InteractionMode = TerminalInteractionMode.Navigating; //so select menu is for folder navigation
+
+        //Buuilds directory list
+        List<FsNode> directories =
+            _fs.GetDirectories(_data.Cwd);
+        
+        List<SelectMenuOptionBuilder> options = new();
+
+        // parent directory option
+        if (!string.IsNullOrWhiteSpace(_data.Cwd) &&
+            _data.Cwd != "/")
+        {
+            options.Add(new SelectMenuOptionBuilder()
+                .WithLabel("📁 ..")
+                .WithDescription("Go to parent directory")
+                .WithValue("PARENT"));
+        }
+
+        foreach (FsNode dir in directories.Take(24))
+        {
+            options.Add(new SelectMenuOptionBuilder()
+                .WithLabel($"📁 {dir.Name}")
+                .WithDescription($"Navigate to {dir.Name}")
+                .WithValue(dir.FullPath));
+        }
+
+        MessageComponent menu = new ComponentBuilder()
+            .WithSelectMenu(new SelectMenuBuilder()
+                .WithCustomId("terminal_nav_select")
+                .WithPlaceholder("Select a directory")
+                .WithOptions(options)
+                .WithMinValues(1)
+                .WithMaxValues(1))
+            .Build();
+
+        await RespondAsync(
+            $"Current Directory: `{_data.Cwd}`",
+            components: menu,
+            ephemeral: true);
+    }
+    
+    [ComponentInteraction("terminal_nav_select", ignoreGroupNames: true)]
+    public async Task OnNavigationSelected(string selected)
+    {
+        string newPath;
+
+        // parent navigation
+        if (selected == "PARENT")
+        {
+            FsNode current = _fs.GetCurrentNode(_data.Cwd);
+
+            newPath = current.Parent == null ||
+                      current.Parent == _fs.Root
+                ? "/"
+                : current.Parent.FullPath
+                    .Replace(_fs.RootPath, "")
+                    .Replace("\\", "/");
+        }
+        else
+        {
+            newPath = selected
+                .Replace(_fs.RootPath, "")
+                .Replace("\\", "/");
+        }
+
+        _data.PendingPath = newPath;
+
+        ComponentBuilder buttons = new();
+
+        buttons.WithButton(
+            "Confirm",
+            "terminal_btn_confirm_nav",
+            ButtonStyle.Success);
+
+        buttons.WithButton(
+            "Cancel",
+            "terminal_btn_cancel",
+            ButtonStyle.Secondary);
+
+        await RespondAsync(
+            $"Navigate to `{newPath}` ?",
+            components: buttons.Build(),
+            ephemeral: true);
+    }
+    
+    [ComponentInteraction("terminal_btn_confirm_nav", ignoreGroupNames: true)]
+    public async Task ConfirmNavigation()
+    {
+        _data.Cwd = _data.PendingPath;
+
+        _data.LastAction =
+            $"navigated to {_data.Cwd}";
+
+        _data.Save();
+
+        ITextChannel? channel =
+            Context.Guild.GetChannel(
+                    _data.PublishedChannelId)
+                as ITextChannel;
+
+        Embed terminalEmbed =
+            _terminal.BuildTerminalEmbed();
+
+        await _terminal.UpdateExistingEmbedWButtons(
+            channel,
+            terminalEmbed,
+            _data.PublishedTMessageId,
+            new Dictionary<string, string>()
+            {
+                {"Navigate", "terminal_btn_nav"},
+                {"Read", "terminal_btn_read"},
+                {"Ping", "terminal_btn_ping"}
+            });
+
+        await RespondAsync(
+            $"Directory changed to `{_data.Cwd}`",
+            ephemeral: true);
+    }
+    
+    [ComponentInteraction("terminal_btn_cancel", ignoreGroupNames: true)]
+    public async Task CancelInteraction()
+    {
+        _data.InteractionMode =
+            TerminalInteractionMode.None;
+
+        _data.PendingPath = "";
+        _data.PendingFilePath = "";
+
+        await RespondAsync(
+            "Operation cancelled.",
+            ephemeral: true);
     }
 
+    
+    
+    
     public async Task ReadFile()
     {
-        // Log($"[Debug] Building Read file embed...");
-        //
-        // Embed readEmbed = _terminal.BuildReadEmbed();
-        // ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
-        //
-        // Log($"[Debug] Updating existing read embed (ID: {_data.PublishedRMessageId})");
-        // await _terminal.UpdateExistingEmbedWButtons(channel, readEmbed, _data.PublishedRMessageId, new Dictionary<string, string>()
-        // {
-        //     {"Exit", "terminal_btn_read_exit"}
-        // });
-        
-        //open menu to enter filename and update read embed
-    }
+        if (!IsLoggedIn())
+        {
+            await RespondAsync(
+                "You must login first.",
+                ephemeral: true);
 
-    public async Task ReadExit()
-    {
-        //blanks out read embed to idle state and removes button
-        
-        Log($"[Debug] Building Read file embed...");
-        
-        Embed readEmbed = _terminal.BuildReadEmbed();
-        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
-        
-        Log($"[Debug] Updating existing read embed (ID: {_data.PublishedRMessageId})");
-        await _terminal.UpdateExistingEmbed(channel, readEmbed, _data.PublishedRMessageId);
+            return;
+        }
+
+        _data.InteractionMode =
+            TerminalInteractionMode.Reading;
+
+        int coherence = _data.GetCoherence();
+
+        List<FsNode> files =
+            _fs.GetReadableFiles(_data.Cwd, coherence);
+
+        if (files.Count == 0)
+        {
+            await RespondAsync(
+                "No readable files found in this directory.",
+                ephemeral: true);
+
+            return;
+        }
+
+        List<SelectMenuOptionBuilder> options = new();
+
+        foreach (FsNode file in files.Take(25))
+        {
+            string label = file.Corrupted
+                ? $"📄 {file.Filename} [CORRUPTED]"
+                : $"📄 {file.Filename}";
+
+            options.Add(new SelectMenuOptionBuilder()
+                .WithLabel(label)
+                .WithDescription("Open file")
+                .WithValue(file.FullPath));
+        }
+
+        MessageComponent menu = new ComponentBuilder()
+            .WithSelectMenu(new SelectMenuBuilder()
+                .WithCustomId("terminal_read_select")
+                .WithPlaceholder("Select a file to read")
+                .WithOptions(options)
+                .WithMinValues(1)
+                .WithMaxValues(1))
+            .Build();
+
+        await RespondAsync(
+            $"Current Directory: `{_data.Cwd}`",
+            components: menu,
+            ephemeral: true);
     }
+    
+    [ComponentInteraction("terminal_read_select", ignoreGroupNames: true)]
+    public async Task OnReadFileSelected(string selected)
+    {
+        _data.PendingFilePath = selected;
+
+        string relativePath = selected
+            .Replace(_fs.RootPath, "")
+            .Replace("\\", "/");
+
+        ComponentBuilder buttons = new();
+
+        buttons.WithButton(
+            "Open File",
+            "terminal_btn_confirm_read",
+            ButtonStyle.Success);
+
+        buttons.WithButton(
+            "Cancel",
+            "terminal_btn_cancel",
+            ButtonStyle.Secondary);
+
+        await RespondAsync(
+            $"Open `{relativePath}` ?",
+            components: buttons.Build(),
+            ephemeral: true);
+    }
+    
+    [ComponentInteraction("terminal_btn_confirm_read", ignoreGroupNames: true)]
+    public async Task ConfirmRead()
+    {
+        if (!_fs.PathIndex.TryGetValue(
+                _data.PendingFilePath,
+                out FsNode? node))
+        {
+            await RespondAsync(
+                "File no longer exists.",
+                ephemeral: true);
+
+            return;
+        }
+
+        _data.ReadMessageFile =
+            node.Filename ?? "unknown_file";
+
+        string content = node.Content == null
+            ? "*empty file*"
+            : string.Join("\n", node.Content);
+
+        if (content.Length > 4000)
+        {
+            content = content[..4000] +
+                      "\n\n[FILE TRUNCATED]";
+        }
+
+        _data.ReadMessageContent = content;
+
+        _data.LastAction =
+            $"read {_data.ReadMessageFile}";
+
+        _data.Save();
+
+        ITextChannel? channel =
+            Context.Guild.GetChannel(
+                    _data.PublishedChannelId)
+                as ITextChannel;
+
+        Embed readEmbed =
+            _terminal.BuildReadEmbed();
+
+        await _terminal.UpdateExistingEmbedWButtons(
+            channel,
+            readEmbed,
+            _data.PublishedRMessageId,
+            new Dictionary<string, string>()
+            {
+                {"Close File", "terminal_btn_close_file"}
+            });
+
+        await RespondAsync(
+            $"Opened `{_data.ReadMessageFile}`",
+            ephemeral: true);
+    }
+    
+    [ComponentInteraction("terminal_btn_close_file", ignoreGroupNames: true)]
+    public async Task CloseFile()
+    {
+        _data.ReadMessageFile = "";
+        _data.ReadMessageContent = "";
+
+        _data.LastAction =
+            "closed active file";
+
+        _data.Save();
+
+        ITextChannel? channel =
+            Context.Guild.GetChannel(
+                    _data.PublishedChannelId)
+                as ITextChannel;
+
+        Embed readEmbed =
+            _terminal.BuildReadEmbed();
+
+        await _terminal.UpdateExistingEmbedNoComponents(
+            channel,
+            readEmbed,
+            _data.PublishedRMessageId);
+
+        await RespondAsync(
+            "File closed.",
+            ephemeral: true);
+    }
+    
+    
 
     public async Task Ping()
     {
-        //bumps coherence with 2%
-        _data.BumpCoherence(2);
-        
-        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
-        
-        Embed terminalEmbed = _terminal.BuildTerminalEmbed();
-        
-        Log($"[Debug] Updating existing terminal embed (ID: {_data.PublishedTMessageId})");
-        await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId, new Dictionary<string, string>()
-        {
-            {"Navigate", "terminal_btn_nav"},
-            {"Read", "terminal_btn_read"},
-            {"Ping", "terminal_btn_ping"}
-        });
+        int coherenceBefore = _data.GetCoherence();
 
-        await RespondAsync($"{Context.User.Username} has successfully broken down built up bitrot by 2%! 🫧", ephemeral: true);
+        int coherenceAfter =
+            _data.BumpCoherence(2);
+
+        _data.LastAction =
+            $"stabilized filesystem integrity";
+
+        _data.Save();
+
+        ITextChannel? channel =
+            Context.Guild.GetChannel(
+                    _data.PublishedChannelId)
+                as ITextChannel;
+
+        Embed terminalEmbed =
+            _terminal.BuildTerminalEmbed();
+
+        await _terminal.UpdateExistingEmbedWButtons(
+            channel,
+            terminalEmbed,
+            _data.PublishedTMessageId,
+            new Dictionary<string, string>()
+            {
+                {"Navigate", "terminal_btn_nav"},
+                {"Read", "terminal_btn_read"},
+                {"Ping", "terminal_btn_ping"}
+            });
+
+        int restored =
+            coherenceAfter - coherenceBefore;
+
+        await RespondAsync(
+            $"🫧 Filesystem integrity restored by {restored}%\n" +
+            $"Current coherence: {coherenceAfter}%",
+            ephemeral: true);
     }
 }

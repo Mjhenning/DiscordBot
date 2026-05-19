@@ -136,6 +136,45 @@ void WatchForChanges()
 
     watcher.EnableRaisingEvents = true;
 }
+
+public FsNode GetCurrentNode(string cwd)
+{
+    if (string.IsNullOrWhiteSpace(cwd) || cwd == "/")
+        return Root;
+
+    string fullPath = Path.Combine(
+        RootPath,
+        cwd.TrimStart('/'));
+
+    return PathIndex.TryGetValue(fullPath, out FsNode? node)
+        ? node
+        : Root;
+}
+
+public List<FsNode> GetDirectories(string cwd)
+{
+    FsNode node = GetCurrentNode(cwd);
+
+    return node.Children.Values
+        .Where(c => c.IsDirectory)
+        .OrderBy(c => c.Name)
+        .ToList();
+}
+
+public List<FsNode> GetReadableFiles(string cwd, int coherence)
+{
+    FsNode node = GetCurrentNode(cwd);
+
+    return node.Children.Values
+        .Where(c =>
+            !c.IsDirectory &&
+            (
+                !c.UnlockedAtCoherence.HasValue ||
+                coherence >= c.UnlockedAtCoherence.Value
+            ))
+        .OrderBy(c => c.Filename)
+        .ToList();
+}
 }
 
 public class FsNode

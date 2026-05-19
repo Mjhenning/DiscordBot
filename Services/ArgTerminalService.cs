@@ -205,11 +205,28 @@ public class ArgTerminalService
             props.Components = buttons;
         });
     }
+    public async Task UpdateExistingEmbedNoComponents(ITextChannel? channel, Embed embed, ulong messageId)
+    {
+        if (channel == null)
+            return;
+
+        IUserMessage? message =
+            await channel.GetMessageAsync(messageId)
+                as IUserMessage;
+
+        if (message == null)
+            return;
+
+        await message.ModifyAsync(props =>
+        {
+            props.Embed = embed;
+            props.Components = new ComponentBuilder().Build();
+        });
+    }
     public async Task<IUserMessage> SendNewEmbed(ITextChannel? channel, Embed embed)
     {
         return await channel.SendMessageAsync(embed: embed);
     }
-    
     public async Task<IUserMessage> SendNewEmbedWButtons (ITextChannel? channel, Embed embed, Dictionary<String, String> Btns)
     {
         ComponentBuilder builder = new();

@@ -8,6 +8,13 @@ public enum ARGEmbed_Type
     ReadOutput
 }
 
+public enum TerminalInteractionMode
+{
+    None,
+    Navigating,
+    Reading
+}
+
 public class ArgTerminalData
 {
     private const string FilePath = "Data/argData.json";
@@ -17,7 +24,7 @@ public class ArgTerminalData
     public ulong PublishedTMessageId  { get; private set; } = 0;
     public ulong PublishedRMessageId  { get; set; } = 0;
 
-    public string Cwd { get; set; } = "";
+    public string Cwd { get; set; } = "/";
     public string ReadMessageFile{ get; set; } = "";
     public string ReadMessageContent { get; set; } = "";
 
@@ -28,6 +35,11 @@ public class ArgTerminalData
     public HashSet<ulong> LoggedInUsers { get; private set; } = new();
 
     public List<string> ActionHistory { get; set; } = new List<string>();
+    
+    public TerminalInteractionMode InteractionMode { get; set; }
+
+    public string PendingPath { get; set; } = "";
+    public string PendingFilePath { get; set; } = "";
     
     
     public ArgTerminalData() => Initialize();
@@ -46,9 +58,9 @@ public class ArgTerminalData
 
         if (store != null)
         {
-            PublishedTMessageId = store.MessageId;
+            PublishedTMessageId = store.TerminalMessageId;
             PublishedChannelId = store.ChannelId;
-            PublishedRMessageId = store.ContentMessageId;
+            PublishedRMessageId = store.ReadMessageId;
             
             Cwd = store.Cwd;
             ReadMessageFile = store.ReadMessageFile;
@@ -79,11 +91,12 @@ public class ArgTerminalData
     {
         TerminalStore store = new()
         {
-            MessageId = PublishedTMessageId,
+            TerminalMessageId = PublishedTMessageId,
             ChannelId = PublishedChannelId,
-            ContentMessageId = PublishedRMessageId,
+            ReadMessageId = PublishedRMessageId,
             
             Cwd = Cwd,
+            ReadMessageFile = ReadMessageFile,
             ReadMessage = ReadMessageContent,
             LastAction = LastAction,
             
@@ -110,15 +123,13 @@ public class ArgTerminalData
     
     public int BumpCoherence(int amount)
     {
-        if (amount != 0)
-        {
-            string json = File.ReadAllText(StateFilePath);
-            dynamic state = JsonConvert.DeserializeObject<dynamic>(json)!;
-            state.coherence += amount;
-            return state.coherence;
-        }
-        
-        return 0;
+        if (amount == 0) return 0;
+    
+        string json   = File.ReadAllText(StateFilePath);
+        dynamic state = JsonConvert.DeserializeObject<dynamic>(json)!;
+        state.coherence = Math.Min(100, (int)(state.coherence ?? 0) + amount);
+        File.WriteAllText(StateFilePath, JsonConvert.SerializeObject(state, Formatting.Indented));
+        return (int)state.coherence;
     }
     
     
@@ -143,10 +154,10 @@ public class ArgTerminalData
 public class TerminalStore
 {
     public ulong ChannelId  { get; set; } = 0;
-    public ulong MessageId  { get; set; } = 0;
-    public ulong ContentMessageId { get; set; } = 0;
+    public ulong TerminalMessageId { get; set; } = 0;
+    public ulong ReadMessageId { get; set; } = 0;
 
-    public string Cwd { get; set; } = "";
+    public string Cwd { get; set; } = "/";
     public string ReadMessageFile { get; set; } = "";
     public string ReadMessage { get; set; } = "";
     
