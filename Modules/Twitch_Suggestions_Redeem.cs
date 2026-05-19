@@ -99,20 +99,28 @@ public class TwitchSuggestionsPoster
         var redemption = args.Payload.Event;
         Log($"[Info] Redemption event received — Status: {redemption.Status}, User: {redemption.UserName}");
 
-        if (redemption.Status != "fulfilled")
-        {
-            Log($"[Info] Skipping — status is '{redemption.Status}', not fulfilled");
-            return;
-        }
-        
-        string userName  = redemption.UserName;
-        
-        GetUsersResponse? userResult = await TwitchApi.Helix.Users.GetUsersAsync(
-            null,
-            new List<string>() { userName }
-        );
+        if (redemption.Status != "fulfilled") return;
 
-        await PostToDiscord(userName, redemption.UserInput, userResult.Users[0].ProfileImageUrl, $"https://www.twitch.tv/{userName}");
+        string userName = redemption.UserName;
+
+        try
+        {
+            GetUsersResponse? userResult = await TwitchApi.Helix.Users.GetUsersAsync(
+                null, new List<string>() { userName }
+            );
+            Log($"[Info] GetUsers returned {userResult?.Users?.Length ?? 0} user(s)");
+
+            string avatarUrl = userResult?.Users?.Length > 0
+                ? userResult.Users[0].ProfileImageUrl
+                : "";
+
+            await PostToDiscord(userName, redemption.UserInput, avatarUrl, $"https://www.twitch.tv/{userName}");
+        }
+        catch (Exception ex)
+        {
+            Log($"[Error] OnRewardRedemptionUpdated failed: {ex.Message}");
+            Log($"[Error] {ex.StackTrace}");
+        }
     }
 
     async Task PostToDiscord(string user, string input, string avatarUrl, string userUrl = "")
