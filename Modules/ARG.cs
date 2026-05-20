@@ -170,7 +170,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         if (!IsLoggedIn()) //if logged in
         {
             await RespondAsync(
-                "You must login first.",
+                "You're not currently logged in! Please call /system login first to interact with the ARTHER-OS!🫧",
                 ephemeral: true);
 
             return;
@@ -252,7 +252,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         if (!IsLoggedIn())
         {
             await RespondAsync(
-                "You must login first.",
+                "You're not currently logged in! Please call /system login first to interact with the ARTHER-OS!🫧",
                 ephemeral: true);
 
             return;
@@ -345,6 +345,15 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("terminal_btn_close_file", ignoreGroupNames: true)]
     public async Task CloseFile()
     {
+        if (!IsLoggedIn())
+        {
+            await RespondAsync(
+                "You're not currently logged in! Please call /system login first to interact with the AETHER-OS!🫧",
+                ephemeral: true);
+
+            return;
+        }
+        
         _data.AddHistory($"{Context.User.Username} closed {_data.ReadMessageFile}");
         
         _data.ReadMessageFile = "";
@@ -361,6 +370,15 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     
     public async Task Ping()
     {
+        if (!IsLoggedIn())
+        {
+            await RespondAsync(
+                "You're not currently logged in! Please call /system login first to interact with the AETHER-OS!🫧",
+                ephemeral: true);
+
+            return;
+        }
+        
         int coherenceBefore = _data.GetCoherence();
 
         int coherenceAfter =
