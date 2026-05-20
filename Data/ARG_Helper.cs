@@ -149,11 +149,20 @@ public FsNode GetCurrentNode(string cwd)
     if (string.IsNullOrWhiteSpace(cwd) || cwd == "/")
         return Root;
 
-    string fullPath = Path.Combine(RootPath, cwd.TrimEnd('/'));
+    string[] parts = cwd.Trim('/')
+        .Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-    return PathIndex.TryGetValue(fullPath, out FsNode? node)
-        ? node
-        : Root;
+    FsNode current = Root;
+
+    foreach (string part in parts)
+    {
+        if (!current.Children.TryGetValue(part, out FsNode? next))
+            return Root; // or return current if you prefer partial fallback
+
+        current = next;
+    }
+
+    return current;
 }
 
 public List<FsNode> GetDirectories(string cwd)
