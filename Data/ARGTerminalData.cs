@@ -4,6 +4,7 @@ namespace DiscordBot.Data;
 
 public enum ARGEmbed_Type
 {
+    Logs,
     Terminal,
     ReadOutput
 }
@@ -31,6 +32,7 @@ public class ArgTerminalData
     public ulong PublishedChannelId  { get; private set; } = 0;
     public ulong PublishedTMessageId  { get; private set; } = 0;
     public ulong PublishedRMessageId  { get; set; } = 0;
+    public ulong PublishedLMessageId  { get; set; } = 0;
 
     public string Cwd { get; set; } = "/";
     public string ReadMessageFile{ get; set; } = "";
@@ -61,6 +63,7 @@ public class ArgTerminalData
 
         if (store != null)
         {
+            PublishedLMessageId = store.LogsMessageId;
             PublishedTMessageId = store.TerminalMessageId;
             PublishedChannelId = store.ChannelId;
             PublishedRMessageId = store.ReadMessageId;
@@ -85,6 +88,9 @@ public class ArgTerminalData
             case ARGEmbed_Type.ReadOutput:
                 PublishedRMessageId = messageId;
                 break;
+            case ARGEmbed_Type.Logs:
+                PublishedLMessageId = messageId;
+                break;
         }
         Save();
     }
@@ -93,6 +99,7 @@ public class ArgTerminalData
     {
         TerminalStore store = new()
         {
+            LogsMessageId = PublishedLMessageId,
             TerminalMessageId = PublishedTMessageId,
             ChannelId = PublishedChannelId,
             ReadMessageId = PublishedRMessageId,
@@ -107,6 +114,8 @@ public class ArgTerminalData
         string json = JsonConvert.SerializeObject(store, Formatting.Indented);
         File.WriteAllText(FilePath, json);
     }
+    
+    // ─── HELPERS ────────────────────────────────────────────────────
 
     public int GetCoherence()
     {
@@ -157,12 +166,18 @@ public class ArgTerminalData
     
     public void AddHistory(string action)
     {
-        ActionHistory.Enqueue(action);
+        long unixTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        ActionHistory.Enqueue(action + $" <t:{unixTimestamp}:R>");
 
         while (ActionHistory.Count > 25)
         {
             ActionHistory.Dequeue();
         }
+    }
+
+    public Queue<string> GetHistory()
+    {
+        return ActionHistory;
     }
 
 }
@@ -172,6 +187,7 @@ public class TerminalStore
     public ulong ChannelId  { get; set; } = 0;
     public ulong TerminalMessageId { get; set; } = 0;
     public ulong ReadMessageId { get; set; } = 0;
+    public ulong LogsMessageId { get; set; } = 0;
 
     public string Cwd { get; set; } = "/";
     public string ReadMessageFile { get; set; } = "";

@@ -7,6 +7,7 @@ using DiscordBot.Services;
 
 namespace DiscordBot.Modules;
 
+[Group("system", "Interact with the AETHER-OS")]
 public class ARG : InteractionModuleBase<SocketInteractionContext>
 {
     readonly ArgTerminalData _data;
@@ -59,28 +60,27 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             });
             return;
         }
-
-        Log($"[Debug] Building embeds...");
-        Embed terminalEmbed = _terminal.BuildTerminalEmbed();
-        Embed readEmbed = _terminal.BuildReadEmbed();
-        Log($"[Debug] Embeds built successfully");
-
-        IUserMessage postedTerminal;
-        IUserMessage postedRead;
-
-        // ── Terminal embed first ────────────────────────────────────────
-        if (_data.PublishedTMessageId != 0)
+        
+        if (_data.PublishedLMessageId == 0)
         {
-            Log($"[Debug] Updating existing terminal embed (ID: {_data.PublishedTMessageId})");
-            await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId, new Dictionary<string, string>()
-            {
-                {"Navigate", "terminal_btn_nav"},
-                {"Read", "terminal_btn_read"},
-                {"Ping", "terminal_btn_ping"}
-            });
+            IUserMessage postedLog;
+            
+            Embed logEmbed = _terminal.BuildLogHistoryEmbed();
+            
+            Log($"[Debug] No existing logs embed — posting new");
+            postedLog = await _terminal.SendNewEmbed(channel, logEmbed);
+            Log($"[Debug] Terminal embed posted with ID: {postedLog.Id}");
+            _data.SetPublished(postedLog.Id, channel.Id, ARGEmbed_Type.Logs);
         }
-        else
+        
+
+        // ── Terminal embed ────────────────────────────────────────
+        if (_data.PublishedTMessageId == 0)
         {
+            IUserMessage postedTerminal;
+            
+            Embed terminalEmbed = _terminal.BuildTerminalEmbed();
+            
             Log($"[Debug] No existing terminal embed — posting new");
             postedTerminal = await _terminal.SendNewEmbedWButtons(channel, terminalEmbed, new Dictionary<string, string>()
             {
@@ -92,19 +92,23 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             _data.SetPublished(postedTerminal.Id, channel.Id, ARGEmbed_Type.Terminal);
         }
 
-        // ── Read embed second ───────────────────────────────────────────
-        if (_data.PublishedRMessageId != 0)
+        // ── Read embed ───────────────────────────────────────────
+        if (_data.PublishedRMessageId == 0)
         {
-            Log($"[Debug] Updating existing read embed (ID: {_data.PublishedRMessageId})");
-            await _terminal.UpdateExistingEmbed(channel, readEmbed, _data.PublishedRMessageId);
-        }
-        else
-        {
+            IUserMessage postedRead;
+            
+            Embed readEmbed = _terminal.BuildReadEmbed();
+            
             Log($"[Debug] No existing read embed — posting new");
             postedRead = await _terminal.SendNewEmbed(channel, readEmbed);
             Log($"[Debug] Read embed posted with ID: {postedRead.Id}");
             _data.SetPublished(postedRead.Id, channel.Id, ARGEmbed_Type.ReadOutput);
         }
+        
+        await _terminal.RefreshEmbeds(
+            ARGEmbed_Type.Logs,
+            ARGEmbed_Type.Terminal,
+            ARGEmbed_Type.ReadOutput);
 
         Log($"[Info] /login complete for {Context.User.Username} — terminal session active");
         await ModifyOriginalResponseAsync(msg =>
@@ -136,22 +140,14 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             return;
         }
         
-        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
-        Embed terminalEmbed   = _terminal.BuildTerminalEmbed();
-
-        await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId,
-            new Dictionary<string, string>
-            {
-                { "Navigate", "terminal_btn_nav" },
-                { "Read",     "terminal_btn_read" },
-                { "Ping",     "terminal_btn_ping" }
-            });
+        await _terminal.RefreshEmbeds(ARGEmbed_Type.Terminal);
 
         Log($"[Debug] activeUsers after logout: {_data.activeUsers}");
         await RespondAsync($"{Context.User.Username} has successfully logged out of the AETHER-OS. Sad to see you go! 🫧", ephemeral: true);
     }
     
     bool IsLoggedIn() => _data.LoggedInUsers.Contains(Context.User.Id);
+    
     
     
     // ─── BUTTONS ────────────────────────────────────────────────────
@@ -165,6 +161,8 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     public Task OnBtnPing() => Ping();
     
     
+    
+    // ─── BUTTON LOGIC ────────────────────────────────────────────────────
     
 
     public async Task NavigateToFolder()
@@ -244,22 +242,10 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         _data.AddHistory($"{Context.User.Username} navigated to {newPath}");
         _data.Save();
 
-        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
-        Embed terminalEmbed   = _terminal.BuildTerminalEmbed();
-
-        await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId,
-            new Dictionary<string, string>
-            {
-                { "Navigate", "terminal_btn_nav" },
-                { "Read",     "terminal_btn_read" },
-                { "Ping",     "terminal_btn_ping" }
-            });
+        await _terminal.RefreshEmbeds(ARGEmbed_Type.Terminal, ARGEmbed_Type.Logs);
 
         await RespondAsync($"Moved to `{newPath}`", ephemeral: true);
     }
-
-    
-    
     
     public async Task ReadFile()
     {
@@ -349,22 +335,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         _data.Save();
 
-        ITextChannel? channel =
-            Context.Guild.GetChannel(
-                    _data.PublishedChannelId)
-                as ITextChannel;
-
-        Embed readEmbed =
-            _terminal.BuildReadEmbed();
-
-        await _terminal.UpdateExistingEmbedWButtons(
-            channel,
-            readEmbed,
-            _data.PublishedRMessageId,
-            new Dictionary<string, string>()
-            {
-                {"Close File", "terminal_btn_close_file"}
-            });
+        await _terminal.RefreshEmbeds(ARGEmbed_Type.ReadOutput, ARGEmbed_Type.Logs);
 
         await RespondAsync(
             $"Opened `{_data.ReadMessageFile}`",
@@ -374,33 +345,20 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("terminal_btn_close_file", ignoreGroupNames: true)]
     public async Task CloseFile()
     {
+        _data.AddHistory($"{Context.User.Username} closed {_data.ReadMessageFile}");
+        
         _data.ReadMessageFile = "";
         _data.ReadMessageContent = "";
-
-        _data.AddHistory("closed active file");
-
+        
         _data.Save();
 
-        ITextChannel? channel =
-            Context.Guild.GetChannel(
-                    _data.PublishedChannelId)
-                as ITextChannel;
-
-        Embed readEmbed =
-            _terminal.BuildReadEmbed();
-
-        await _terminal.UpdateExistingEmbedNoComponents(
-            channel,
-            readEmbed,
-            _data.PublishedRMessageId);
+        await _terminal.RefreshEmbeds(ARGEmbed_Type.ReadOutput, ARGEmbed_Type.Logs);
 
         await RespondAsync(
-            "File closed.",
+            "File closed successfully.🫧",
             ephemeral: true);
     }
     
-    
-
     public async Task Ping()
     {
         int coherenceBefore = _data.GetCoherence();
@@ -408,31 +366,13 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         int coherenceAfter =
             _data.BumpCoherence(2);
 
-        _data.AddHistory("stabilized filesystem integrity");
+        _data.AddHistory($"{Context.User.Username} stabilized filesystem integrity");
 
         _data.Save();
 
-        ITextChannel? channel =
-            Context.Guild.GetChannel(
-                    _data.PublishedChannelId)
-                as ITextChannel;
+        await _terminal.RefreshEmbeds(ARGEmbed_Type.Terminal, ARGEmbed_Type.Logs);
 
-        Embed terminalEmbed =
-            _terminal.BuildTerminalEmbed();
-
-        await _terminal.UpdateExistingEmbedWButtons(
-            channel,
-            terminalEmbed,
-            _data.PublishedTMessageId,
-            new Dictionary<string, string>()
-            {
-                {"Navigate", "terminal_btn_nav"},
-                {"Read", "terminal_btn_read"},
-                {"Ping", "terminal_btn_ping"}
-            });
-
-        int restored =
-            coherenceAfter - coherenceBefore;
+        int restored = coherenceAfter - coherenceBefore;
 
         await RespondAsync(
             $"🫧 Filesystem integrity restored by {restored}%\n" +
