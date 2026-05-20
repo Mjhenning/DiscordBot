@@ -13,15 +13,14 @@ public class CoherenceWatcher : IDisposable
 
     public CoherenceWatcher(
         ArgTerminalService terminal,
-        ArgTerminalData data,
-        string jsonPath)
+        ArgTerminalData data)
     {
         _terminal = terminal;
         _data = data;
 
-        _watcher = new FileSystemWatcher(Path.GetDirectoryName(jsonPath)!)
+        _watcher = new FileSystemWatcher(Path.GetDirectoryName(_data.StateFilePath)!)
         {
-            Filter = Path.GetFileName(jsonPath),
+            Filter = Path.GetFileName(_data.StateFilePath),
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
             EnableRaisingEvents = true
         };

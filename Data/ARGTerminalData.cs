@@ -18,9 +18,9 @@ public enum TerminalInteractionMode
 
 public class ArgTerminalData
 {
-    private const string FilePath = "Data/argData.json";
+    const string FilePath = "Data/argData.json";
     
-    static readonly string StateFilePath =
+    public readonly string StateFilePath =
         Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,

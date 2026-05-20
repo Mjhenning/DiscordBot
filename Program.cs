@@ -60,8 +60,7 @@ ServiceProvider services = new ServiceCollection()
 
         return new CoherenceWatcher(
             terminal,
-            data,
-            "data/terminal.json"
+            data
         );
     })
     .BuildServiceProvider();
