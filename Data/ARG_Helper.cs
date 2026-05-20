@@ -9,7 +9,7 @@ public class ArgFilesystem
             Path.Combine(
                 AppContext.BaseDirectory,
                 "..", "..", "..", "..",
-                "Twitch_Bot",
+                "TwitchBot",
                 "ARG",
                 "_filesystem"));
     

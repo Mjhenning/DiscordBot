@@ -24,7 +24,7 @@ public class ArgTerminalData
             Path.Combine(
                 AppContext.BaseDirectory,
                 "..", "..", "..", "..",
-                "Twitch_Bot",
+                "TwitchBot",
                 "ARG",
                 "data",
                 "state.json"));
