@@ -135,8 +135,6 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             await RespondAsync($"{Context.User.Username} you haven't connected yet!", ephemeral: true);
             return;
         }
-
-        _data.activeUsers--;
         
         ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
         Embed terminalEmbed   = _terminal.BuildTerminalEmbed();
