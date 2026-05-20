@@ -179,7 +179,40 @@ public class ArgTerminalData
     {
         return ActionHistory;
     }
+    
+    public void Reload()
+    {
+        try
+        {
+            if (!File.Exists(FilePath))
+                return;
 
+            string json = File.ReadAllText(FilePath);
+            TerminalStore? store =
+                JsonConvert.DeserializeObject<TerminalStore>(json);
+
+            if (store == null)
+                return;
+
+            PublishedLMessageId = store.LogsMessageId;
+            PublishedTMessageId = store.TerminalMessageId;
+            PublishedChannelId  = store.ChannelId;
+            PublishedRMessageId = store.ReadMessageId;
+
+            Cwd = store.Cwd ?? "/";
+            ReadMessageFile = store.ReadMessageFile ?? "";
+            ReadMessageContent = store.ReadMessage ?? "";
+
+            ActionHistory = store.ActionHistory ?? new Queue<string>();
+
+            // keep runtime-only state intact unless you want resets:
+            activeUsers = LoggedInUsers.Count;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ARG Reload Error] {ex.Message}");
+        }
+    }
 }
 
 public class TerminalStore

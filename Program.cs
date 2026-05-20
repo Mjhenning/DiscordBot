@@ -53,10 +53,23 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<ArgFilesystem>()
     .AddSingleton<ArgTerminalData>()
     .AddSingleton<ArgTerminalService>()
+    .AddSingleton(sp =>
+    {
+        var terminal = sp.GetRequiredService<ArgTerminalService>();
+        var data = sp.GetRequiredService<ArgTerminalData>();
+
+        return new CoherenceWatcher(
+            terminal,
+            data,
+            "data/terminal.json"
+        );
+    })
     .BuildServiceProvider();
 
 InteractionService interactions = services.GetRequiredService<InteractionService>();
 ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
+
+CoherenceWatcher watcher = services.GetRequiredService<CoherenceWatcher>();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Logging — routes both client and interaction service logs to the console
