@@ -136,6 +136,19 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
+        _data.activeUsers--;
+        
+        ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
+        Embed terminalEmbed   = _terminal.BuildTerminalEmbed();
+
+        await _terminal.UpdateExistingEmbedWButtons(channel, terminalEmbed, _data.PublishedTMessageId,
+            new Dictionary<string, string>
+            {
+                { "Navigate", "terminal_btn_nav" },
+                { "Read",     "terminal_btn_read" },
+                { "Ping",     "terminal_btn_ping" }
+            });
+
         Log($"[Debug] activeUsers after logout: {_data.activeUsers}");
         await RespondAsync($"{Context.User.Username} has successfully logged out of the AETHER-OS. Sad to see you go! 🫧", ephemeral: true);
     }
