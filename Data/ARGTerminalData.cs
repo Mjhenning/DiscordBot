@@ -23,8 +23,7 @@ public class ArgTerminalData
         Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
-                "..",
-                "..",
+                "..", "..", "..", "..",
                 "Twitch_Bot",
                 "ARG",
                 "data",

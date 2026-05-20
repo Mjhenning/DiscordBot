@@ -8,8 +8,7 @@ public class ArgFilesystem
         Path.GetFullPath(
             Path.Combine(
                 AppContext.BaseDirectory,
-                "..",
-                "..",
+                "..", "..", "..", "..",
                 "Twitch_Bot",
                 "ARG",
                 "_filesystem"));
