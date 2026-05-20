@@ -4,7 +4,15 @@ namespace DiscordBot.Data;
 
 public class ArgFilesystem
 {
-    const string FsRoot = "/home/mjhenning/OBS/Twitch_Bot/ARG/_filesystem";
+    static readonly string FsRoot =
+        Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "..",
+                "..",
+                "Twitch_Bot",
+                "ARG",
+                "_filesystem"));
     
     public string RootPath => FsRoot;
     public FsNode Root { get; private set; }

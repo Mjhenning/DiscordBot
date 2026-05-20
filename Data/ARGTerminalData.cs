@@ -19,7 +19,16 @@ public class ArgTerminalData
 {
     private const string FilePath = "Data/argData.json";
     
-    const string StateFilePath = "/home/mjhenning/OBS/Twitch_Bot/ARG/data/state.json";
+    static readonly string StateFilePath =
+        Path.GetFullPath(
+            Path.Combine(
+                AppContext.BaseDirectory,
+                "..",
+                "..",
+                "Twitch_Bot",
+                "ARG",
+                "data",
+                "state.json"));
     public ulong PublishedChannelId  { get; private set; } = 0;
     public ulong PublishedTMessageId  { get; private set; } = 0;
     public ulong PublishedRMessageId  { get; set; } = 0;
