@@ -241,7 +241,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         }
 
         _data.Cwd       = newPath;
-        _data.LastAction = $"{Context.User.Username} navigated to {newPath}";
+        _data.AddHistory($"{Context.User.Username} navigated to {newPath}");
         _data.Save();
 
         ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
@@ -345,8 +345,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         _data.ReadMessageContent = content;
 
-        _data.LastAction =
-            $"{Context.User.Username} read {_data.ReadMessageFile}";
+        _data.AddHistory($"{Context.User.Username} read {_data.ReadMessageFile}");
 
         _data.Save();
 
@@ -378,8 +377,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         _data.ReadMessageFile = "";
         _data.ReadMessageContent = "";
 
-        _data.LastAction =
-            "closed active file";
+        _data.AddHistory("closed active file");
 
         _data.Save();
 
@@ -410,8 +408,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         int coherenceAfter =
             _data.BumpCoherence(2);
 
-        _data.LastAction =
-            $"stabilized filesystem integrity";
+        _data.AddHistory("stabilized filesystem integrity");
 
         _data.Save();
 

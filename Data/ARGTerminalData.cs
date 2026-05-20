@@ -35,14 +35,12 @@ public class ArgTerminalData
     public string Cwd { get; set; } = "/";
     public string ReadMessageFile{ get; set; } = "";
     public string ReadMessageContent { get; set; } = "";
-
-    public string LastAction { get; set; } = "";
     
     public int activeUsers = 0;
     
     public HashSet<ulong> LoggedInUsers { get; private set; } = new();
 
-    public List<string> ActionHistory { get; set; } = new List<string>();
+    public Queue<string> ActionHistory { get; set; } = new Queue<string>();
     
     public TerminalInteractionMode InteractionMode { get; set; }
     
@@ -70,7 +68,6 @@ public class ArgTerminalData
             Cwd = store.Cwd;
             ReadMessageFile = store.ReadMessageFile;
             ReadMessageContent = store.ReadMessage;
-            LastAction = store.LastAction;
 
             ActionHistory = store.ActionHistory ?? new();
         }
@@ -103,7 +100,6 @@ public class ArgTerminalData
             Cwd = Cwd,
             ReadMessageFile = ReadMessageFile,
             ReadMessage = ReadMessageContent,
-            LastAction = LastAction,
             
             ActionHistory = ActionHistory
         };
@@ -158,6 +154,16 @@ public class ArgTerminalData
         activeUsers = LoggedInUsers.Count;
         return true;
     }
+    
+    public void AddHistory(string action)
+    {
+        ActionHistory.Enqueue(action);
+
+        while (ActionHistory.Count > 25)
+        {
+            ActionHistory.Dequeue();
+        }
+    }
 
 }
 
@@ -171,7 +177,5 @@ public class TerminalStore
     public string ReadMessageFile { get; set; } = "";
     public string ReadMessage { get; set; } = "";
     
-    public string LastAction { get; set; }
-    
-    public List<string> ActionHistory { get; set; }
+    public Queue<string> ActionHistory { get; set; }
 }

@@ -118,7 +118,7 @@ public class ArgTerminalService
                 listing +
                 $"\n**------------------------------------------**" +
                 $"\n🔌 Active connections: {_data.activeUsers}" +
-                $"\n⚡ Last action: {_data.LastAction ?? "none"}" +
+                $"\n⚡ Last action: {_data.ActionHistory.Last() ?? "none"}" +
                 $"\n💾 Coherence: {coherence}%" +
                 $"\n**------------------------------------------**")
             .WithColor(new Color(0xffffff))
