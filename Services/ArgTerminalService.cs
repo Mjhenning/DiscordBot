@@ -103,32 +103,8 @@ public class ArgTerminalService
     // ─── EMBEDS ────────────────────────────────────────────────────
     public Embed BuildTerminalEmbed()
     {
-        int coherence = _data.GetCoherence();
-
-        FsNode currentNode;
-
-        if (string.IsNullOrEmpty(_data.Cwd) || _data.Cwd == "/")
-        {
-            currentNode = _fs.Root;
-        }
-        else
-        {
-            string fullPath =
-                Path.Combine(_fs.RootPath, _data.Cwd.TrimStart('/'));
-
-            _fs.PathIndex.TryGetValue(fullPath, out FsNode? found);
-            
-            Console.WriteLine($"[DEBUG] cwd={_data.Cwd}");
-            Console.WriteLine($"[DEBUG] fullPath={fullPath}");
-            Console.WriteLine($"[DEBUG] found={found != null}");
-
-            foreach (string key in _fs.PathIndex.Keys)
-            {
-                Console.WriteLine($"KEY: {key}");
-            }
-
-            currentNode = found ?? _fs.Root;
-        }
+        int coherence    = _data.GetCoherence();
+        FsNode currentNode = _fs.GetCurrentNode(_data.Cwd); // use the fixed method
 
         string listing = RenderDirectory(currentNode, coherence);
 
@@ -138,7 +114,7 @@ public class ArgTerminalService
                 "https://images.icon-icons.com/213/PNG/256/Mac_Terminal-01_25118.png")
             .WithTitle("---------------------------------------")
             .WithDescription(
-                $"📂 {(_data.Cwd == "" ? "/" : _data.Cwd)}\n" +
+                $"📂 {(string.IsNullOrEmpty(_data.Cwd) ? "/" : _data.Cwd)}\n" +
                 listing +
                 $"\n**------------------------------------------**" +
                 $"\n🔌 Active connections: {_data.activeUsers}" +
