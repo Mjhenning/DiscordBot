@@ -149,7 +149,7 @@ public FsNode GetCurrentNode(string cwd)
     if (string.IsNullOrWhiteSpace(cwd) || cwd == "/")
         return Root;
 
-    string fullPath = Path.Combine(RootPath, cwd);
+    string fullPath = Path.Combine(RootPath, cwd.TrimEnd('/'));
 
     return PathIndex.TryGetValue(fullPath, out FsNode? node)
         ? node
