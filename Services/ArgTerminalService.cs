@@ -92,8 +92,8 @@ public class ArgTerminalService
                     continue;
 
                 sb.AppendLine(child.Corrupted
-                    ? $"📄 {child.Filename} [CORRUPTED]"
-                    : $"📄 {child.Filename}");
+                    ? $"├📄 {child.Filename} [CORRUPTED]"
+                    : $"├📄 {child.Filename}");
             }
         }
 
