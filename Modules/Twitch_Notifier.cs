@@ -35,7 +35,7 @@ public class Twitch_Notifier
     // Ensures only one thread reads or writes TwitchSession/TwitchVOD at a time
     private readonly SemaphoreSlim _sessionLock = new(1, 1);
     
-    static readonly HttpClient HttpClient = new HttpClient(){BaseAddress = new Uri("https://id.twitch.tv/oauth2/token")};
+    static readonly HttpClient HttpClient = new();
 
     void Log(string msg)
     {
@@ -135,7 +135,8 @@ public class Twitch_Notifier
     public async Task<string?> GetUserToken()
     {
         Log("[Info] Fetching user token...");
-        FormUrlEncodedContent tokenRequest = new FormUrlEncodedContent(new[]
+
+        FormUrlEncodedContent tokenRequest = new(new[]
         {
             new KeyValuePair<string, string>("client_id",     Config.TwitchClientId),
             new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
@@ -143,20 +144,33 @@ public class Twitch_Notifier
             new KeyValuePair<string, string>("refresh_token", Config.BroadcasterRefreshToken),
         });
 
-        TwitchTokenResponse response = new TwitchTokenResponse();
         try
         {
-            var asyncResponse = await HttpClient.PostAsync(HttpClient.BaseAddress, tokenRequest);
-            Log($"[Info] Token HTTP status: {asyncResponse.StatusCode}");
-            string json = await asyncResponse.Content.ReadAsStringAsync();
-            response = JsonConvert.DeserializeObject<TwitchTokenResponse>(json) ?? new TwitchTokenResponse();
+            HttpResponseMessage response = await HttpClient.PostAsync(
+                "https://id.twitch.tv/oauth2/token",
+                tokenRequest
+            );
+
+            string json = await response.Content.ReadAsStringAsync();
+
+            Log($"[Info] Token HTTP status: {response.StatusCode}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Log($"[Error] Token response body: {json}");
+                return null;
+            }
+
+            TwitchTokenResponse? tokenResponse =
+                JsonConvert.DeserializeObject<TwitchTokenResponse>(json);
+
+            return tokenResponse?.AccessToken;
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            Log($"[Error] {e.GetType().Name}: {e.Message}");
-            Log($"[Error] Inner: {e.InnerException?.Message}");
+            Log($"[Error] GetUserToken failed: {ex}");
+            return null;
         }
-        return response?.AccessToken != "" ? response?.AccessToken : null;
     }
 
     public async Task StartAsync()
@@ -167,6 +181,12 @@ public class Twitch_Notifier
         Log($"[Info] Twitch user token fetched: {(_token != null ? "success" : "failed")}");
 
         TwitchApi.Settings.ClientId    = Config.TwitchClientId;
+        if (string.IsNullOrWhiteSpace(_token))
+        {
+            Log("[Error] Could not obtain Twitch token");
+            return;
+        }
+
         TwitchApi.Settings.AccessToken = _token;
     
         Log("[Info] TwitchApi credentials set — calling ConnectAsync");
@@ -177,59 +197,121 @@ public class Twitch_Notifier
     // ─── ONLINE ──────────────────────────────────────────────────────────────
 
     async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
+{
+    Log("[Info] OnStreamOnline fired");
+
+    try
     {
-        Log("[Info] OnStreamOnline fired");
+        GetStreamsResponse? result = null;
+
         try
         {
-            GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
+            result = await TwitchApi.Helix.Streams.GetStreamsAsync(
                 null, 1, null, null, null,
                 new List<string>() { Config.TwitchChannelName }
             );
-            Log($"[Info] GetStreams returned {result?.Streams?.Length ?? 0} stream(s)");
+        }
+        catch (Exception ex) when (ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
+        {
+            Log("[Warning] Twitch token expired during GetStreamsAsync");
 
-            if (result?.Streams == null || result.Streams.Length == 0)
-            {
-                Log("[Warning] OnStreamOnline: no streams returned, aborting");
-                return;
-            }
+            bool refreshed = await RefreshAccessToken();
 
-            GetUsersResponse? userResult = await TwitchApi.Helix.Users.GetUsersAsync(
+            if (!refreshed)
+                throw;
+
+            result = await TwitchApi.Helix.Streams.GetStreamsAsync(
+                null, 1, null, null, null,
+                new List<string>() { Config.TwitchChannelName }
+            );
+        }
+
+        Log($"[Info] GetStreams returned {result?.Streams?.Length ?? 0} stream(s)");
+
+        if (result?.Streams == null || result.Streams.Length == 0)
+        {
+            Log("[Warning] OnStreamOnline: no streams returned");
+            return;
+        }
+
+        GetUsersResponse? userResult = null;
+
+        try
+        {
+            userResult = await TwitchApi.Helix.Users.GetUsersAsync(
                 null,
                 new List<string>() { Config.TwitchChannelName }
             );
-            Log($"[Info] GetUsers returned {userResult?.Users?.Length ?? 0} user(s)");
+        }
+        catch (Exception ex) when (ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
+        {
+            Log("[Warning] Twitch token expired during GetUsersAsync");
 
-            await _sessionLock.WaitAsync();
-            try
-            {
-                TwitchSession.TwitchAvatarUrl = userResult.Users[0].ProfileImageUrl;
-                TwitchSession.UserId          = result.Streams[0].UserId;
-                TwitchSession.CurrentlyLive   = true;
-                TwitchSession.Title           = result.Streams[0].Title;
-                TwitchSession.GameName        = result.Streams[0].GameName;
-                TwitchSession.ThumbnailUrl    = result.Streams[0].ThumbnailUrl
+            bool refreshed = await RefreshAccessToken();
+
+            if (!refreshed)
+                throw;
+
+            userResult = await TwitchApi.Helix.Users.GetUsersAsync(
+                null,
+                new List<string>() { Config.TwitchChannelName }
+            );
+        }
+
+        Log($"[Info] GetUsers returned {userResult?.Users?.Length ?? 0} user(s)");
+
+        if (userResult?.Users == null || userResult.Users.Length == 0)
+        {
+            Log("[Warning] OnStreamOnline: no users returned");
+            return;
+        }
+
+        await _sessionLock.WaitAsync();
+
+        try
+        {
+            TwitchSession.TwitchAvatarUrl = userResult.Users[0].ProfileImageUrl;
+            TwitchSession.UserId          = result.Streams[0].UserId;
+            TwitchSession.CurrentlyLive   = true;
+            TwitchSession.Title           = result.Streams[0].Title;
+            TwitchSession.GameName        = result.Streams[0].GameName;
+
+            TwitchSession.ThumbnailUrl =
+                result.Streams[0].ThumbnailUrl
                     .Replace("{width}", "1920")
                     .Replace("{height}", "1080");
-                TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
-                TwitchSession.StartedAt    = new DateTimeOffset(result.Streams[0].StartedAt, TimeSpan.Zero);
-            }
-            finally { _sessionLock.Release(); }
-            
-            Log($"[Info] Session populated — Title: {TwitchSession.Title}, Game: {TwitchSession.GameName}, Viewers: {TwitchSession.ViewerCount}");
-            
-            await OnStreamReceived();
+
+            TwitchSession.ViewerCount = result.Streams[0].ViewerCount;
+
+            TwitchSession.StartedAt =
+                new DateTimeOffset(result.Streams[0].StartedAt, TimeSpan.Zero);
         }
-        catch (Exception ex)
+        finally
         {
-            Log($"[Error] OnStreamOnline failed: {ex.Message}");
-            Log($"[Error] {ex.StackTrace}");
+            _sessionLock.Release();
         }
+
+        Log(
+            $"[Info] Session populated — " +
+            $"Title: {TwitchSession.Title}, " +
+            $"Game: {TwitchSession.GameName}, " +
+            $"Viewers: {TwitchSession.ViewerCount}"
+        );
+
+        await OnStreamReceived();
     }
+    catch (Exception ex)
+    {
+        Log($"[Error] OnStreamOnline failed: {ex}");
+    }
+}
     
     async Task OnStreamReceived()
     {
         Log("[Info] OnStreamReceived called");
-        ITextChannel? channel = _discordSocket.GetChannel(Config.TwitchNotifyChannelId) as ITextChannel;
+        ITextChannel? channel =
+            _discordSocket.GetChannel(Config.TwitchNotifyChannelId) as ITextChannel
+            ?? await _discordSocket.GetChannelAsync(Config.TwitchNotifyChannelId) as ITextChannel;
         
         if (channel == null)
         {
@@ -316,9 +398,27 @@ public class Twitch_Notifier
         try   { userId = TwitchSession.UserId; }
         finally { _sessionLock.Release(); }
 
-        GetVideosResponse? result = await TwitchApi.Helix.Videos.GetVideosAsync(
-            null, userId, null, null, null, 1
-        );
+        GetVideosResponse? result = null;
+
+        try
+        {
+            result = await TwitchApi.Helix.Videos.GetVideosAsync(
+                null, userId, null, null, null, 1
+            );
+        }
+        catch (Exception ex) when (ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
+        {
+            Log("[Warning] Twitch token expired during GetVideosAsync");
+
+            bool refreshed = await RefreshAccessToken();
+
+            if (!refreshed)
+                throw;
+
+            result = await TwitchApi.Helix.Videos.GetVideosAsync(
+                null, userId, null, null, null, 1
+            );
+        }
 
         if (result?.Videos != null && result.Videos.Length > 0)
         {
@@ -358,40 +458,113 @@ public class Twitch_Notifier
     async Task StartLiveUpdates()
     {
         Log("[Info] StartLiveUpdates loop started");
-        while (TwitchSession.CurrentlyLive)
+
+        while (true)
         {
+            bool live;
+
+            await _sessionLock.WaitAsync();
+
+            try
+            {
+                live = TwitchSession.CurrentlyLive;
+            }
+            finally
+            {
+                _sessionLock.Release();
+            }
+
+            if (!live)
+                break;
+
             DateTimeOffset startTime = DateTimeOffset.UtcNow;
 
-            GetStreamsResponse? result = await TwitchApi.Helix.Streams.GetStreamsAsync(
-                null, 1, null, null, null,
-                new List<string>() { Config.TwitchChannelName }
-            );
-            
-            if (result?.Streams == null || result.Streams.Length == 0)
+            try
             {
-                Log("[Warning] StartLiveUpdates: GetStreams returned no results");
-            }
-            else
-            {
-                await _sessionLock.WaitAsync();
+                GetStreamsResponse? result = null;
+
                 try
                 {
-                    TwitchSession.ViewerCount  = result.Streams[0].ViewerCount;
-                    TwitchSession.ThumbnailUrl = result.Streams[0].ThumbnailUrl
-                        .Replace("{width}", "1920")
-                        .Replace("{height}", "1080");
+                    result = await TwitchApi.Helix.Streams.GetStreamsAsync(
+                        null,
+                        1,
+                        null,
+                        null,
+                        null,
+                        new List<string>() { Config.TwitchChannelName }
+                    );
                 }
-                finally { _sessionLock.Release(); }
-            }
-            
-            await UpdateEmbed();
-            
-            TimeSpan elapsed = DateTimeOffset.UtcNow - startTime;
-            TimeSpan delay   = TimeSpan.FromMinutes(1) - elapsed;
+                catch (Exception ex) when (
+                    ex.Message.Contains(
+                        "Unauthorized",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    Log("[Warning] Twitch token expired during StartLiveUpdates");
 
-            if (delay > TimeSpan.Zero)
-                await Task.Delay(delay);
+                    bool refreshed = await RefreshAccessToken();
+
+                    if (!refreshed)
+                        throw;
+
+                    result = await TwitchApi.Helix.Streams.GetStreamsAsync(
+                        null,
+                        1,
+                        null,
+                        null,
+                        null,
+                        new List<string>() { Config.TwitchChannelName }
+                    );
+                }
+
+                if (result?.Streams == null || result.Streams.Length == 0)
+                {
+                    Log("[Warning] StartLiveUpdates: GetStreams returned no results");
+                }
+                else
+                {
+                    await _sessionLock.WaitAsync();
+
+                    try
+                    {
+                        TwitchSession.ViewerCount =
+                            result.Streams[0].ViewerCount;
+
+                        TwitchSession.ThumbnailUrl =
+                            result.Streams[0].ThumbnailUrl
+                                .Replace("{width}", "1920")
+                                .Replace("{height}", "1080");
+                    }
+                    finally
+                    {
+                        _sessionLock.Release();
+                    }
+                }
+
+                await UpdateEmbed();
+            }
+            catch (Exception ex)
+            {
+                Log($"[Error] StartLiveUpdates failed: {ex}");
+            }
+
+            TimeSpan elapsed = DateTimeOffset.UtcNow - startTime;
+
+            TimeSpan delay = TimeSpan.FromMinutes(1) - elapsed;
+
+            try
+            {
+                if (delay > TimeSpan.Zero)
+                    await Task.Delay(delay);
+            }
+            catch (TaskCanceledException)
+            {
+                Log("[Info] StartLiveUpdates delay cancelled");
+                break;
+            }
         }
+
         Log("[Info] StartLiveUpdates loop ended — stream no longer live");
     }
     
@@ -436,17 +609,21 @@ public class Twitch_Notifier
             {
                 vodText = $"> [{vod.Duration}]({vod.Url})";
             }
-            
+
+            string offlineText = timeOffline.HasValue
+                ? $"<t:{timeOffline.Value.ToUnixTimeSeconds()}:f>"
+                : "Unknown";
+
             builder
                 .WithAuthor($"{userName} was live on Twitch!", pfp, Config.TwitchChannelUrl)
                 .WithTitle(title).WithUrl(Config.TwitchChannelUrl)
                 .AddField("Game", $"> {game}", true)
-                .AddField($"VOD", vodText, true)
+                .AddField("VOD", vodText, true)
                 .WithColor(new Color(0x5865F2))
                 .WithFooter(
-                    $"{streamDuration} • Offline at {timeOffline}",
+                    $"{streamDuration} • Offline at {offlineText}",
                     "https://static.vecteezy.com/system/resources/previews/010/992/697/large_2x/social-media-twitch-realistic-icon-free-free-png.png"
-                ); 
+                );
         }
         
         return builder.Build();
@@ -454,54 +631,101 @@ public class Twitch_Notifier
 
     async Task UpdateEmbed()
     {
-        // TotalSeconds > 0 rather than != TimeSpan.Zero so sub-minute durations don't incorrectly show "Just started." for the whole first minute
-        TimeSpan duration     = DateTimeOffset.UtcNow - TwitchSession.StartedAt;
-        string onlineDuration = "Just started.";
-        
-        if (duration.TotalSeconds > 0)
-        {
-            List<string> parts = new();
-
-            if (duration.Days > 0)    parts.Add($"{duration.Days} day{(duration.Days == 1 ? "" : "s")}");
-            if (duration.Hours > 0)   parts.Add($"{duration.Hours} hour{(duration.Hours == 1 ? "" : "s")}");
-            if (duration.Minutes > 0) parts.Add($"{duration.Minutes} minute{(duration.Minutes == 1 ? "" : "s")}");
-
-            onlineDuration = parts.Count > 0 ? "Online for " + string.Join(", ", parts) + "." : "Just started.";
-        }
-        
         try
         {
             ulong channelId;
             ulong messageId;
-            bool  currentlyLive;
-            string avatarUrl, title, gameName, thumbnailUrl;
-            int   viewerCount;
+
+            bool currentlyLive;
+
+            string avatarUrl;
+            string title;
+            string gameName;
+            string thumbnailUrl;
+
+            int viewerCount;
+
+            DateTimeOffset startedAt;
             DateTimeOffset offlineAt;
+
             TwitchVOD vod;
 
             await _sessionLock.WaitAsync();
+
             try
             {
-                channelId    = TwitchSession.PublishedChannelId;
-                messageId    = TwitchSession.PublishedMessageId;
-                currentlyLive   = TwitchSession.CurrentlyLive;
-                avatarUrl    = TwitchSession.TwitchAvatarUrl;
-                title        = TwitchSession.Title;
-                gameName     = TwitchSession.GameName;
-                thumbnailUrl = TwitchSession.ThumbnailUrl;
-                viewerCount  = TwitchSession.ViewerCount;
-                offlineAt    = TwitchSession.OfflineAt;
-                vod          = TwitchVOD;
+                startedAt      = TwitchSession.StartedAt;
+                channelId      = TwitchSession.PublishedChannelId;
+                messageId      = TwitchSession.PublishedMessageId;
+
+                currentlyLive  = TwitchSession.CurrentlyLive;
+
+                avatarUrl      = TwitchSession.TwitchAvatarUrl;
+                title          = TwitchSession.Title;
+                gameName       = TwitchSession.GameName;
+                thumbnailUrl   = TwitchSession.ThumbnailUrl;
+
+                viewerCount    = TwitchSession.ViewerCount;
+
+                offlineAt      = TwitchSession.OfflineAt;
+
+                // Clone instead of sharing same reference object
+                vod = new TwitchVOD
+                {
+                    Url      = TwitchVOD.Url,
+                    Duration = TwitchVOD.Duration,
+                    Viewable = TwitchVOD.Viewable
+                };
             }
-            finally { _sessionLock.Release(); }
+            finally
+            {
+                _sessionLock.Release();
+            }
 
-            ITextChannel? channel = _discordSocket.GetChannel(channelId) as ITextChannel;
+            // TotalSeconds > 0 rather than != TimeSpan.Zero so sub-minute durations
+            // don't incorrectly show "Just started." for the whole first minute
+            TimeSpan duration = DateTimeOffset.UtcNow - startedAt;
+
+            string onlineDuration = "Just started.";
+
+            if (duration.TotalSeconds > 0)
+            {
+                List<string> parts = new();
+
+                if (duration.Days > 0)
+                    parts.Add($"{duration.Days} day{(duration.Days == 1 ? "" : "s")}");
+
+                if (duration.Hours > 0)
+                    parts.Add($"{duration.Hours} hour{(duration.Hours == 1 ? "" : "s")}");
+
+                if (duration.Minutes > 0)
+                    parts.Add($"{duration.Minutes} minute{(duration.Minutes == 1 ? "" : "s")}");
+
+                if (duration.Seconds > 0 && parts.Count == 0)
+                    parts.Add($"{duration.Seconds} second{(duration.Seconds == 1 ? "" : "s")}");
+
+                onlineDuration =
+                    parts.Count > 0
+                        ? "Online for " + string.Join(", ", parts) + "."
+                        : "Just started.";
+            }
+
+            ITextChannel? channel =
+                _discordSocket.GetChannel(channelId) as ITextChannel
+                ?? await _discordSocket.GetChannelAsync(channelId) as ITextChannel;
+
             Log($"[Debug] Channel: {channel?.Name ?? "NULL"}");
-            if (channel == null) return;
 
-            IUserMessage? message = await channel.GetMessageAsync(messageId) as IUserMessage;
+            if (channel == null)
+                return;
+
+            IUserMessage? message =
+                await channel.GetMessageAsync(messageId) as IUserMessage;
+
             Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
-            if (message == null) return;
+
+            if (message == null)
+                return;
 
             Embed updated = BuildTwitchEmbed(
                 Config.TwitchChannelName,
@@ -515,14 +739,31 @@ public class Twitch_Notifier
                 currentlyLive ? null : vod,
                 currentlyLive ? null : offlineAt
             );
+
             await message.ModifyAsync(props => props.Embed = updated);
-            Log($"[Info] Published twitch embed updated");
+
+            Log("[Info] Published twitch embed updated");
         }
         catch (Exception ex)
         {
-            Log($"[Warning] TryUpdatePublishedEmbed failed: {ex.Message}");
-            Log($"[Warning] {ex.StackTrace}");
+            Log($"[Warning] TryUpdatePublishedEmbed failed: {ex}");
         }
+    }
+    
+    async Task<bool> RefreshAccessToken()
+    {
+        string? token = await GetUserToken();
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            Log("[Error] Failed to refresh Twitch token");
+            return false;
+        }
+
+        TwitchApi.Settings.AccessToken = token;
+
+        Log("[Info] Twitch access token refreshed");
+        return true;
     }
 }
 
