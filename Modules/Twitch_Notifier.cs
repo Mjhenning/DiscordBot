@@ -363,12 +363,23 @@ public class Twitch_Notifier
         Log("[Info] OnStreamOffline fired");
 
         await _sessionLock.WaitAsync();
+
         try
         {
+            // Already handled offline state
+            if (!TwitchSession.CurrentlyLive)
+            {
+                Log("[Info] StreamOffline ignored — stream already offline");
+                return;
+            }
+
             TwitchSession.OfflineAt     = DateTimeOffset.UtcNow;
             TwitchSession.CurrentlyLive = false;
         }
-        finally { _sessionLock.Release(); }
+        finally
+        {
+            _sessionLock.Release();
+        }
 
         Log("[Info] Updating embed to offline state...");
         await UpdateEmbed();
@@ -458,6 +469,8 @@ public class Twitch_Notifier
     async Task StartLiveUpdates()
     {
         Log("[Info] StartLiveUpdates loop started");
+        
+        int missedStreamChecks = 0;
 
         while (true)
         {
@@ -520,10 +533,44 @@ public class Twitch_Notifier
 
                 if (result?.Streams == null || result.Streams.Length == 0)
                 {
-                    Log("[Warning] StartLiveUpdates: GetStreams returned no results");
+                    missedStreamChecks++;
+
+                    Log(
+                        $"[Warning] StartLiveUpdates: GetStreams returned no results " +
+                        $"({missedStreamChecks}/3)"
+                    );
+
+                    if (missedStreamChecks >= 3)
+                    {
+                        Log("[Warning] Stream assumed offline after 3 failed checks");
+
+                        bool shouldTriggerOffline;
+
+                        await _sessionLock.WaitAsync();
+
+                        try
+                        {
+                            shouldTriggerOffline = TwitchSession.CurrentlyLive;
+                        }
+                        finally
+                        {
+                            _sessionLock.Release();
+                        }
+
+                        if (shouldTriggerOffline)
+                        {
+                            Log("[Info] Forcing offline event from StartLiveUpdates");
+
+                            await OnStreamOffline(this, null!);
+                        }
+
+                        break;
+                    }
                 }
                 else
                 {
+                    missedStreamChecks = 0;
+
                     await _sessionLock.WaitAsync();
 
                     try
