@@ -640,7 +640,7 @@ public class Twitch_Notifier
                 .WithColor(new Color(0x5865F2))
                 .WithFooter(
                     $"{streamDuration}",
-                    "https://static.vecteezy.com/system/resources/previews/010/992/697/large_2x/social-media-twitch-realistic-icon-free-free-png.png"
+                    "https://images.icon-icons.com/4401/PNG/256/269414_twitch-icon.png"
                 );
             
                 if (!string.IsNullOrWhiteSpace(thumbnailUrl))
@@ -658,7 +658,7 @@ public class Twitch_Notifier
             }
 
             string offlineText = timeOffline.HasValue
-                ? $"<t:{timeOffline.Value.ToUnixTimeSeconds()}:f>"
+                ? timeOffline.Value.ToUniversalTime().ToString("d MMMM yyyy HH:mm")
                 : "Unknown";
 
             builder
@@ -669,7 +669,7 @@ public class Twitch_Notifier
                 .WithColor(new Color(0x5865F2))
                 .WithFooter(
                     $"{streamDuration} • Offline at {offlineText}",
-                    "https://static.vecteezy.com/system/resources/previews/010/992/697/large_2x/social-media-twitch-realistic-icon-free-free-png.png"
+                    "https://images.icon-icons.com/4401/PNG/256/269414_twitch-icon.png"
                 );
         }
         
@@ -731,7 +731,7 @@ public class Twitch_Notifier
 
             // TotalSeconds > 0 rather than != TimeSpan.Zero so sub-minute durations
             // don't incorrectly show "Just started." for the whole first minute
-            TimeSpan duration = DateTimeOffset.UtcNow - startedAt;
+            TimeSpan duration = (currentlyLive ? DateTimeOffset.UtcNow : offlineAt) - startedAt;
 
             string onlineDuration = "Just started.";
 
