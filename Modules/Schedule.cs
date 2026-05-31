@@ -64,15 +64,15 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     public async Task AddStart()
     {
         List<SelectMenuOptionBuilder> options = new();
-        DateTimeOffset now       = DateTimeOffset.UtcNow;
-        DateTimeOffset weekStart = ScheduleData.GetCurrentWeekStart();
-        DateTimeOffset weekEnd   = weekStart.AddDays(7);
+        DateTimeOffset now = DateTimeOffset.Now;
+        int daysUntilSunday = ((int)DayOfWeek.Sunday - (int)now.DayOfWeek + 7) % 7;
+        DateTimeOffset weekEnd = now.Date.AddDays(daysUntilSunday == 0 ? 7 : daysUntilSunday + 1);
 
         for (DateTimeOffset day = now.Date; day < weekEnd; day = day.AddDays(1))
         {
             string dayStr      = day.ToString("yyyy-MM-dd");
-            bool alreadyAdded  = _data.ScheduleEntries
-                .Any(e => e.ScheduledAtParsed.ToString("yyyy-MM-dd") == dayStr);
+            bool alreadyAdded = _data.ScheduleEntries
+                .Any(e => e.ScheduledAtParsed.ToLocalTime().ToString("yyyy-MM-dd") == dayStr);
 
             if (alreadyAdded) continue;
 
