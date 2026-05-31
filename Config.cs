@@ -51,5 +51,5 @@ public static class Config
     // -----------------------------
     public const string ReactionRolesFile = "Data/reaction_roles.json";
     public const string ScheduleFile = "Data/schedule.json";
-    public const string QuoteDirectory ="../Overlay/Scripts";
+    public const string QuoteDirectory ="../../Overlay/Scripts";
 }
