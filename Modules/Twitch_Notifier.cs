@@ -363,29 +363,30 @@ public class Twitch_Notifier
         Log("[Info] OnStreamOffline fired");
 
         await _sessionLock.WaitAsync();
-
         try
         {
-            // Already handled offline state
             if (!TwitchSession.CurrentlyLive)
             {
                 Log("[Info] StreamOffline ignored — stream already offline");
                 return;
             }
-
             TwitchSession.OfflineAt     = DateTimeOffset.UtcNow;
             TwitchSession.CurrentlyLive = false;
         }
-        finally
-        {
-            _sessionLock.Release();
-        }
+        finally { _sessionLock.Release(); }
 
         Log("[Info] Updating embed to offline state...");
         await UpdateEmbed();
 
         _ = Task.Run(async () =>
         {
+            // Wait for the live updater loop to fully exit before resetting
+            while (Interlocked.CompareExchange(ref _liveUpdaterRunning, 0, 0) == 1)
+            {
+                Log("[Info] Waiting for live updater to stop before resetting session...");
+                await Task.Delay(500);
+            }
+
             Log("[Info] Starting background VOD check...");
             await CheckIfVodUp();
 
