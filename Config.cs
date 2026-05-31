@@ -25,6 +25,8 @@ public static class Config
     public const string SuggestRewardId = "f379d2f4-202d-48fd-929a-bb830a2f3a32";
     public const ulong SuggestionChannelId = 1504438238058905732;
 
+    public const string QuoteRewardId = "5e6b9d0d-6ae6-4f98-91bc-f9c925ab1ae6";
+
     // -----------------------------
     // Welcome / Auto Role
     // -----------------------------
@@ -49,5 +51,5 @@ public static class Config
     // -----------------------------
     public const string ReactionRolesFile = "Data/reaction_roles.json";
     public const string ScheduleFile = "Data/schedule.json";
-    public const string ARGDirectory = "../../Twitch_Bot/ARG/_filesystem";
+    public const string QuoteDirectory ="../Overlay/Scripts";
 }

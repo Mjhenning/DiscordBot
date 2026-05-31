@@ -36,7 +36,7 @@ public class TwitchRedeemHandler
         _handlers = new Dictionary<string, Func<RedemptionContext, Task>>
         {
             { Config.SuggestRewardId, SuggestionRedeem.Handle },
-            // { Config.SomeOtherRewardId, SomeOtherRedeem.Handle },
+            { Config.QuoteRewardId, QuoteRedeem.Handle },
         };
 
         _eventSubClient.WebsocketConnected                          += OnWebsocketConnected;
