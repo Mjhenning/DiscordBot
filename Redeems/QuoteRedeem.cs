@@ -38,6 +38,8 @@ public static class QuoteRedeem
 
     static QuoteEntry Parse(string input, string submitter)
     {
+        input = input.Replace("\"", "");
+        
         if (!input.Contains('-'))
             return new QuoteEntry(input.Trim(), "", "", submitter);
 
@@ -73,7 +75,7 @@ public static class QuoteRedeem
             source = metaPart.Trim();
         }
 
-        return new QuoteEntry(quotePart.Replace("\"", ""), source, year, submitter);
+        return new QuoteEntry(quotePart, source, year, submitter);
     }
 
     static async Task AppendToJson(QuoteEntry entry)
