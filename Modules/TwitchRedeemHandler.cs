@@ -40,6 +40,7 @@ public class TwitchRedeemHandler
         };
 
         _eventSubClient.WebsocketConnected                          += OnWebsocketConnected;
+        _eventSubClient.ChannelPointsCustomRewardRedemptionUpdate += OnRedemptionUpdated;
         _discordSocket.InteractionCreated                           += OnInteractionCreated;
     }
 
