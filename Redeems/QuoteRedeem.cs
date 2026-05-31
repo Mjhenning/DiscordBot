@@ -33,18 +33,14 @@ public static class QuoteRedeem
 
     static bool IsValidInput(string input)
     {
-        if (string.IsNullOrWhiteSpace(input)) return false;
-        if (!input.Contains('-')) return false;
-
-        int dash    = input.IndexOf('-');
-        string left  = input[..dash].Trim();
-        string right = input[(dash + 1)..].Trim();
-
-        return !string.IsNullOrWhiteSpace(left) && !string.IsNullOrWhiteSpace(right);
+        return !string.IsNullOrWhiteSpace(input);
     }
 
     static QuoteEntry Parse(string input, string submitter)
     {
+        if (!input.Contains('-'))
+            return new QuoteEntry(input.Trim(), "", "", submitter);
+
         int dash     = input.IndexOf('-');
         string left  = input[..dash].Trim();
         string right = input[(dash + 1)..].Trim();
@@ -54,13 +50,11 @@ public static class QuoteRedeem
 
         if (left.Contains(',') && !right.Contains(','))
         {
-            // "Source, Year - Quote"
             metaPart  = left;
             quotePart = right;
         }
         else
         {
-            // "Quote - Source, Year" or "Quote - Source"
             quotePart = left;
             metaPart  = right;
         }
