@@ -169,7 +169,7 @@ public class ArgTerminalData
         long unixTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         ActionHistory.Enqueue(action + $" <t:{unixTimestamp}:R>");
 
-        while (ActionHistory.Count > 25)
+        while (ActionHistory.Count > 10)
         {
             ActionHistory.Dequeue();
         }
