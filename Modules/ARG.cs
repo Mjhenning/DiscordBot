@@ -277,7 +277,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         List<SelectMenuOptionBuilder> options = new();
 
-        foreach (FsNode file in files.Take(25))
+        foreach (FsNode file in files.Take(10))
         {
             string label = file.Corrupted
                 ? $"📄 {file.Filename} [CORRUPTED]"
