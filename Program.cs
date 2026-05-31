@@ -49,7 +49,7 @@ ServiceProvider services = new ServiceCollection()
     .AddTwitchLibEventSubWebsockets() //creates websocket to inject in twitch_notifier
     .AddLogging() //Adds ILogger support
     .AddSingleton<Twitch_Notifier>()
-    .AddSingleton<TwitchSuggestionsPoster>()
+    .AddSingleton<TwitchRedeemHandler>()
     .AddSingleton<ArgFilesystem>()
     .AddSingleton<ArgTerminalData>()
     .AddSingleton<ArgTerminalService>()
@@ -130,7 +130,7 @@ client.Ready += async () =>
     
     _ = Task.Run(async () =>
     {
-        await services.GetRequiredService<TwitchSuggestionsPoster>().StartAsync();
+        await services.GetRequiredService<TwitchRedeemHandler>().StartAsync();
         await services.GetRequiredService<Twitch_Notifier>().StartAsync();
     });
 };
