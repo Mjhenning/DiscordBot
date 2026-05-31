@@ -246,7 +246,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         await _terminal.RefreshEmbeds(ARGEmbed_Type.Terminal, ARGEmbed_Type.Logs);
 
-        await ModifyOriginalResponseAsync(props => props.Content =$"Moved to `{newPath}`");
+        await DeleteOriginalResponseAsync();
     }
     
     public async Task ReadFile()
@@ -309,6 +309,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("terminal_read_select", ignoreGroupNames: true)]
     public async Task OnReadFileSelected(string selected)
     {
+        await DeferAsync(ephemeral: true);
         if (!_fs.PathIndex.TryGetValue(selected, out FsNode? node))
         {
             await RespondAsync(
@@ -339,9 +340,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         await _terminal.RefreshEmbeds(ARGEmbed_Type.ReadOutput, ARGEmbed_Type.Logs);
 
-        await RespondAsync(
-            $"Opened `{_data.ReadMessageFile}`",
-            ephemeral: true);
+        await DeleteOriginalResponseAsync();
     }
     
     [ComponentInteraction("terminal_btn_close_file", ignoreGroupNames: true)]
