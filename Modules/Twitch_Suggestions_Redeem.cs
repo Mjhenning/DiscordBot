@@ -69,10 +69,6 @@ public class TwitchSuggestionsPoster
         {
             try
             {
-                // var userApi = new TwitchAPI();
-                // userApi.Settings.ClientId    = Config.TwitchClientId;
-                // userApi.Settings.AccessToken = _userAccessToken;
-
                 await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
                     "channel.channel_points_custom_reward_redemption.update",
                     "1",
