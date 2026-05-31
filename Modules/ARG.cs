@@ -220,6 +220,8 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("terminal_nav_select", ignoreGroupNames: true)]
     public async Task OnNavigationSelected(string selected)
     {
+        await DeferAsync(ephemeral: true);
+        
         string newPath;
 
         if (selected == "PARENT")
@@ -244,7 +246,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         await _terminal.RefreshEmbeds(ARGEmbed_Type.Terminal, ARGEmbed_Type.Logs);
 
-        await RespondAsync($"Moved to `{newPath}`", ephemeral: true);
+        await ModifyOriginalResponseAsync(props => props.Content =$"Moved to `{newPath}`");
     }
     
     public async Task ReadFile()
