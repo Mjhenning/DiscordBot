@@ -135,6 +135,24 @@ client.Ready += async () =>
     });
 };
 
+// ── Schedule reset DM notification ───────────────────────────────────────────
+ScheduleData scheduleData = services.GetRequiredService<ScheduleData>();
+scheduleData.OnWeekReset += async () =>
+{
+    try
+    {
+        var appInfo = await client.GetApplicationInfoAsync();
+        var dm      = await appInfo.Owner.CreateDMChannelAsync();
+        await dm.SendMessageAsync("📅 The stream schedule has been automatically cleared for the new week. Don't forget to add your streams!");
+        Log("[Info] Week reset DM sent to owner");
+    }
+    catch (Exception ex)
+    {
+        Log($"[Warning] Failed to send week reset DM: {ex.Message}");
+    }
+};
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Interaction routing — forwards all interactions to the interaction service
 // ─────────────────────────────────────────────────────────────────────────────

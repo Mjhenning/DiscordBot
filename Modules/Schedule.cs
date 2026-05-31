@@ -22,11 +22,17 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         _log  = log;
     }
     
+    [SlashCommand("resetschedule", "Force reset the schedule — delete after use")]
+    public async Task ForceReset()
+    {
+        _data.ClearPublished();
+        Log("[Info] Schedule force reset by command");
+        await RespondAsync("🗑️ Schedule has been force reset.", ephemeral: true);
+    }
+    
     [SlashCommand("streamschedule", "Manage the stream schedule")]
     public async Task ScheduleMenu()
     {
-        _data.EnsureCurrentWeek();
-
         MessageComponent buttons = new ComponentBuilder()
             .WithButton("➕ Add",     "schedule_btn_add",     ButtonStyle.Primary)
             .WithButton("🗑️ Remove",  "schedule_btn_remove",  ButtonStyle.Danger)
@@ -57,8 +63,6 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     
     public async Task AddStart()
     {
-        _data.EnsureCurrentWeek();
-        
         List<SelectMenuOptionBuilder> options = new();
         DateTimeOffset now       = DateTimeOffset.UtcNow;
         DateTimeOffset weekStart = ScheduleData.GetCurrentWeekStart();
@@ -152,8 +156,6 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     
     public async Task RemoveStart()
     {
-        _data.EnsureCurrentWeek();
-        
         var entries = _data.ScheduleEntries;
 
         if (entries.Count == 0)
@@ -221,8 +223,6 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     
     public async Task View()
     {
-        _data.EnsureCurrentWeek();
-        
         if (_data.ScheduleEntries.Count == 0)
         {
             await RespondAsync("No entries yet. Use `/schedule add` to add some.", ephemeral: true);
@@ -237,8 +237,6 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     
     public async Task PublishStart()
     {
-        _data.EnsureCurrentWeek();
-        
         if (_data.ScheduleEntries.Count == 0)
         {
             await RespondAsync("There are no schedule entries to publish.", ephemeral: true);

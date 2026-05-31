@@ -8,6 +8,14 @@ using Newtonsoft.Json;
 public class ScheduleData
 {
     const string FilePath = "Data/schedule.json";
+    
+    // ── Tweak these to change when the week resets ────────────────────────
+    const DayOfWeek ResetDay    = DayOfWeek.Sunday;
+    const int       ResetHour   = 23;   // 24-hour local time
+    const int       ResetMinute = 30;
+    // ─────────────────────────────────────────────────────────────────────
+    
+    Timer _resetTimer;
 
     public List<ScheduleEntry> ScheduleEntries { get; private set; } = new();
 
@@ -36,6 +44,9 @@ public class ScheduleData
             PublishedChannelId = store.ChannelId;
             WeekStart          = store.WeekStart  ?? "";
         }
+        
+        EnsureCurrentWeek();
+        StartResetTimer();
     }
 
     public void Save()
@@ -54,23 +65,17 @@ public class ScheduleData
 
     public ScheduleEntry? GetEntry(ulong id)
     {
-        EnsureCurrentWeek();
-        
         return ScheduleEntries.FirstOrDefault(x => x.Id == id);
     }
 
     public void AddEntry(ScheduleEntry entry)
     {
-        EnsureCurrentWeek();
-        
         ScheduleEntries.Add(entry);
         Save();
     }
 
     public void RemoveEntry(ulong id)
     {
-        EnsureCurrentWeek();
-        
         ScheduleEntries.RemoveAll(x => x.Id == id);
         Save();
     }
@@ -83,6 +88,8 @@ public class ScheduleData
         Save();
     }
 
+    public event Func<Task>? OnWeekReset;
+    
     public void ClearPublished()
     {
         PublishedMessageId = 0;
@@ -90,12 +97,13 @@ public class ScheduleData
         WeekStart          = "";
         ScheduleEntries.Clear();
         Save();
+        
+        OnWeekReset?.Invoke();
     }
 
     // Returns true if a message is published for the current week
     public bool IsPublishedThisWeek()
     {
-        EnsureCurrentWeek();
         
         if (PublishedMessageId == 0 || string.IsNullOrWhiteSpace(WeekStart))
             return false;
@@ -107,9 +115,43 @@ public class ScheduleData
     // Monday of the current UTC week
     public static DateTimeOffset GetCurrentWeekStart()
     {
-        DateTimeOffset today = DateTimeOffset.UtcNow;
-        int daysFromMonday = ((int)today.DayOfWeek + 6) % 7;
-        return today.AddDays(-daysFromMonday).Date;
+        DateTime now = DateTime.Now;
+        int daysFromMonday = ((int)now.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        DateTime weekStart = now.AddDays(-daysFromMonday).Date;
+        return new DateTimeOffset(weekStart);
+    }
+    
+    void StartResetTimer()
+    {
+        DateTime now          = DateTime.Now;
+        DateTime nextReset    = GetNextResetTime(now);
+        TimeSpan initialDelay = nextReset - now;
+
+        _resetTimer = new Timer(_ =>
+        {
+            Console.WriteLine("[Info] Scheduled week reset triggered");
+            EnsureCurrentWeek();
+
+            // Reschedule for next week
+            TimeSpan nextInterval = TimeSpan.FromDays(7);
+            _resetTimer.Change(nextInterval, TimeSpan.FromDays(7));
+        }, null, initialDelay, TimeSpan.FromDays(7));
+
+        Console.WriteLine($"[Info] Reset timer scheduled — next reset at {nextReset:f}");
+    }
+    
+    static DateTime GetNextResetTime(DateTime from)
+    {
+        DateTime candidate = from.Date
+            .AddDays(((int)ResetDay - (int)from.DayOfWeek + 7) % 7)
+            .AddHours(ResetHour)
+            .AddMinutes(ResetMinute);
+
+        // If that time has already passed this week, jump to next week
+        if (candidate <= from)
+            candidate = candidate.AddDays(7);
+
+        return candidate;
     }
     
     public void EnsureCurrentWeek()
