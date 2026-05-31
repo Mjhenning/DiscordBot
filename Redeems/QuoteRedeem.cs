@@ -73,7 +73,7 @@ public static class QuoteRedeem
             source = metaPart.Trim();
         }
 
-        return new QuoteEntry(quotePart, source, year, submitter);
+        return new QuoteEntry(quotePart.Replace("\"", ""), source, year, submitter);
     }
 
     static async Task AppendToJson(QuoteEntry entry)
