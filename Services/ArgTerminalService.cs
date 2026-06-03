@@ -12,14 +12,12 @@ public class ArgTerminalService
     readonly DiscordSocketClient _client;
     readonly ArgTerminalData _data;
     readonly ArgFilesystem _fs;
-    readonly StreamWriter _log;
 
     public ArgTerminalService(DiscordSocketClient client, ArgTerminalData data, ArgFilesystem fs, StreamWriter log)
     {
         _client = client;
         _data = data;
         _fs = fs;
-        _log = log;
     }
 
     // ─── HELPERS ────────────────────────────────────────────────────
