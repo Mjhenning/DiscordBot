@@ -11,7 +11,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
 
     readonly ReactionsData _data;
 
-    public ReactionRolesModule(ReactionsData data, StreamWriter log)
+    public ReactionRolesModule(ReactionsData data)
     {
         _data = data;
     }

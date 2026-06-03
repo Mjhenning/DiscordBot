@@ -13,7 +13,7 @@ public class ArgTerminalService
     readonly ArgTerminalData _data;
     readonly ArgFilesystem _fs;
 
-    public ArgTerminalService(DiscordSocketClient client, ArgTerminalData data, ArgFilesystem fs, StreamWriter log)
+    public ArgTerminalService(DiscordSocketClient client, ArgTerminalData data, ArgFilesystem fs)
     {
         _client = client;
         _data = data;

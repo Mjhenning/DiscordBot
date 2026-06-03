@@ -9,7 +9,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 {
     readonly ScheduleData _data;
 
-    public ScheduleModule(ScheduleData data, StreamWriter log)
+    public ScheduleModule(ScheduleData data)
     {
         _data = data;
     }

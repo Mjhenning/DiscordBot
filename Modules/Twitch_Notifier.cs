@@ -37,7 +37,7 @@ public class Twitch_Notifier
     static readonly HttpClient HttpClient = new();
     
 
-    public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, StreamWriter log, TwitchAPI twitchApi)
+    public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, TwitchAPI twitchApi)
     {
         TwitchApi = twitchApi;
         _eventSubClient = eventSubClient;

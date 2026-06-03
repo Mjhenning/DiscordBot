@@ -14,7 +14,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     readonly ArgFilesystem _fs;
     readonly ArgTerminalService _terminal;
     
-    public ARG(ArgTerminalData data, ArgFilesystem fs, StreamWriter log, ArgTerminalService terminal)
+    public ARG(ArgTerminalData data, ArgFilesystem fs, ArgTerminalService terminal)
     {
         _data = data;
         _fs = fs;
