@@ -10,7 +10,7 @@ namespace DiscordBot
     public static class Logger
     {
         private static readonly StreamWriter _logFile =
-            new StreamWriter("../bot-log.txt", append: true) { AutoFlush = true };
+            new StreamWriter("bot-log.txt", append: true) { AutoFlush = true };
 
         public static void Log(string msg)
         {
