@@ -15,7 +15,7 @@ public static class QuoteRedeem
     {
         if (!IsValidInput(ctx.UserInput))
         {
-            ctx.Log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] [Warning] QuoteRedeem: invalid input from {ctx.UserName} — \"{ctx.UserInput}\"");
+            Logger.Log($"[Warning] QuoteRedeem: invalid input from {ctx.UserName} — \"{ctx.UserInput}\"");
             return;
         }
 
@@ -23,11 +23,11 @@ public static class QuoteRedeem
         {
             QuoteEntry entry = Parse(ctx.UserInput, ctx.UserName);
             await AppendToJson(entry);
-            ctx.Log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] [Info] Quote saved from {ctx.UserName}: \"{entry.Quote}\"");
+            Logger.Log($"[Info] Quote saved from {ctx.UserName}: \"{entry.Quote}\"");
         }
         catch (Exception ex)
         {
-            ctx.Log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] [Error] QuoteRedeem.Handle failed: {ex.Message}");
+            Logger.Log($"[Error] QuoteRedeem.Handle failed: {ex.Message}");
         }
     }
 

@@ -14,23 +14,15 @@ public class TwitchRedeemHandler
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
     readonly TwitchAPI _twitchApi;
-    readonly StreamWriter _log;
     readonly HttpClient _http = new() { BaseAddress = new Uri("https://id.twitch.tv/oauth2/token") };
 
     readonly Dictionary<string, Func<RedemptionContext, Task>> _handlers;
-
-    void Log(string msg)
-    {
-        Console.WriteLine(msg);
-        _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
-    }
 
     public TwitchRedeemHandler(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, StreamWriter log, TwitchAPI twitchApi)
     {
         _twitchApi      = twitchApi;
         _eventSubClient = eventSubClient;
         _discordSocket  = discordSocket;
-        _log            = log;
 
         // ── Register redeems here ──────────────────────────────────────────
         _handlers = new Dictionary<string, Func<RedemptionContext, Task>>
@@ -63,16 +55,16 @@ public class TwitchRedeemHandler
 
             if (string.IsNullOrWhiteSpace(token))
             {
-                Log("[Error] TwitchRedeemHandler: failed to fetch token");
+                Logger.Log("[Error] TwitchRedeemHandler: failed to fetch token");
                 return;
             }
 
             _twitchApi.Settings.AccessToken = token;
-            Log("[Info] TwitchRedeemHandler token fetched: success");
+            Logger.Log("[Info] TwitchRedeemHandler token fetched: success");
         }
         catch (Exception ex)
         {
-            Log($"[Error] TwitchRedeemHandler token fetch failed: {ex.Message}");
+            Logger.Log($"[Error] TwitchRedeemHandler token fetch failed: {ex.Message}");
         }
     }
 
@@ -99,11 +91,11 @@ public class TwitchRedeemHandler
                     _eventSubClient.SessionId
                 );
 
-                Log($"[Info] Subscribed to redemption events for reward {rewardId}");
+                Logger.Log($"[Info] Subscribed to redemption events for reward {rewardId}");
             }
             catch (Exception ex)
             {
-                Log($"[Error] Subscription failed for reward {rewardId}: {ex.Message}");
+                Logger.Log($"[Error] Subscription failed for reward {rewardId}: {ex.Message}");
             }
         }
     }
@@ -118,7 +110,7 @@ public class TwitchRedeemHandler
         if (redemption.Status != "fulfilled") return;
         if (!_handlers.TryGetValue(redemption.Reward.Id, out Func<RedemptionContext, Task>? handler)) return;
 
-        Log($"[Info] Routing fulfilled redemption — Reward: {redemption.Reward.Id}, User: {redemption.UserName}");
+        Logger.Log($"[Info] Routing fulfilled redemption — Reward: {redemption.Reward.Id}, User: {redemption.UserName}");
 
         try
         {
@@ -131,7 +123,7 @@ public class TwitchRedeemHandler
             }
             catch (Exception ex)
             {
-                Log($"[Warning] Could not fetch avatar for {redemption.UserName}: {ex.Message}");
+                Logger.Log($"[Warning] Could not fetch avatar for {redemption.UserName}: {ex.Message}");
             }
 
             RedemptionContext ctx = new(
@@ -139,15 +131,14 @@ public class TwitchRedeemHandler
                 redemption.UserInput,
                 avatarUrl,
                 $"https://www.twitch.tv/{redemption.UserName}",
-                _discordSocket,
-                _log
+                _discordSocket
             );
 
             await handler(ctx);
         }
         catch (Exception ex)
         {
-            Log($"[Error] Handler for reward {redemption.Reward.Id} failed: {ex.Message}");
+            Logger.Log($"[Error] Handler for reward {redemption.Reward.Id} failed: {ex.Message}");
         }
     }
 

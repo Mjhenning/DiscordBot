@@ -12,18 +12,14 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 {
     readonly ArgTerminalData _data;
     readonly ArgFilesystem _fs;
-    readonly StreamWriter _log;
     readonly ArgTerminalService _terminal;
     
     public ARG(ArgTerminalData data, ArgFilesystem fs, StreamWriter log, ArgTerminalService terminal)
     {
         _data = data;
         _fs = fs;
-        _log = log;
         _terminal = terminal;
     }
-
-    void Log(string msg) { Console.WriteLine(msg); _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}"); }
 
     [SlashCommand("login", "Login to continue with or start a terminal session")]
     public async Task TerminalStart()
@@ -31,12 +27,12 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     
     await DeferAsync(ephemeral: true);
     
-    Log($"[Info] /login called by {Context.User.Username}");
+    Logger.Log($"[Info] /login called by {Context.User.Username}");
 
     bool loggedIn = _data.Login(Context.User.Id);
     if (!loggedIn)
     {
-        Log($"[Debug] {Context.User.Username} already logged in");
+        Logger.Log($"[Debug] {Context.User.Username} already logged in");
         await ModifyOriginalResponseAsync(msg =>
         {
             msg.Content = "You're already logged in to the terminal. 🫧";
@@ -44,16 +40,16 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         return;
     }
 
-    Log($"[Debug] activeUsers after login: {_data.activeUsers}");
+    Logger.Log($"[Debug] activeUsers after login: {_data.activeUsers}");
 
     if (_data.PublishedChannelId != 0)
     {
-        Log($"[Debug] Published channel found: {_data.PublishedChannelId}");
+        Logger.Log($"[Debug] Published channel found: {_data.PublishedChannelId}");
         ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
 
         if (channel == null)
         {
-            Log($"[Warning] Could not resolve channel {_data.PublishedChannelId} as ITextChannel");
+            Logger.Log($"[Warning] Could not resolve channel {_data.PublishedChannelId} as ITextChannel");
             await ModifyOriginalResponseAsync(msg =>
             {
                 msg.Content = "Terminal channel unavailable.";
@@ -67,9 +63,9 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             
             Embed logEmbed = _terminal.BuildLogHistoryEmbed();
             
-            Log($"[Debug] No existing logs embed — posting new");
+            Logger.Log($"[Debug] No existing logs embed — posting new");
             postedLog = await _terminal.SendNewEmbed(channel, logEmbed);
-            Log($"[Debug] Terminal embed posted with ID: {postedLog.Id}");
+            Logger.Log($"[Debug] Terminal embed posted with ID: {postedLog.Id}");
             _data.SetPublished(postedLog.Id, channel.Id, ARGEmbed_Type.Logs);
         }
         
@@ -81,14 +77,14 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             
             Embed terminalEmbed = _terminal.BuildTerminalEmbed();
             
-            Log($"[Debug] No existing terminal embed — posting new");
+            Logger.Log($"[Debug] No existing terminal embed — posting new");
             postedTerminal = await _terminal.SendNewEmbedWButtons(channel, terminalEmbed, new Dictionary<string, string>()
             {
                 {"Navigate", "terminal_btn_nav"},
                 {"Read", "terminal_btn_read"},
                 {"Ping", "terminal_btn_ping"}
             });
-            Log($"[Debug] Terminal embed posted with ID: {postedTerminal.Id}");
+            Logger.Log($"[Debug] Terminal embed posted with ID: {postedTerminal.Id}");
             _data.SetPublished(postedTerminal.Id, channel.Id, ARGEmbed_Type.Terminal);
         }
 
@@ -99,9 +95,9 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             
             Embed readEmbed = _terminal.BuildReadEmbed();
             
-            Log($"[Debug] No existing read embed — posting new");
+            Logger.Log($"[Debug] No existing read embed — posting new");
             postedRead = await _terminal.SendNewEmbed(channel, readEmbed);
-            Log($"[Debug] Read embed posted with ID: {postedRead.Id}");
+            Logger.Log($"[Debug] Read embed posted with ID: {postedRead.Id}");
             _data.SetPublished(postedRead.Id, channel.Id, ARGEmbed_Type.ReadOutput);
         }
         
@@ -110,7 +106,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             ARGEmbed_Type.Terminal,
             ARGEmbed_Type.ReadOutput);
 
-        Log($"[Info] /login complete for {Context.User.Username} — terminal session active");
+        Logger.Log($"[Info] /login complete for {Context.User.Username} — terminal session active");
         await ModifyOriginalResponseAsync(msg =>
         {
             msg.Content =
@@ -119,7 +115,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     }
     else
     {
-        Log($"[Warning] No published channel set — cannot post terminal embeds");
+        Logger.Log($"[Warning] No published channel set — cannot post terminal embeds");
         await ModifyOriginalResponseAsync(msg =>
         {
             msg.Content = "No published channel set.";
@@ -130,19 +126,19 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("logout", "logout to stop interacting with terminal")]
     public async Task Disconnect()
     {
-        Log($"[Info] /logout called by {Context.User.Username}");
+        Logger.Log($"[Info] /logout called by {Context.User.Username}");
 
         bool loggedOut = _data.Logout(Context.User.Id);
         if (!loggedOut)
         {
-            Log($"[Debug] {Context.User.Username} was not logged in");
+            Logger.Log($"[Debug] {Context.User.Username} was not logged in");
             await RespondAsync($"{Context.User.Username} you haven't connected yet!", ephemeral: true);
             return;
         }
         
         await _terminal.RefreshEmbeds(ARGEmbed_Type.Terminal);
 
-        Log($"[Debug] activeUsers after logout: {_data.activeUsers}");
+        Logger.Log($"[Debug] activeUsers after logout: {_data.activeUsers}");
         await RespondAsync($"{Context.User.Username} has successfully logged out of the AETHER-OS. Sad to see you go! 🫧", ephemeral: true);
     }
     

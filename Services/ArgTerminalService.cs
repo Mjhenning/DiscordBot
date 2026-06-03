@@ -23,11 +23,6 @@ public class ArgTerminalService
     }
 
     // ─── HELPERS ────────────────────────────────────────────────────
-    void Log(string msg)
-    {
-        Console.WriteLine(msg);
-        _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
-    }
     public async Task ResetSession()
     {
         _data.LoggedInUsers.Clear();
@@ -37,13 +32,13 @@ public class ArgTerminalService
 
         if (guild == null)
         {
-            Log("[Warning] Guild not found");
+            Logger.Log("[Warning] Guild not found");
             return;
         }
 
         if (_data.PublishedChannelId == 0)
         {
-            Log("[Debug] No published channel set");
+            Logger.Log("[Debug] No published channel set");
             return;
         }
 
@@ -52,7 +47,7 @@ public class ArgTerminalService
 
         if (channel == null)
         {
-            Log("[Warning] Published channel not found");
+            Logger.Log("[Warning] Published channel not found");
             return;
         }
 

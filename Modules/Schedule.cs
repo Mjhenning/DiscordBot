@@ -8,25 +8,17 @@ namespace DiscordBot.Modules;
 public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 {
     readonly ScheduleData _data;
-    readonly StreamWriter _log;
-
-    void Log(string msg)
-    {
-        Console.WriteLine(msg);
-        _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
-    }
 
     public ScheduleModule(ScheduleData data, StreamWriter log)
     {
         _data = data;
-        _log  = log;
     }
     
     [SlashCommand("resetschedule", "Force reset the schedule — delete after use")]
     public async Task ForceReset()
     {
         _data.ClearPublished();
-        Log("[Info] Schedule force reset by command");
+        Logger.Log("[Info] Schedule force reset by command");
         await RespondAsync("🗑️ Schedule has been force reset.", ephemeral: true);
     }
     
@@ -142,7 +134,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 
         _data.AddEntry(entry);
 
-        Log($"[Info] Schedule entry added: {entry.Description} — {entry.ScheduledAtDisplay}");
+        Logger.Log($"[Info] Schedule entry added: {entry.Description} — {entry.ScheduledAtDisplay}");
 
         await TryUpdatePublishedEmbed();
 
@@ -286,7 +278,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         IUserMessage posted = await channel.SendMessageAsync(text: roleMention, embed: embed);
         _data.SetPublished(posted.Id, channelId, ScheduleData.GetCurrentWeekStart());
 
-        Log($"[Info] Schedule published to #{channel.Name} (msg: {posted.Id}) by {Context.User.Username}");
+        Logger.Log($"[Info] Schedule published to #{channel.Name} (msg: {posted.Id}) by {Context.User.Username}");
 
         if (Context.Interaction is SocketMessageComponent component)
         {
@@ -306,31 +298,31 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 
     async Task TryUpdatePublishedEmbed()
     {
-        Log($"[Debug] TryUpdatePublishedEmbed called");
-        Log($"[Debug] IsPublishedThisWeek: {_data.IsPublishedThisWeek()}");
-        Log($"[Debug] MessageId: {_data.PublishedMessageId}, ChannelId: {_data.PublishedChannelId}");
+        Logger.Log($"[Debug] TryUpdatePublishedEmbed called");
+        Logger.Log($"[Debug] IsPublishedThisWeek: {_data.IsPublishedThisWeek()}");
+        Logger.Log($"[Debug] MessageId: {_data.PublishedMessageId}, ChannelId: {_data.PublishedChannelId}");
 
-        if (!_data.IsPublishedThisWeek()) { Log("[Debug] Bailing — not published this week"); return; }
-        if (_data.PublishedMessageId == 0 || _data.PublishedChannelId == 0) { Log("[Debug] Bailing — missing IDs"); return; }
+        if (!_data.IsPublishedThisWeek()) { Logger.Log("[Debug] Bailing — not published this week"); return; }
+        if (_data.PublishedMessageId == 0 || _data.PublishedChannelId == 0) { Logger.Log("[Debug] Bailing — missing IDs"); return; }
 
         try
         {
             ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
-            Log($"[Debug] Channel: {channel?.Name ?? "NULL"}");
+            Logger.Log($"[Debug] Channel: {channel?.Name ?? "NULL"}");
             if (channel == null) return;
 
             IUserMessage? message = await channel.GetMessageAsync(_data.PublishedMessageId) as IUserMessage;
-            Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
+            Logger.Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
             if (message == null) return;
 
             Embed updated = BuildScheduleEmbed();
             await message.ModifyAsync(props => props.Embed = updated);
-            Log($"[Info] Published schedule embed updated");
+            Logger.Log($"[Info] Published schedule embed updated");
         }
         catch (Exception ex)
         {
-            Log($"[Warning] TryUpdatePublishedEmbed failed: {ex.Message}");
-            Log($"[Warning] {ex.StackTrace}");
+            Logger.Log($"[Warning] TryUpdatePublishedEmbed failed: {ex.Message}");
+            Logger.Log($"[Warning] {ex.StackTrace}");
         }
     }
 

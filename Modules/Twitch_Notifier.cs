@@ -23,7 +23,6 @@ public class Twitch_Notifier
 {
     readonly EventSubWebsocketClient _eventSubClient;
     private readonly DiscordSocketClient _discordSocket;
-    private readonly StreamWriter _log;
     
     static StreamSession TwitchSession = new();
     static TwitchVOD TwitchVOD = new();
@@ -36,34 +35,28 @@ public class Twitch_Notifier
     private readonly SemaphoreSlim _sessionLock = new(1, 1);
     
     static readonly HttpClient HttpClient = new();
-
-    void Log(string msg)
-    {
-        Console.WriteLine(msg);
-        _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
-    }
+    
 
     public Twitch_Notifier(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, StreamWriter log, TwitchAPI twitchApi)
     {
         TwitchApi = twitchApi;
         _eventSubClient = eventSubClient;
-        _log = log;
         
-        Log("[Info] Twitch_Notifier constructor called");
-        Log($"[Info] Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
+        Logger.Log("[Info] Twitch_Notifier constructor called");
+        Logger.Log($"[Info] Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
         
         _eventSubClient.WebsocketConnected    += OnWebsocketConnected;
         _eventSubClient.WebsocketDisconnected += (s, e) =>
         {
-            Log("[Warning] Notifier websocket disconnected");
+            Logger.Log("[Warning] Notifier websocket disconnected");
             return Task.CompletedTask;
         };
 
         _eventSubClient.ErrorOccurred += (s, e) =>
         {
-            Log("[Error] Notifier websocket error occurred");
+            Logger.Log("[Error] Notifier websocket error occurred");
             foreach (var prop in e.GetType().GetProperties())
-                Log($"[Error]   {prop.Name}: {prop.GetValue(e)}");
+                Logger.Log($"[Error]   {prop.Name}: {prop.GetValue(e)}");
             return Task.CompletedTask;
         };
         
@@ -73,18 +66,18 @@ public class Twitch_Notifier
 
         _discordSocket = discordSocket;
         
-        Log("[Info] Twitch_Notifier constructor complete — all handlers attached");
+        Logger.Log("[Info] Twitch_Notifier constructor complete — all handlers attached");
     }
     
     async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
-        Log($"[Info] Notifier OnWebsocketConnected fired — IsReconnect: {e.IsRequestedReconnect}, SessionId: {_eventSubClient.SessionId}");
+        Logger.Log($"[Info] Notifier OnWebsocketConnected fired — IsReconnect: {e.IsRequestedReconnect}, SessionId: {_eventSubClient.SessionId}");
         
         if (!e.IsRequestedReconnect)
         {
             try
             {
-                Log("[Info] Creating stream.online subscription...");
+                Logger.Log("[Info] Creating stream.online subscription...");
                 await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
                     "stream.online",
                     "1",
@@ -92,13 +85,13 @@ public class Twitch_Notifier
                     TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
                     _eventSubClient.SessionId
                 );
-                Log("[Info] stream.online subscription created");
+                Logger.Log("[Info] stream.online subscription created");
             }
-            catch (Exception ex) { Log($"[Error] stream.online subscription failed: {ex.Message}"); }
+            catch (Exception ex) { Logger.Log($"[Error] stream.online subscription failed: {ex.Message}"); }
         
             try
             {
-                Log("[Info] Creating stream.offline subscription...");
+                Logger.Log("[Info] Creating stream.offline subscription...");
                 await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
                     "stream.offline",           
                     "1",                       
@@ -106,13 +99,13 @@ public class Twitch_Notifier
                     TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
                     _eventSubClient.SessionId  
                 );
-                Log("[Info] stream.offline subscription created");
+                Logger.Log("[Info] stream.offline subscription created");
             }
-            catch (Exception ex) { Log($"[Error] stream.offline subscription failed: {ex.Message}"); }
+            catch (Exception ex) { Logger.Log($"[Error] stream.offline subscription failed: {ex.Message}"); }
             
             try
             {
-                Log("[Info] Creating channel.update subscription...");
+                Logger.Log("[Info] Creating channel.update subscription...");
                 await TwitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
                     "channel.update",           
                     "2",                       
@@ -120,21 +113,21 @@ public class Twitch_Notifier
                     TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
                     _eventSubClient.SessionId  
                 );
-                Log("[Info] channel.update subscription created");
+                Logger.Log("[Info] channel.update subscription created");
             }
-            catch (Exception ex) { Log($"[Error] channel.update subscription failed: {ex.Message}"); }
+            catch (Exception ex) { Logger.Log($"[Error] channel.update subscription failed: {ex.Message}"); }
             
-            Log("[Info] Notifier OnWebsocketConnected complete");
+            Logger.Log("[Info] Notifier OnWebsocketConnected complete");
         }
         else
         {
-            Log("[Info] Reconnect detected — skipping subscription creation");
+            Logger.Log("[Info] Reconnect detected — skipping subscription creation");
         }
     }
     
     public async Task<string?> GetUserToken()
     {
-        Log("[Info] Fetching user token...");
+        Logger.Log("[Info] Fetching user token...");
 
         FormUrlEncodedContent tokenRequest = new(new[]
         {
@@ -153,11 +146,11 @@ public class Twitch_Notifier
 
             string json = await response.Content.ReadAsStringAsync();
 
-            Log($"[Info] Token HTTP status: {response.StatusCode}");
+            Logger.Log($"[Info] Token HTTP status: {response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
             {
-                Log($"[Error] Token response body: {json}");
+                Logger.Log($"[Error] Token response body: {json}");
                 return null;
             }
 
@@ -168,37 +161,37 @@ public class Twitch_Notifier
         }
         catch (Exception ex)
         {
-            Log($"[Error] GetUserToken failed: {ex}");
+            Logger.Log($"[Error] GetUserToken failed: {ex}");
             return null;
         }
     }
 
     public async Task StartAsync()
     {
-        Log("[Info] Notifier StartAsync called");
+        Logger.Log("[Info] Notifier StartAsync called");
     
         string? _token = await GetUserToken();
-        Log($"[Info] Twitch user token fetched: {(_token != null ? "success" : "failed")}");
+        Logger.Log($"[Info] Twitch user token fetched: {(_token != null ? "success" : "failed")}");
 
         TwitchApi.Settings.ClientId    = Config.TwitchClientId;
         if (string.IsNullOrWhiteSpace(_token))
         {
-            Log("[Error] Could not obtain Twitch token");
+            Logger.Log("[Error] Could not obtain Twitch token");
             return;
         }
 
         TwitchApi.Settings.AccessToken = _token;
     
-        Log("[Info] TwitchApi credentials set — calling ConnectAsync");
+        Logger.Log("[Info] TwitchApi credentials set — calling ConnectAsync");
         await _eventSubClient.ConnectAsync();
-        Log("[Info] ConnectAsync returned");
+        Logger.Log("[Info] ConnectAsync returned");
     }
 
     // ─── ONLINE ──────────────────────────────────────────────────────────────
 
     async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
 {
-    Log("[Info] OnStreamOnline fired");
+    Logger.Log("[Info] OnStreamOnline fired");
 
     try
     {
@@ -213,7 +206,7 @@ public class Twitch_Notifier
         }
         catch (Exception ex) when (ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
         {
-            Log("[Warning] Twitch token expired during GetStreamsAsync");
+            Logger.Log("[Warning] Twitch token expired during GetStreamsAsync");
 
             bool refreshed = await RefreshAccessToken();
 
@@ -226,11 +219,11 @@ public class Twitch_Notifier
             );
         }
 
-        Log($"[Info] GetStreams returned {result?.Streams?.Length ?? 0} stream(s)");
+        Logger.Log($"[Info] GetStreams returned {result?.Streams?.Length ?? 0} stream(s)");
 
         if (result?.Streams == null || result.Streams.Length == 0)
         {
-            Log("[Warning] OnStreamOnline: no streams returned");
+            Logger.Log("[Warning] OnStreamOnline: no streams returned");
             return;
         }
 
@@ -245,7 +238,7 @@ public class Twitch_Notifier
         }
         catch (Exception ex) when (ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
         {
-            Log("[Warning] Twitch token expired during GetUsersAsync");
+            Logger.Log("[Warning] Twitch token expired during GetUsersAsync");
 
             bool refreshed = await RefreshAccessToken();
 
@@ -258,11 +251,11 @@ public class Twitch_Notifier
             );
         }
 
-        Log($"[Info] GetUsers returned {userResult?.Users?.Length ?? 0} user(s)");
+        Logger.Log($"[Info] GetUsers returned {userResult?.Users?.Length ?? 0} user(s)");
 
         if (userResult?.Users == null || userResult.Users.Length == 0)
         {
-            Log("[Warning] OnStreamOnline: no users returned");
+            Logger.Log("[Warning] OnStreamOnline: no users returned");
             return;
         }
 
@@ -291,7 +284,7 @@ public class Twitch_Notifier
             _sessionLock.Release();
         }
 
-        Log(
+        Logger.Log(
             $"[Info] Session populated — " +
             $"Title: {TwitchSession.Title}, " +
             $"Game: {TwitchSession.GameName}, " +
@@ -302,24 +295,24 @@ public class Twitch_Notifier
     }
     catch (Exception ex)
     {
-        Log($"[Error] OnStreamOnline failed: {ex}");
+        Logger.Log($"[Error] OnStreamOnline failed: {ex}");
     }
 }
     
     async Task OnStreamReceived()
     {
-        Log("[Info] OnStreamReceived called");
+        Logger.Log("[Info] OnStreamReceived called");
         ITextChannel? channel =
             _discordSocket.GetChannel(Config.TwitchNotifyChannelId) as ITextChannel
             ?? await _discordSocket.GetChannelAsync(Config.TwitchNotifyChannelId) as ITextChannel;
         
         if (channel == null)
         {
-            Log($"[Warning] Could not find Twitch notify channel (ID: {Config.TwitchNotifyChannelId})");
+            Logger.Log($"[Warning] Could not find Twitch notify channel (ID: {Config.TwitchNotifyChannelId})");
             return;
         }
 
-        Log($"[Info] Posting to #{channel.Name}");
+        Logger.Log($"[Info] Posting to #{channel.Name}");
 
         Embed embed = BuildTwitchEmbed(
             Config.TwitchChannelName,
@@ -343,7 +336,7 @@ public class Twitch_Notifier
         }
         finally { _sessionLock.Release(); }
 
-        Log($"[Info] Notification published to #{channel.Name} (msg: {posted.Id})");
+        Logger.Log($"[Info] Notification published to #{channel.Name} (msg: {posted.Id})");
         
         // Atomically set _liveUpdaterRunning to 1 only if it's currently 0, so a second stream.online event can't spawn a duplicate loop
         if (Interlocked.CompareExchange(ref _liveUpdaterRunning, 1, 0) == 0)
@@ -360,14 +353,14 @@ public class Twitch_Notifier
     
     async Task OnStreamOffline(object? sender, StreamOfflineArgs args)
     {
-        Log("[Info] OnStreamOffline fired");
+        Logger.Log("[Info] OnStreamOffline fired");
 
         await _sessionLock.WaitAsync();
         try
         {
             if (!TwitchSession.CurrentlyLive)
             {
-                Log("[Info] StreamOffline ignored — stream already offline");
+                Logger.Log("[Info] StreamOffline ignored — stream already offline");
                 return;
             }
             TwitchSession.OfflineAt     = DateTimeOffset.UtcNow;
@@ -375,7 +368,7 @@ public class Twitch_Notifier
         }
         finally { _sessionLock.Release(); }
 
-        Log("[Info] Updating embed to offline state...");
+        Logger.Log("[Info] Updating embed to offline state...");
         await UpdateEmbed();
 
         _ = Task.Run(async () =>
@@ -383,11 +376,11 @@ public class Twitch_Notifier
             // Wait for the live updater loop to fully exit before resetting
             while (Interlocked.CompareExchange(ref _liveUpdaterRunning, 0, 0) == 1)
             {
-                Log("[Info] Waiting for live updater to stop before resetting session...");
+                Logger.Log("[Info] Waiting for live updater to stop before resetting session...");
                 await Task.Delay(500);
             }
 
-            Log("[Info] Starting background VOD check...");
+            Logger.Log("[Info] Starting background VOD check...");
             await CheckIfVodUp();
 
             await _sessionLock.WaitAsync();
@@ -398,7 +391,7 @@ public class Twitch_Notifier
             }
             finally { _sessionLock.Release(); }
 
-            Log("[Info] Session reset");
+            Logger.Log("[Info] Session reset");
         });
     }
 
@@ -420,7 +413,7 @@ public class Twitch_Notifier
         }
         catch (Exception ex) when (ex.Message.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase))
         {
-            Log("[Warning] Twitch token expired during GetVideosAsync");
+            Logger.Log("[Warning] Twitch token expired during GetVideosAsync");
 
             bool refreshed = await RefreshAccessToken();
 
@@ -442,7 +435,7 @@ public class Twitch_Notifier
             }
             finally { _sessionLock.Release(); }
 
-            Log($"[Info] VOD found: {result.Videos[0].Url}");
+            Logger.Log($"[Info] VOD found: {result.Videos[0].Url}");
 
             await UpdateEmbed();
         }
@@ -452,7 +445,7 @@ public class Twitch_Notifier
     
     async Task OnChannelUpdate(object? sender, ChannelUpdateArgs args)
     {
-        Log($"[Info] OnChannelUpdate fired — Title: {args.Payload.Event.Title}, Game: {args.Payload.Event.CategoryName}");
+        Logger.Log($"[Info] OnChannelUpdate fired — Title: {args.Payload.Event.Title}, Game: {args.Payload.Event.CategoryName}");
 
         await _sessionLock.WaitAsync();
         try
@@ -469,7 +462,7 @@ public class Twitch_Notifier
     
     async Task StartLiveUpdates()
     {
-        Log("[Info] StartLiveUpdates loop started");
+        Logger.Log("[Info] StartLiveUpdates loop started");
         
         int missedStreamChecks = 0;
 
@@ -515,7 +508,7 @@ public class Twitch_Notifier
                     )
                 )
                 {
-                    Log("[Warning] Twitch token expired during StartLiveUpdates");
+                    Logger.Log("[Warning] Twitch token expired during StartLiveUpdates");
 
                     bool refreshed = await RefreshAccessToken();
 
@@ -536,14 +529,14 @@ public class Twitch_Notifier
                 {
                     missedStreamChecks++;
 
-                    Log(
+                    Logger.Log(
                         $"[Warning] StartLiveUpdates: GetStreams returned no results " +
                         $"({missedStreamChecks}/3)"
                     );
 
                     if (missedStreamChecks >= 3)
                     {
-                        Log("[Warning] Stream assumed offline after 3 failed checks");
+                        Logger.Log("[Warning] Stream assumed offline after 3 failed checks");
 
                         bool shouldTriggerOffline;
 
@@ -560,7 +553,7 @@ public class Twitch_Notifier
 
                         if (shouldTriggerOffline)
                         {
-                            Log("[Info] Forcing offline event from StartLiveUpdates");
+                            Logger.Log("[Info] Forcing offline event from StartLiveUpdates");
 
                             await OnStreamOffline(this, null!);
                         }
@@ -594,7 +587,7 @@ public class Twitch_Notifier
             }
             catch (Exception ex)
             {
-                Log($"[Error] StartLiveUpdates failed: {ex}");
+                Logger.Log($"[Error] StartLiveUpdates failed: {ex}");
             }
 
             TimeSpan elapsed = DateTimeOffset.UtcNow - startTime;
@@ -608,12 +601,12 @@ public class Twitch_Notifier
             }
             catch (TaskCanceledException)
             {
-                Log("[Info] StartLiveUpdates delay cancelled");
+                Logger.Log("[Info] StartLiveUpdates delay cancelled");
                 break;
             }
         }
 
-        Log("[Info] StartLiveUpdates loop ended — stream no longer live");
+        Logger.Log("[Info] StartLiveUpdates loop ended — stream no longer live");
     }
     
     Embed BuildTwitchEmbed(
@@ -762,7 +755,7 @@ public class Twitch_Notifier
                 _discordSocket.GetChannel(channelId) as ITextChannel
                 ?? await _discordSocket.GetChannelAsync(channelId) as ITextChannel;
 
-            Log($"[Debug] Channel: {channel?.Name ?? "NULL"}");
+            Logger.Log($"[Debug] Channel: {channel?.Name ?? "NULL"}");
 
             if (channel == null)
                 return;
@@ -770,7 +763,7 @@ public class Twitch_Notifier
             IUserMessage? message =
                 await channel.GetMessageAsync(messageId) as IUserMessage;
 
-            Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
+            Logger.Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
 
             if (message == null)
                 return;
@@ -790,11 +783,11 @@ public class Twitch_Notifier
 
             await message.ModifyAsync(props => props.Embed = updated);
 
-            Log("[Info] Published twitch embed updated");
+            Logger.Log("[Info] Published twitch embed updated");
         }
         catch (Exception ex)
         {
-            Log($"[Warning] TryUpdatePublishedEmbed failed: {ex}");
+            Logger.Log($"[Warning] TryUpdatePublishedEmbed failed: {ex}");
         }
     }
     
@@ -804,13 +797,13 @@ public class Twitch_Notifier
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            Log("[Error] Failed to refresh Twitch token");
+            Logger.Log("[Error] Failed to refresh Twitch token");
             return false;
         }
 
         TwitchApi.Settings.AccessToken = token;
 
-        Log("[Info] Twitch access token refreshed");
+        Logger.Log("[Info] Twitch access token refreshed");
         return true;
     }
 }

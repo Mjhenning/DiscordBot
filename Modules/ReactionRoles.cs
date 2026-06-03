@@ -10,18 +10,10 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
     public static readonly Dictionary<ulong, ReactionSetupSession> Sessions = new();
 
     readonly ReactionsData _data;
-    readonly StreamWriter  _log;
-
-    void Log(string msg)
-    {
-        Console.WriteLine(msg);
-        _log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] {msg}");
-    }
 
     public ReactionRolesModule(ReactionsData data, StreamWriter log)
     {
         _data = data;
-        _log  = log;
     }
     
     [SlashCommand("reactionrole", "Manage your Reaction Roles")]
@@ -274,7 +266,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
                 }
                 catch (Exception ex)
                 {
-                    Log($"[Warning] Failed to delete confirmation message: {ex.Message}");
+                    Logger.Log($"[Warning] Failed to delete confirmation message: {ex.Message}");
                 }
             });
         }
@@ -314,7 +306,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         if (options.Count > 25)
         {
             options = options.Take(25).ToList();
-            Log("[Warning] More than 25 reaction role entries — only showing first 25 in delete menu");
+            Logger.Log("[Warning] More than 25 reaction role entries — only showing first 25 in delete menu");
         }
 
         MessageComponent menu = new ComponentBuilder()
@@ -396,7 +388,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             _data.RemoveEntry(messageId, emoji);
             deleted++;
 
-            Log($"[Info] Reaction role deleted — message {messageId}, emoji {emoji} by {Context.User.Username}");
+            Logger.Log($"[Info] Reaction role deleted — message {messageId}, emoji {emoji} by {Context.User.Username}");
 
             try
             {
@@ -416,7 +408,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
             }
             catch (Exception ex)
             {
-                Log($"[Warning] Could not remove bot reaction during delete: {ex.Message}");
+                Logger.Log($"[Warning] Could not remove bot reaction during delete: {ex.Message}");
             }
         }
 

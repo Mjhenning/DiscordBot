@@ -129,7 +129,7 @@ public class ScheduleData
 
         _resetTimer = new Timer(_ =>
         {
-            Console.WriteLine("[Info] Scheduled week reset triggered");
+            Logger.Log("[Info] Scheduled week reset triggered");
             EnsureCurrentWeek();
 
             // Reschedule for next week
@@ -137,7 +137,7 @@ public class ScheduleData
             _resetTimer.Change(nextInterval, TimeSpan.FromDays(7));
         }, null, initialDelay, TimeSpan.FromDays(7));
 
-        Console.WriteLine($"[Info] Reset timer scheduled — next reset at {nextReset:f}");
+        Logger.Log($"[Info] Reset timer scheduled — next reset at {nextReset:f}");
     }
     
     static DateTime GetNextResetTime(DateTime from)
@@ -166,7 +166,7 @@ public class ScheduleData
         if (WeekStart == currentWeekStart)
             return;
 
-        Console.WriteLine("[Info] Week rollover detected — clearing previous schedule");
+        Logger.Log("[Info] Week rollover detected — clearing previous schedule");
 
         ClearPublished();
     }

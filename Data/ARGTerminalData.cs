@@ -142,7 +142,7 @@ public class ArgTerminalData
         state.coherence = updated;
     
         string written = JsonConvert.SerializeObject(state, Formatting.Indented);
-        Console.WriteLine($"[ARG] Writing coherence: {written}"); // temp debug
+        Logger.Log($"[ARG] Writing coherence: {written}"); // temp debug
         File.WriteAllText(StateFilePath, written);
         return updated;
     }
@@ -210,7 +210,7 @@ public class ArgTerminalData
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ARG Reload Error] {ex.Message}");
+            Logger.Log($"[ARG Reload Error] {ex.Message}");
         }
     }
 }

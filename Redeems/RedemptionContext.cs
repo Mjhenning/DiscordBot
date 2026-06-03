@@ -7,6 +7,5 @@ public record RedemptionContext(
     string              UserInput,
     string              AvatarUrl,
     string              UserUrl,
-    DiscordSocketClient Discord,
-    StreamWriter        Log
+    DiscordSocketClient Discord
 );

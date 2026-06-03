@@ -1,4 +1,5 @@
 using System.IO;
+using DiscordBot;
 using DiscordBot.Data;
 using DiscordBot.Services;
 
@@ -58,7 +59,7 @@ public class CoherenceWatcher : IDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[CoherenceWatcher] Error: {ex}");
+            Logger.Log($"[CoherenceWatcher] Error: {ex}");
         }
     }
 

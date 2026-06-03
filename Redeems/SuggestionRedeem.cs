@@ -10,7 +10,7 @@ public static class SuggestionRedeem
         ITextChannel? channel = ctx.Discord.GetChannel(Config.SuggestionChannelId) as ITextChannel;
         if (channel == null)
         {
-            ctx.Log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] [Warning] SuggestionRedeem: could not find channel");
+            Logger.Log("[Warning] SuggestionRedeem: could not find channel");
             return;
         }
 
@@ -27,7 +27,7 @@ public static class SuggestionRedeem
             .Build();
 
         IUserMessage posted = await channel.SendMessageAsync(embed: embed, components: components);
-        ctx.Log.WriteLine($"[{DateTime.UtcNow:HH:mm:ss}] [Info] Suggestion published to #{channel.Name} (msg: {posted.Id})");
+        Logger.Log($"[Info] Suggestion published to #{channel.Name} (msg: {posted.Id})");
     }
 
     public static async Task OnMarkComplete(SocketMessageComponent component)

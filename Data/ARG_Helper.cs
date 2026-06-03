@@ -80,7 +80,7 @@ public class ArgFilesystem
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ARG] Failed to parse {filePath}: {ex.Message}");
+            Logger.Log($"[ARG] Failed to parse {filePath}: {ex.Message}");
         }
     }
 
