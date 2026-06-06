@@ -124,6 +124,7 @@ client.Ready += async () =>
     
     _ = Task.Run(async () =>
     {
+        services.GetRequiredService<TwitchRedeemHandler>();
         await services.GetRequiredService<Twitch_Notifier>().StartAsync();
     });
 };
