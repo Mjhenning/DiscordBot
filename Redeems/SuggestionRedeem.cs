@@ -29,18 +29,4 @@ public static class SuggestionRedeem
         IUserMessage posted = await channel.SendMessageAsync(embed: embed, components: components);
         Logger.Log($"[Info] Suggestion published to #{channel.Name} (msg: {posted.Id})");
     }
-
-    public static async Task OnMarkComplete(SocketMessageComponent component)
-    {
-        SocketGuildUser? user = component.User as SocketGuildUser;
-
-        if (user == null || !user.GuildPermissions.Administrator)
-        {
-            await component.RespondAsync("You don't have permission to do this.", ephemeral: true);
-            return;
-        }
-
-        await component.Message.DeleteAsync();
-        await component.RespondAsync("Suggestion marked as complete.", ephemeral: true);
-    }
 }

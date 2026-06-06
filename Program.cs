@@ -35,8 +35,13 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
     .AddSingleton<TwitchAPI>()
-    .AddTwitchLibEventSubWebsockets() //creates websocket to inject in twitch_notifier
-    .AddLogging() //Adds ILogger support
+    .AddTwitchLibEventSubWebsockets()
+    .AddLogging()
+    .AddSingleton<TokenManager>(sp => new TokenManager(
+        sp.GetRequiredService<TwitchAPI>(),
+        "Data/twitch_tokens.json"
+    ))
+    .AddSingleton<TwitchClient>()
     .AddSingleton<Twitch_Notifier>()
     .AddSingleton<TwitchRedeemHandler>()
     .AddSingleton<ArgFilesystem>()
@@ -119,7 +124,6 @@ client.Ready += async () =>
     
     _ = Task.Run(async () =>
     {
-        await services.GetRequiredService<TwitchRedeemHandler>().StartAsync();
         await services.GetRequiredService<Twitch_Notifier>().StartAsync();
     });
 };
@@ -148,11 +152,6 @@ scheduleData.OnWeekReset += async () =>
 
 client.InteractionCreated += async interaction =>
 {
-    
-    // Let button components be handled by their own registered handlers
-    if (interaction is SocketMessageComponent component && component.Data.CustomId == "suggestion_complete") 
-        return;
-    
     SocketInteractionContext ctx = new SocketInteractionContext(client, interaction);
     
     // Log what's coming in to confirm routing

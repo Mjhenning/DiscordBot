@@ -13,59 +13,31 @@ public class TwitchRedeemHandler
 {
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
-    readonly TwitchAPI _twitchApi;
-    readonly HttpClient _http = new() { BaseAddress = new Uri("https://id.twitch.tv/oauth2/token") };
+    readonly TokenManager _tokenManager;
+    readonly TwitchClient _twitchClient;
 
     readonly Dictionary<string, Func<RedemptionContext, Task>> _handlers;
 
-    public TwitchRedeemHandler(EventSubWebsocketClient eventSubClient, DiscordSocketClient discordSocket, TwitchAPI twitchApi)
+    public TwitchRedeemHandler(
+        EventSubWebsocketClient eventSubClient,
+        DiscordSocketClient discordSocket,
+        TokenManager tokenManager,
+        TwitchClient twitchClient)
     {
-        _twitchApi      = twitchApi;
+        _tokenManager   = tokenManager;
+        _twitchClient   = twitchClient;
         _eventSubClient = eventSubClient;
         _discordSocket  = discordSocket;
 
-        // ── Register redeems here ──────────────────────────────────────────
         _handlers = new Dictionary<string, Func<RedemptionContext, Task>>
         {
             { Config.SuggestRewardId, SuggestionRedeem.Handle },
-            { Config.QuoteRewardId, QuoteRedeem.Handle },
+            { Config.QuoteRewardId,   QuoteRedeem.Handle },
         };
 
-        _eventSubClient.WebsocketConnected                          += OnWebsocketConnected;
+        _eventSubClient.WebsocketConnected                        += OnWebsocketConnected;
         _eventSubClient.ChannelPointsCustomRewardRedemptionUpdate += OnRedemptionUpdated;
-        _discordSocket.InteractionCreated                           += OnInteractionCreated;
-    }
-
-    public async Task StartAsync()
-    {
-        FormUrlEncodedContent request = new(new[]
-        {
-            new KeyValuePair<string, string>("client_id",     Config.TwitchClientId),
-            new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
-            new KeyValuePair<string, string>("grant_type",    "refresh_token"),
-            new KeyValuePair<string, string>("refresh_token", Config.BroadcasterRefreshToken),
-        });
-
-        try
-        {
-            HttpResponseMessage response = await _http.PostAsync(_http.BaseAddress, request);
-            string json = await response.Content.ReadAsStringAsync();
-            TwitchTokenResponse? parsed = JsonConvert.DeserializeObject<TwitchTokenResponse>(json);
-            string token = parsed?.AccessToken ?? "";
-
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                Logger.Log("[Error] TwitchRedeemHandler: failed to fetch token");
-                return;
-            }
-
-            _twitchApi.Settings.AccessToken = token;
-            Logger.Log("[Info] TwitchRedeemHandler token fetched: success");
-        }
-        catch (Exception ex)
-        {
-            Logger.Log($"[Error] TwitchRedeemHandler token fetch failed: {ex.Message}");
-        }
+        // OnInteractionCreated hook REMOVED — suggestion_complete is now a proper [ComponentInteraction]
     }
 
     // ── Subscriptions ──────────────────────────────────────────────────────
@@ -74,21 +46,26 @@ public class TwitchRedeemHandler
     {
         if (e.IsRequestedReconnect) return;
 
+        // Ensure token is valid before subscribing
+        await _tokenManager.GetValidAccessTokenAsync(TwitchProfile.Broadcaster);
+
         foreach (string rewardId in _handlers.Keys)
         {
             try
             {
-                // Subscribe to redemption updated (fulfilled/cancelled)
-                await _twitchApi.Helix.EventSub.CreateEventSubSubscriptionAsync(
-                    "channel.channel_points_custom_reward_redemption.update",
-                    "1",
-                    new Dictionary<string, string>
-                    {
-                        { "broadcaster_user_id", Config.TwitchUserId },
-                        { "reward_id",           rewardId            }
-                    },
-                    TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
-                    _eventSubClient.SessionId
+                await _twitchClient.ExecuteAsync(
+                    TwitchProfile.Broadcaster,
+                    api => api.Helix.EventSub.CreateEventSubSubscriptionAsync(
+                        "channel.channel_points_custom_reward_redemption.update",
+                        "1",
+                        new Dictionary<string, string>
+                        {
+                            { "broadcaster_user_id", Config.TwitchUserId },
+                            { "reward_id",           rewardId            }
+                        },
+                        TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
+                        _eventSubClient.SessionId
+                    )
                 );
 
                 Logger.Log($"[Info] Subscribed to redemption events for reward {rewardId}");
@@ -118,7 +95,10 @@ public class TwitchRedeemHandler
 
             try
             {
-                var userResult = await _twitchApi.Helix.Users.GetUsersAsync(null, new List<string> { redemption.UserName });
+                var userResult = await _twitchClient.ExecuteAsync(
+                    TwitchProfile.Broadcaster,
+                    api => api.Helix.Users.GetUsersAsync(null, new List<string> { redemption.UserName })
+                );
                 avatarUrl = userResult?.Users?.Length > 0 ? userResult.Users[0].ProfileImageUrl : "";
             }
             catch (Exception ex)
@@ -140,15 +120,5 @@ public class TwitchRedeemHandler
         {
             Logger.Log($"[Error] Handler for reward {redemption.Reward.Id} failed: {ex.Message}");
         }
-    }
-
-    // ── Shared interaction handling ────────────────────────────────────────
-
-    async Task OnInteractionCreated(SocketInteraction interaction)
-    {
-        if (interaction is not SocketMessageComponent component) return;
-
-        if (component.Data.CustomId == "suggestion_complete")
-            await SuggestionRedeem.OnMarkComplete(component);
     }
 }
