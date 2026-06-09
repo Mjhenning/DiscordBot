@@ -573,6 +573,13 @@ public class Twitch_Notifier
     // Called by the live updater loop, channel update handler, and offline handler.
     async Task UpdateEmbed()
     {
+        // Don't attempt to update if no message has been published yet
+        if (TwitchSession.PublishedChannelId == 0 || TwitchSession.PublishedMessageId == 0)
+        {
+            Logger.Log("[Debug] UpdateEmbed skipped — no published message");
+            return;
+        }
+        
         try
         {
             // Snapshot all session state under the lock to avoid race conditions

@@ -17,9 +17,12 @@ using TwitchLib.EventSub.Websockets.Extensions;
 
 DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
 {
-    GatewayIntents = GatewayIntents.AllUnprivileged 
-                   | GatewayIntents.MessageContent 
-                   | GatewayIntents.GuildMembers,
+    GatewayIntents = GatewayIntents.Guilds
+                     | GatewayIntents.GuildMessages
+                     | GatewayIntents.GuildMessageReactions
+                     | GatewayIntents.GuildMembers
+                     | GatewayIntents.MessageContent
+                     | GatewayIntents.DirectMessages,
     LogLevel = LogSeverity.Info
 });
 
@@ -125,6 +128,7 @@ client.Ready += async () =>
     _ = Task.Run(async () =>
     {
         services.GetRequiredService<TwitchRedeemHandler>();
+        services.GetRequiredService<EventSubReconnectService>(); //disconnect handler
         await services.GetRequiredService<Twitch_Notifier>().StartAsync();
     });
 };
