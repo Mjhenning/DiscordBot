@@ -24,6 +24,8 @@ public static class Config
     public const ulong TwitchNotifyChannelId = 1487776641248792778;
     public const ulong SuggestionChannelId = 1504438238058905732;
     public const ulong WelcomeChannelId = 1487775542106390599;
+    public const ulong FavouritesNotifyChannelId = 1502655175809171648;
+    
     public const ulong AutoRoleId = 1487777765003497482;
     
     //Rewards

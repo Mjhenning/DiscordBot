@@ -14,10 +14,6 @@ public class Twitch_Notifier
 {
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
-
-    // ── NEW: TokenManager handles all token refresh automatically.
-    //         TwitchClient wraps every API call with auto-retry on 401.
-    //         We no longer hold a raw TwitchAPI reference here. ──────────────
     readonly TokenManager _tokenManager;
     readonly TwitchClient _twitchClient;
 

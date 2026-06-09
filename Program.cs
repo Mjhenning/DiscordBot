@@ -47,6 +47,7 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<TwitchClient>()
     .AddSingleton<Twitch_Notifier>()
     .AddSingleton<TwitchRedeemHandler>()
+    .AddSingleton<FavouritesLiveNoti>()
     .AddSingleton<ArgFilesystem>()
     .AddSingleton<ArgTerminalData>()
     .AddSingleton<ArgTerminalService>()
@@ -128,7 +129,8 @@ client.Ready += async () =>
     _ = Task.Run(async () =>
     {
         services.GetRequiredService<TwitchRedeemHandler>();
-        services.GetRequiredService<EventSubReconnectService>(); //disconnect handler
+        services.GetRequiredService<EventSubReconnectService>();
+        services.GetRequiredService<FavouritesLiveNoti>();
         await services.GetRequiredService<Twitch_Notifier>().StartAsync();
     });
 };
