@@ -9,6 +9,8 @@ using DiscordBot.Services;
 using TwitchLib.Api;
 using TwitchLib.EventSub.Websockets.Extensions;
 
+bool _ready = false;
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // c# version 9+ does not use main class void structure, allows writing top level
@@ -104,6 +106,9 @@ client.Ready += async () =>
     //          await guild.DeleteApplicationCommandsAsync();
     //          Logger.Log($"[Info] Cleared commands for {guild.Name}");
     //      }
+    
+    if (_ready) return; // prevent re-running on reconnect
+    _ready = true;
     
     await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services); //adds Schedule and ReactionROle because both derive from IInteractionModuleBase
     
