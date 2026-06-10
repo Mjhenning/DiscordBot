@@ -4,65 +4,24 @@ namespace DiscordBot.Modules;
 
 public class TwitchClient
 {
-    private readonly TokenManager _tokenManager;
-    private readonly TwitchAPI _api;
+    readonly TwitchAPI _api;
+    readonly TokenManager _tokens;
 
-    public TwitchClient(TokenManager tokenManager, TwitchAPI api)
+    public TwitchClient(TwitchAPI api, TokenManager tokens)
     {
-        _tokenManager = tokenManager;
         _api = api;
+        _tokens = tokens;
+
+        _api.Settings.ClientId = Config.TwitchClientId;
     }
 
     public async Task<T> ExecuteAsync<T>(
         TwitchProfile profile,
         Func<TwitchAPI, Task<T>> action)
     {
-        return await ExecuteInternal(profile, action, retry: true);
-    }
+        _api.Settings.AccessToken =
+            await _tokens.GetValidAccessTokenAsync(profile);
 
-    private async Task<T> ExecuteInternal<T>(
-        TwitchProfile profile,
-        Func<TwitchAPI, Task<T>> action,
-        bool retry)
-    {
-        var token = await _tokenManager.GetValidAccessTokenAsync(profile);
-
-        try
-        {
-            // IMPORTANT: clone API per call (prevents race conditions)
-            var api = CloneApi(token);
-
-            return await action(api);
-        }
-        catch (Exception ex) when (retry && IsAuthError(ex))
-        {
-            Logger.Log("[TwitchClient] auth failure, refreshing token...");
-
-            await _tokenManager.ForceRefreshAsync(profile);
-
-            return await ExecuteInternal(profile, action, retry: false);
-        }
-    }
-
-    private TwitchAPI CloneApi(string token)
-    {
-        var api = new TwitchAPI
-        {
-            Settings =
-            {
-                ClientId = Config.TwitchClientId,
-                AccessToken = token
-            }
-        };
-
-        return api;
-    }
-
-    private bool IsAuthError(Exception ex)
-    {
-        // still simple, but safer fallback
-        return ex.Message.Contains("401") ||
-               ex.Message.Contains("Unauthorized") ||
-               ex.Message.Contains("invalid token");
+        return await action(_api);
     }
 }

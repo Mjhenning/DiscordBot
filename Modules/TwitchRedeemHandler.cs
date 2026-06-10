@@ -53,7 +53,7 @@ public class TwitchRedeemHandler
         {
             try
             {
-                await _twitchClient.ExecuteAsync(
+                var result = await _twitchClient.ExecuteAsync(
                     TwitchProfile.Broadcaster,
                     api => api.Helix.EventSub.CreateEventSubSubscriptionAsync(
                         "channel.channel_points_custom_reward_redemption.update",
@@ -68,7 +68,9 @@ public class TwitchRedeemHandler
                     )
                 );
 
-                Logger.Log($"[Info] Subscribed to redemption events for reward {rewardId}");
+                Logger.Log(
+                    $"[Info] Redeem subscription created: " +
+                    $"{result.Subscriptions[0].Id}");
             }
             catch (Exception ex)
             {

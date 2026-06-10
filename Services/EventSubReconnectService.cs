@@ -29,8 +29,6 @@ public class EventSubReconnectService
 
             try
             {
-                // Refresh token before reconnecting in case that was the cause
-                await _tokenManager.ForceRefreshAsync(TwitchProfile.Broadcaster);
                 await _eventSubClient.ReconnectAsync();
                 Logger.Log("[Info] EventSub reconnected successfully");
                 return;

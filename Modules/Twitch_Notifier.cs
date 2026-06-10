@@ -82,8 +82,9 @@ public class Twitch_Notifier
 
         // Trigger initial token fetch/validation. TokenManager saves the token
         // to disk and updates it automatically before it expires from now on.
-        await _tokenManager.GetValidAccessTokenAsync(TwitchProfile.Broadcaster);
-        Logger.Log("[Info] Token ready — connecting EventSub");
+        var token = await _tokenManager.GetValidAccessTokenAsync(TwitchProfile.Broadcaster);
+
+        Logger.Log($"[Info] Token ready ({token[..10]}...)");
 
         await _eventSubClient.ConnectAsync();
         Logger.Log("[Info] ConnectAsync returned");
@@ -126,7 +127,7 @@ public class Twitch_Notifier
             {
                 Logger.Log("[Info] Creating stream.offline subscription...");
 
-                await _twitchClient.ExecuteAsync(
+                var result = await _twitchClient.ExecuteAsync(
                     TwitchProfile.Broadcaster,
                     api => api.Helix.EventSub.CreateEventSubSubscriptionAsync(
                         "stream.offline",
@@ -137,7 +138,9 @@ public class Twitch_Notifier
                     )
                 );
 
-                Logger.Log("[Info] stream.offline subscription created");
+                Logger.Log(
+                    $"[Info] Subscription created: " +
+                    $"{result.Subscriptions[0].Id}");
             }
             catch (Exception ex) { Logger.Log($"[Error] stream.offline subscription failed: {ex.Message}"); }
 
@@ -146,7 +149,7 @@ public class Twitch_Notifier
             {
                 Logger.Log("[Info] Creating channel.update subscription...");
 
-                await _twitchClient.ExecuteAsync(
+                var result = await _twitchClient.ExecuteAsync(
                     TwitchProfile.Broadcaster,
                     api => api.Helix.EventSub.CreateEventSubSubscriptionAsync(
                         "channel.update",
@@ -157,7 +160,9 @@ public class Twitch_Notifier
                     )
                 );
 
-                Logger.Log("[Info] channel.update subscription created");
+                Logger.Log(
+                    $"[Info] Subscription created: " +
+                    $"{result.Subscriptions[0].Id}");
             }
             catch (Exception ex) { Logger.Log($"[Error] channel.update subscription failed: {ex.Message}"); }
 

@@ -1,6 +1,7 @@
 using Discord;
 using Discord.WebSocket;
 using TwitchLib.Api.Helix.Models.Streams.GetStreams;
+using TwitchLib.Api.Helix.Models.Users.GetUsers;
 using TwitchLib.EventSub.Websockets;
 using TwitchLib.EventSub.Websockets.Core.EventArgs;
 using TwitchLib.EventSub.Core.EventArgs.Stream;
@@ -20,11 +21,11 @@ public class FavouritesLiveNoti
     
     static readonly Dictionary<string, string> WatchList = new(StringComparer.OrdinalIgnoreCase)
     {
-        { "Siigynn",   "Fox's favourite matcha obsessed herbalist is live!! Whether it's {game} or karaoke, she's always a blast to have around! 💚 GO CATCH HER OVER AT {link}" },
-        { "its_livinabox", "Go catch the amazing livy with {game} or anything else over @ {link} 🩷" },
-        { "InnocentOfSin", "Definitely not a cult, but brother can this owl yap! 🧡 Go catch the amazing sin and his sussy but lovely community over @ {link}"},
-        { "BaxxyCH", "Go catch our lovely family from next door, the baxxidents!!! 💜 Make sure to keep up with their chaotic energy on {game} over at {link}"},
-        { "LaeliaTheCat", "Fox's favourite chef star kitty is live!!! 🌟 Make sure to go pop in and say hi!! {link}"}
+        { "Siigynn",   "Fox's favourite matcha obsessed herbalist is live!! Whether it's {game} or karaoke, she's always a blast to have around! 💚" },
+        { "its_livinabox", "Go catch our favourite australian goober Livy, whether it's {game} or anything else, there's always a giggle to be shared! 🩷" },
+        { "InnocentOfSin", "Definitely not a cult, but brother can this owl yap! 🧡 Go checkout the amazing sin and his sussy but lovely community!"},
+        { "BaxxyCH", "Go catch our lovely family from next door, the baxxidents!!! 💜 Make sure to keep up with their chaotic energy on {game}!"},
+        { "LaeliaTheCat", "Fox's favourite chef star kitty is live with {game}!!! 🌟 Make sure to go pop in and say hi!!"}
     };
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ public class FavouritesLiveNoti
 
                 string userId = userResult.Users[0].Id;
 
-                await _twitchClient.ExecuteAsync(
+                var result = await _twitchClient.ExecuteAsync(
                     TwitchProfile.Broadcaster,
                     api => api.Helix.EventSub.CreateEventSubSubscriptionAsync(
                         "stream.online",
@@ -96,7 +97,9 @@ public class FavouritesLiveNoti
                     )
                 );
 
-                Logger.Log($"[FavNoti] Subscribed to stream.online for {username} (ID: {userId})");
+                Logger.Log(
+                    $"[FavNoti] Subscription created: " +
+                    $"{result.Subscriptions[0].Id}");
             }
             catch (Exception ex)
             {
@@ -119,10 +122,18 @@ public class FavouritesLiveNoti
             return;
 
         Logger.Log($"[FavNoti] {broadcasterLogin} went live — fetching stream info");
-
+        
+        
         try
         {
-            // Fetch stream info so we can fill in {game}
+            string userName = "";
+            string gameName = "";
+            string thumbnail = "";
+            string pfp = "";
+            
+           
+            
+            // Fetch stream info so we can fill in game, thumbail, username
             GetStreamsResponse? streamResult = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
                 api => api.Helix.Streams.GetStreamsAsync(
@@ -130,20 +141,32 @@ public class FavouritesLiveNoti
                     new List<string> { broadcasterLogin }
                 )
             );
+            
+            if (streamResult?.Streams?.Length > 0)
+            {
+                gameName = streamResult.Streams[0].GameName;
+                thumbnail = streamResult.Streams[0].ThumbnailUrl;
+                
+            }
 
-            string gameName = streamResult?.Streams?.Length > 0
-                ? streamResult.Streams[0].GameName
-                : "something";
+            GetUsersResponse? usersResponse = await _twitchClient.ExecuteAsync(
+                TwitchProfile.Broadcaster,
+                api => api.Helix.Users.GetUsersAsync(
+                    null, new List<string> { broadcasterLogin }
+                )
+            );
 
+            if (usersResponse?.Users?.Length > 0)
+            {
+                userName = usersResponse.Users[0].DisplayName;
+                pfp = usersResponse.Users[0].ProfileImageUrl;
+            }
+            
             // Build the message — replace placeholders
-            string message = messageTemplate
-                .Replace("{user}", broadcasterLogin, StringComparison.OrdinalIgnoreCase)
-                .Replace("{game}", gameName,         StringComparison.OrdinalIgnoreCase)
-                .Replace("{link}", $"https://www.twitch.tv/{broadcasterLogin}", StringComparison.OrdinalIgnoreCase);
+            string message = messageTemplate.Replace("{game}", gameName, StringComparison.OrdinalIgnoreCase);
 
             // Resolve the notification channel
-            ITextChannel? channel =
-                _discordSocket.GetChannel(Config.FavouritesNotifyChannelId) as ITextChannel;
+            ITextChannel? channel = _discordSocket.GetChannel(Config.FavouritesNotifyChannelId) as ITextChannel;
 
             if (channel == null)
             {
@@ -151,12 +174,38 @@ public class FavouritesLiveNoti
                 return;
             }
 
-            await channel.SendMessageAsync(message);
+            Embed embed = BuildLiveEmbed(userName, pfp, message, $"https://www.twitch.tv/{userName}", thumbnail);
+
+            await channel.SendMessageAsync(embed: embed);
             Logger.Log($"[FavNoti] Posted notification for {broadcasterLogin} to #{channel.Name}");
         }
         catch (Exception ex)
         {
             Logger.Log($"[FavNoti] Failed to post notification for {broadcasterLogin}: {ex.Message}");
         }
+    }
+    
+    
+        // ── EMBED BUILDER ────────────────────────────────────────────────────────
+    // Builds either a live embed or an offline embed depending on stream state.
+    Embed BuildLiveEmbed(
+        string userName,
+        string pfp,
+        string customMsg,
+        string url,
+        string thumbnailUrl
+    )
+    {
+        EmbedBuilder builder = new EmbedBuilder();
+        
+            builder
+                .WithAuthor($"AETHER-OS // {userName}'s Proxy is Active", pfp, url)
+                .WithDescription("**---------------------------------------------------------------------** \n\n" +customMsg + "\n\n" + $"[Click here to go spread the love 🫧]({url})")
+                .WithColor(new Color(0x5865F2))
+                .WithFooter("System Active • 4/30/03, 3:00 AM")
+                .WithThumbnailUrl(thumbnailUrl);
+        
+
+        return builder.Build();
     }
 }

@@ -33,15 +33,20 @@ DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
 // ─────────────────────────────────────────────────────────────────────────────
 
 ServiceProvider services = new ServiceCollection()
+    
+    //BASE DISCORD STUFF
     .AddSingleton(client)
     .AddSingleton(x => new InteractionService(
         x.GetRequiredService<DiscordSocketClient>()
     ))
+    
+    //DATA RELATED
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
+    
+    //TWITCH RELATED
     .AddSingleton<TwitchAPI>()
     .AddTwitchLibEventSubWebsockets()
-    .AddLogging()
     .AddSingleton<TokenManager>(sp => new TokenManager(
         sp.GetRequiredService<TwitchAPI>(),
         "Data/twitch_tokens.json"
@@ -50,6 +55,11 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<Twitch_Notifier>()
     .AddSingleton<TwitchRedeemHandler>()
     .AddSingleton<FavouritesLiveNoti>()
+    
+    //TWITCH RECONNECT HANDLER
+    .AddSingleton<EventSubReconnectService>()
+    
+    //ARG RELATED
     .AddSingleton<ArgFilesystem>()
     .AddSingleton<ArgTerminalData>()
     .AddSingleton<ArgTerminalService>()
@@ -63,11 +73,15 @@ ServiceProvider services = new ServiceCollection()
             data
         );
     })
+    
+    //LOGGER
+    .AddLogging()
+    
+    //CONSTRUCTS SERVICE PROVIDER
     .BuildServiceProvider();
 
 InteractionService interactions = services.GetRequiredService<InteractionService>();
 ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
-
 CoherenceWatcher watcher = services.GetRequiredService<CoherenceWatcher>();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,13 +145,27 @@ client.Ready += async () =>
     await terminal.ResetSession();
     Logger.Log("[Info] Terminal session reset");
     
-    _ = Task.Run(async () =>
+    
+    try
     {
+        Logger.Log("[Info] Initializing Twitch services...");
+
         services.GetRequiredService<TwitchRedeemHandler>();
-        services.GetRequiredService<EventSubReconnectService>();
         services.GetRequiredService<FavouritesLiveNoti>();
-        await services.GetRequiredService<Twitch_Notifier>().StartAsync();
-    });
+        services.GetRequiredService<EventSubReconnectService>();
+
+        var notifier =
+            services.GetRequiredService<Twitch_Notifier>();
+
+        await notifier.StartAsync();
+
+        Logger.Log("[Info] Twitch services started.");
+    }
+    catch (Exception ex)
+    {
+        Logger.Log(
+            $"[Error] Twitch initialization failed: {ex}");
+    }
 };
 
 // ── Schedule reset DM notification ───────────────────────────────────────────
