@@ -20,11 +20,11 @@ public class FavouritesLiveNoti
     
     static readonly Dictionary<string, string> WatchList = new(StringComparer.OrdinalIgnoreCase)
     {
-        { "Siigynn",   "Fox's favourite matcha obsessed herbalist is live!! Whether it's {game} or karaoke, she's always a blast to have around!💚 GO CATCH HER OVER AT {link}" },
+        { "Siigynn",   "Fox's favourite matcha obsessed herbalist is live!! Whether it's {game} or karaoke, she's always a blast to have around! 💚 GO CATCH HER OVER AT {link}" },
         { "its_livinabox", "Go catch the amazing livy with {game} or anything else over @ {link} 🩷" },
-        { "InnocentOfSin", "Definitely not a cult, but brother can this owl yap!🧡 Go catch the amazing sin and his sussy but lovely community over @ {link}"},
-        { "BaxxyCH", "Go catch our lovely family from next door, the baxxidents!!!💜 Make sure to keep up with their chaotic energy on {game} over at {link}"},
-        { "LaeliaTheCat", "Fox's favourite chef star kitty is live!!!🌟 Make sure to go pop in and say hi!! {link}"}
+        { "InnocentOfSin", "Definitely not a cult, but brother can this owl yap! 🧡 Go catch the amazing sin and his sussy but lovely community over @ {link}"},
+        { "BaxxyCH", "Go catch our lovely family from next door, the baxxidents!!! 💜 Make sure to keep up with their chaotic energy on {game} over at {link}"},
+        { "LaeliaTheCat", "Fox's favourite chef star kitty is live!!! 🌟 Make sure to go pop in and say hi!! {link}"}
     };
 
     // ─────────────────────────────────────────────────────────────────────────
