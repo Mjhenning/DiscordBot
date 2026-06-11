@@ -26,7 +26,8 @@ public class FavouritesLiveNoti
         { "InnocentOfSin", "Definitely not a cult, but brother can this owl yap! 🧡 Go checkout the amazing sin and his sussy but lovely community!"},
         { "BaxxyCH", "Go catch our lovely family from next door, the baxxidents!!! 💜 Make sure to keep up with their chaotic energy on {game}!"},
         { "LaeliaTheCat", "Fox's favourite chef star kitty is live with {game}!!! 🌟 Make sure to go pop in and say hi!!"},
-        {"Juliuskat", "Our Finish Feline from next door is live with {game}! Go show the katpack some love! 🤍"}
+        { "Juliuskat", "Our Finish Feline from next door is live with {game}! Go show the katpack some love! 🤍"},
+        { "violenciakurayami", "Fox's favourite sharkie is busy with {game}, go say hi to our bubbly family, the fishies! 🫧"}
     };
 
     // ─────────────────────────────────────────────────────────────────────────
