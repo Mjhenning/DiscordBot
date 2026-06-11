@@ -201,7 +201,7 @@ public class FavouritesLiveNoti
         
             builder
                 .WithAuthor($"AETHER-OS // {userName}'s Proxy is Active", pfp, url)
-                .WithDescription("**---------------------------------------------------------------------** \n\n" +customMsg + "\n\n" + $"[Click here to go spread the love 🫧]({url})")
+                .WithDescription("**---------------------------------------------------------------------** \n\n" +customMsg + "\n\n" + $"[Click here to go spread the love 🫧]({url})" + "\n\n**---------------------------------------------------------------------**")
                 .WithColor(new Color(0x5865F2))
                 .WithFooter("System Active • 4/30/03, 3:00 AM")
                 .WithThumbnailUrl(thumbnailUrl);
