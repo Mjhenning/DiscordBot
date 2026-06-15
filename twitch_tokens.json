@@ -1,0 +1,12 @@
+{
+  "Broadcaster": {
+    "AccessToken": "8e47jwca8mh5hzvbbtjztlzots7fn3",
+    "RefreshToken": "txymqu9mmqlb1cn0alfmma7q5uqalcu5rvg2uy8mcbvx6yojeo",
+    "ExpiresAt": 1780973349
+  },
+  "Bot": {
+    "AccessToken": "",
+    "RefreshToken": "whuk9xqb9e2nzrlzkun61bp16sorg2gsjwl5rgnjl0bgaapzy5",
+    "ExpiresAt": 0
+  }
+}

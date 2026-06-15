@@ -1,0 +1,21 @@
+{
+  "ChannelId": 1503726071248457790,
+  "TerminalMessageId": 1506651847627378830,
+  "ReadMessageId": 1506651849162363091,
+  "LogsMessageId": 1506651845773234299,
+  "Cwd": "/",
+  "ReadMessageFile": "",
+  "ReadMessage": "",
+  "ActionHistory": [
+    "f0xta1l navigated to /boot <t:1780238768:R>",
+    "f0xta1l navigated to / <t:1780238781:R>",
+    "f0xta1l navigated to /logs <t:1780238792:R>",
+    "f0xta1l navigated to /logs/dev <t:1780238802:R>",
+    "f0xta1l read chatroom_2007_03.log <t:1780238815:R>",
+    "f0xta1l closed chatroom_2007_03.log <t:1780797503:R>",
+    "f0xta1l navigated to /logs <t:1780797516:R>",
+    "f0xta1l navigated to / <t:1780797523:R>",
+    "f0xta1l navigated to /boot <t:1780929010:R>",
+    "f0xta1l navigated to / <t:1780931277:R>"
+  ]
+}

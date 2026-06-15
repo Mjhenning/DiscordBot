@@ -1,0 +1,32 @@
+{
+  "Entries": [
+    {
+      "Id": 1780870743431,
+      "Description": "Undetermined",
+      "ScheduledAt": "2026-06-08T19:00:00.0000000+00:00"
+    },
+    {
+      "Id": 1780870783777,
+      "Description": "Webfishing Wednesday!",
+      "ScheduledAt": "2026-06-10T19:00:00.0000000+00:00"
+    },
+    {
+      "Id": 1780870799650,
+      "Description": "Community Friday",
+      "ScheduledAt": "2026-06-12T19:00:00.0000000+00:00"
+    },
+    {
+      "Id": 1780870824036,
+      "Description": "Story Sunday!",
+      "ScheduledAt": "2026-06-14T13:00:00.0000000+00:00"
+    },
+    {
+      "Id": 1780870843864,
+      "Description": "Undetermined",
+      "ScheduledAt": "2026-06-09T19:00:00.0000000+00:00"
+    }
+  ],
+  "MessageId": 1513307054150914200,
+  "ChannelId": 1488624519391478001,
+  "WeekStart": "2026-06-08"
+}
