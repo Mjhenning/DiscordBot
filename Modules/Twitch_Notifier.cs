@@ -284,7 +284,7 @@ public class Twitch_Notifier
             TwitchSession.ViewerCount
         );
 
-        IUserMessage posted = await channel.SendMessageAsync(text: "@everyone", embed: embed);
+        IUserMessage posted = await channel.SendMessageAsync(text: $"<@&{Config.TwitchNotifyRoleId}>", embed: embed);
 
         await _sessionLock.WaitAsync();
         try

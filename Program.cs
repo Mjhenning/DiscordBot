@@ -356,13 +356,25 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     Logger.Log($"[Info] Reaction role triggered by {member.Username} on message {msg.Id} with {reaction.Emote}");
 
     // ─────────────────────────────────────────────────────────────
-    // ROLE HANDLING
+    // ROLE HANDLING — toggle behavior
+    // If member already has ALL roles-to-add, remove them (toggle off)
+    // Otherwise add them (toggle on)
     // ─────────────────────────────────────────────────────────────
 
     if (entry.RolesToAdd.Count > 0)
     {
-        await member.AddRolesAsync(entry.RolesToAdd);
-        Logger.Log($"[Info] Added {entry.RolesToAdd.Count} role(s) to {member.Username}");
+        bool alreadyHasAll = entry.RolesToAdd.All(id => member.Roles.Any(r => r.Id == id));
+
+        if (alreadyHasAll)
+        {
+            await member.RemoveRolesAsync(entry.RolesToAdd);
+            Logger.Log($"[Info] Toggled OFF — removed {entry.RolesToAdd.Count} role(s) from {member.Username}");
+        }
+        else
+        {
+            await member.AddRolesAsync(entry.RolesToAdd);
+            Logger.Log($"[Info] Toggled ON — added {entry.RolesToAdd.Count} role(s) to {member.Username}");
+        }
     }
 
     if (entry.RolesToRemove.Count > 0)
