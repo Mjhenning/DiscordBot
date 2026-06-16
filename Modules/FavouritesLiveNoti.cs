@@ -37,18 +37,15 @@ public class FavouritesLiveNoti
 
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
-    readonly TokenManager _tokenManager;
     readonly TwitchClient _twitchClient;
 
     public FavouritesLiveNoti(
         EventSubWebsocketClient eventSubClient,
         DiscordSocketClient discordSocket,
-        TokenManager tokenManager,
         TwitchClient twitchClient)
     {
         _eventSubClient = eventSubClient;
         _discordSocket  = discordSocket;
-        _tokenManager   = tokenManager;
         _twitchClient   = twitchClient;
 
         // Hook into the shared EventSub websocket — same connection Twitch_Notifier uses
@@ -66,6 +63,39 @@ public class FavouritesLiveNoti
     {
         if (e.IsRequestedReconnect) return;
 
+        // Clean up any leftover subscriptions from the previous session
+        // before creating new ones, otherwise we'll hit the 10-sub limit
+        try
+        {
+            var existing = await _twitchClient.ExecuteAsync(
+                TwitchProfile.Broadcaster,
+                api => api.Helix.EventSub.GetEventSubSubscriptionsAsync(
+                    status: "enabled",
+                    type: "stream.online"  // only fetch the type we care about
+                )
+            );
+
+            foreach (var sub in existing.Subscriptions)
+            {
+                // Only delete stream.online subs that belong to FavNoti
+                // (identified by broadcaster_user_id NOT being your own channel)
+                if (sub.Type == "stream.online" && 
+                    sub.Condition.TryGetValue("broadcaster_user_id", out string? uid) &&
+                    uid != Config.TwitchUserId)
+                {
+                    await _twitchClient.ExecuteAsync(
+                        TwitchProfile.Broadcaster,
+                        api => api.Helix.EventSub.DeleteEventSubSubscriptionAsync(sub.Id)
+                    );
+                    Logger.Log($"[FavNoti] Cleaned up stale subscription: {sub.Id}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[FavNoti] Failed to clean up old subscriptions: {ex.Message}");
+        }
+        
         // Fetch broadcaster user IDs for each name in the watchlist
         foreach (string username in WatchList.Keys)
         {
@@ -125,6 +155,7 @@ public class FavouritesLiveNoti
 
         Logger.Log($"[FavNoti] {broadcasterLogin} went live — fetching stream info");
         
+        await Task.Delay(3000);
         
         try
         {
@@ -147,7 +178,10 @@ public class FavouritesLiveNoti
             if (streamResult?.Streams?.Length > 0)
             {
                 gameName = streamResult.Streams[0].GameName;
-                thumbnail = streamResult.Streams[0].ThumbnailUrl;
+                thumbnail = streamResult.Streams[0].ThumbnailUrl
+                                .Replace("{width}", "1920")
+                                .Replace("{height}", "1080")
+                            + $"?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
                 
             }
 
@@ -176,7 +210,7 @@ public class FavouritesLiveNoti
                 return;
             }
 
-            Embed embed = BuildLiveEmbed(userName, pfp, message, $"https://www.twitch.tv/{userName}", thumbnail);
+            Embed embed = BuildLiveEmbed(userName, pfp, message, $"https://www.twitch.tv/{broadcasterLogin}", thumbnail);
 
             await channel.SendMessageAsync(embed: embed);
             Logger.Log($"[FavNoti] Posted notification for {broadcasterLogin} to #{channel.Name}");
