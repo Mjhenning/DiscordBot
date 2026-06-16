@@ -70,7 +70,6 @@ public class FavouritesLiveNoti
             var existing = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
                 api => api.Helix.EventSub.GetEventSubSubscriptionsAsync(
-                    status: "enabled",
                     type: "stream.online"  // only fetch the type we care about
                 )
             );
