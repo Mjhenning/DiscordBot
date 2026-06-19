@@ -29,6 +29,7 @@ public static class Config
     public const ulong AutoRoleId = 1487777765003497482;
     public const ulong TwitchNotifyRoleId = 1516099121474306148;
     public const ulong ScheduleNotiRoleId = 1516085795738353836;
+    public const ulong LiveGuestRoleId = 1517654897615568987;
     
     //Rewards
     
