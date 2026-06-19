@@ -15,6 +15,7 @@ public class LiveGuestsModule : InteractionModuleBase<SocketInteractionContext>
 {
     //SLASH COMMAND START
     [SlashCommand("liveguests", "Manage your live guests")]
+    [RequireRole("🔧 Processes")] 
     public async Task LiveGuestsMenu()
     {
         MessageComponent buttons = new ComponentBuilder()

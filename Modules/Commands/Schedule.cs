@@ -23,6 +23,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     }
     
     [SlashCommand("streamschedule", "Manage the stream schedule")]
+    [RequireRole("🔧 Processes")] 
     public async Task ScheduleMenu()
     {
         MessageComponent buttons = new ComponentBuilder()

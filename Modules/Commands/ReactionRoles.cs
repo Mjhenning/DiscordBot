@@ -17,6 +17,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
     }
     
     [SlashCommand("reactionrole", "Manage your Reaction Roles")]
+    [RequireRole("🔧 Processes")] 
     public async Task ScheduleMenu()
     {
         MessageComponent buttons = new ComponentBuilder()
