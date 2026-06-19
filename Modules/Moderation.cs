@@ -10,6 +10,7 @@ public class Moderation
 
 }
 
+//SLASH COMMAND FOR MANGING USERS ALLOWED INTO LIVE VOICE CHANNEL
 public class LiveGuestsModule : InteractionModuleBase<SocketInteractionContext>
 {
     //SLASH COMMAND START
