@@ -226,7 +226,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         await RespondAsync(embed: embed, ephemeral: true);
     }
 
-    // ─── PUBLISH ──────────────────────────────────────────────────────────────
+// ─── PUBLISH ──────────────────────────────────────────────────────────────
     
     public async Task PublishStart()
     {
@@ -238,8 +238,12 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 
         if (_data.IsPublishedThisWeek())
         {
+            bool updated = await TryUpdatePublishedEmbed();
+
             await RespondAsync(
-                "📌 The schedule for this week is already published.\nUse `/schedule add` or `/schedule remove` to update it — the posted embed will update automatically.",
+                updated
+                    ? "🔄 Schedule already published — I've refreshed the existing message with the latest entries."
+                    : "⚠️ Couldn't find the previously published message to update (it may have been deleted). Use `/resetschedule` to start fresh, then publish again.",
                 ephemeral: true
             );
             return;
@@ -297,33 +301,35 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 
     // ─── LIVE EDIT HELPER ─────────────────────────────────────────────────────
 
-    async Task TryUpdatePublishedEmbed()
+    async Task<bool> TryUpdatePublishedEmbed()
     {
         Logger.Log($"[Debug] TryUpdatePublishedEmbed called");
         Logger.Log($"[Debug] IsPublishedThisWeek: {_data.IsPublishedThisWeek()}");
         Logger.Log($"[Debug] MessageId: {_data.PublishedMessageId}, ChannelId: {_data.PublishedChannelId}");
 
-        if (!_data.IsPublishedThisWeek()) { Logger.Log("[Debug] Bailing — not published this week"); return; }
-        if (_data.PublishedMessageId == 0 || _data.PublishedChannelId == 0) { Logger.Log("[Debug] Bailing — missing IDs"); return; }
+        if (!_data.IsPublishedThisWeek()) { Logger.Log("[Debug] Bailing — not published this week"); return false; }
+        if (_data.PublishedMessageId == 0 || _data.PublishedChannelId == 0) { Logger.Log("[Debug] Bailing — missing IDs"); return false; }
 
         try
         {
             ITextChannel? channel = Context.Guild.GetChannel(_data.PublishedChannelId) as ITextChannel;
             Logger.Log($"[Debug] Channel: {channel?.Name ?? "NULL"}");
-            if (channel == null) return;
+            if (channel == null) return false;
 
             IUserMessage? message = await channel.GetMessageAsync(_data.PublishedMessageId) as IUserMessage;
             Logger.Log($"[Debug] Message: {message?.Id.ToString() ?? "NULL"}");
-            if (message == null) return;
+            if (message == null) return false;
 
             Embed updated = BuildScheduleEmbed();
             await message.ModifyAsync(props => props.Embed = updated);
             Logger.Log($"[Info] Published schedule embed updated");
+            return true;
         }
         catch (Exception ex)
         {
             Logger.Log($"[Warning] TryUpdatePublishedEmbed failed: {ex.Message}");
             Logger.Log($"[Warning] {ex.StackTrace}");
+            return false;
         }
     }
 

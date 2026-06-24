@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ScheduleData.cs — updated
+// ScheduleData.cs
 // ─────────────────────────────────────────────────────────────────────────────
 
 namespace DiscordBot.Data;
@@ -23,6 +23,7 @@ public class ScheduleData
     public ulong PublishedMessageId  { get; private set; } = 0;
     public ulong PublishedChannelId  { get; private set; } = 0;
     public string WeekStart          { get; private set; } = ""; // ISO 8601 UTC — Monday of published week
+    public string EntriesWeekStart   { get; private set; } = ""; // ISO 8601 UTC — Monday of the week current entries belong to
 
     public ScheduleData() => Initialize();
 
@@ -30,7 +31,9 @@ public class ScheduleData
     {
         if (!File.Exists(FilePath))
         {
+            EntriesWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
             Save();
+            StartResetTimer();
             return;
         }
 
@@ -39,10 +42,20 @@ public class ScheduleData
 
         if (store != null)
         {
-            ScheduleEntries    = store.Entries    ?? new();
+            ScheduleEntries    = store.Entries          ?? new();
             PublishedMessageId = store.MessageId;
             PublishedChannelId = store.ChannelId;
-            WeekStart          = store.WeekStart  ?? "";
+            WeekStart          = store.WeekStart        ?? "";
+            EntriesWeekStart   = store.EntriesWeekStart  ?? "";
+        }
+
+        // Back-compat: older saves won't have EntriesWeekStart set.
+        // Fall back to WeekStart if we have it, otherwise assume "now".
+        if (string.IsNullOrWhiteSpace(EntriesWeekStart))
+        {
+            EntriesWeekStart = !string.IsNullOrWhiteSpace(WeekStart)
+                ? WeekStart
+                : GetCurrentWeekStart().ToString("yyyy-MM-dd");
         }
         
         EnsureCurrentWeek();
@@ -53,10 +66,11 @@ public class ScheduleData
     {
         ScheduleStore store = new()
         {
-            Entries   = ScheduleEntries,
-            MessageId = PublishedMessageId,
-            ChannelId = PublishedChannelId,
-            WeekStart = WeekStart
+            Entries          = ScheduleEntries,
+            MessageId        = PublishedMessageId,
+            ChannelId        = PublishedChannelId,
+            WeekStart        = WeekStart,
+            EntriesWeekStart = EntriesWeekStart
         };
 
         string json = JsonConvert.SerializeObject(store, Formatting.Indented);
@@ -70,6 +84,10 @@ public class ScheduleData
 
     public void AddEntry(ScheduleEntry entry)
     {
+        // Stamp the entries-week if it's somehow unset (e.g. list was empty going in)
+        if (string.IsNullOrWhiteSpace(EntriesWeekStart))
+            EntriesWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
+
         ScheduleEntries.Add(entry);
         Save();
     }
@@ -95,6 +113,7 @@ public class ScheduleData
         PublishedMessageId = 0;
         PublishedChannelId = 0;
         WeekStart          = "";
+        EntriesWeekStart   = GetCurrentWeekStart().ToString("yyyy-MM-dd");
         ScheduleEntries.Clear();
         Save();
         
@@ -158,12 +177,16 @@ public class ScheduleData
     {
         string currentWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
 
-        // No active week stored
-        if (string.IsNullOrWhiteSpace(WeekStart))
+        // No entries-week tracked yet — stamp it and bail, nothing to clear
+        if (string.IsNullOrWhiteSpace(EntriesWeekStart))
+        {
+            EntriesWeekStart = currentWeekStart;
+            Save();
             return;
+        }
 
-        // Same week → nothing to do
-        if (WeekStart == currentWeekStart)
+        // Entries belong to the current week → nothing to do
+        if (EntriesWeekStart == currentWeekStart)
             return;
 
         Logger.Log("[Info] Week rollover detected — clearing previous schedule");
@@ -175,10 +198,11 @@ public class ScheduleData
 // Wrapper so we can store entries + metadata in one JSON object
 public class ScheduleStore
 {
-    public List<ScheduleEntry> Entries   { get; set; } = new();
-    public ulong MessageId               { get; set; } = 0;
-    public ulong ChannelId               { get; set; } = 0;
-    public string WeekStart              { get; set; } = "";
+    public List<ScheduleEntry> Entries          { get; set; } = new();
+    public ulong MessageId                      { get; set; } = 0;
+    public ulong ChannelId                      { get; set; } = 0;
+    public string WeekStart                     { get; set; } = "";
+    public string EntriesWeekStart              { get; set; } = "";
 }
 
 public class ScheduleEntry
