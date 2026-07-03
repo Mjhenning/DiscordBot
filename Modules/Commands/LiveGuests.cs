@@ -4,27 +4,6 @@ using Discord.WebSocket;
 using DiscordBot.Data;
 
 namespace DiscordBot.Modules;
-
-//SLASH COMMAND FOR MANAGING STREAM INFO
-public class StreamToolsModule : InteractionModuleBase<SocketInteractionContext>
-{
-    [SlashCommand("streaminfo", "Manage and preview stream Info")]
-    [RequireRole("🔧 Processes")]
-    public async Task StreamInfoMenu()
-    {
-        MessageComponent buttons = new ComponentBuilder()
-            .WithButton("📝 Change Stream Info",    "si_btn_change",    ButtonStyle.Primary)
-            .WithButton("🔴 Preview Live Statistic", "si_btn_stats", ButtonStyle.Danger)
-            .Build();
-
-        await RespondAsync(
-            "**Live Guests** — what would you like to do?",
-            components: buttons,
-            ephemeral: true
-        );
-    }
-}
-
 //SLASH COMMAND FOR MANGING USERS ALLOWED INTO LIVE VOICE CHANNEL
 public class LiveGuestsModule : InteractionModuleBase<SocketInteractionContext>
 {

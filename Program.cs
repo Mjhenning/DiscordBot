@@ -74,12 +74,16 @@ ServiceProvider services = new ServiceCollection()
         );
     })
     
+    //Mod Logging
+    .AddSingleton<ModerationLogs>()
+    
     //LOGGER
     .AddLogging()
     
     //CONSTRUCTS SERVICE PROVIDER
     .BuildServiceProvider();
 
+ModerationLogs modLogs = services.GetRequiredService<ModerationLogs>();
 InteractionService interactions = services.GetRequiredService<InteractionService>();
 ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
 CoherenceWatcher watcher = services.GetRequiredService<CoherenceWatcher>();
