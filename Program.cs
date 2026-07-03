@@ -25,6 +25,9 @@ DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
                      | GatewayIntents.GuildMembers
                      | GatewayIntents.MessageContent
                      | GatewayIntents.DirectMessages,
+
+    MessageCacheSize = 1000,
+
     LogLevel = LogSeverity.Info
 });
 

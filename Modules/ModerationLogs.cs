@@ -11,7 +11,7 @@ public class ModerationLogs
     {
         _client = client;
 
-        Logger.Log("[Info] Initializing moderation logger...");
+        Logger.Log("[ModLogs] Initializing moderation logger...");
 
         _client.MessageUpdated += OnMessageUpdated;
         _client.MessageDeleted += OnMessageDeleted;
@@ -22,7 +22,7 @@ public class ModerationLogs
         _client.GuildMemberUpdated += OnGuildMemberUpdated;
         _client.UserUpdated += OnUserUpdated;
 
-        Logger.Log("[Info] Moderation logger initialized.");
+        Logger.Log("[ModLogs] Moderation logger initialized.");
     }
 
     private async Task<IMessageChannel?> GetLogChannel()
@@ -46,17 +46,17 @@ public class ModerationLogs
 
             if (channel == null)
             {
-                Logger.Log($"[Warning] Moderation log channel ({Config.ModLogChannelId}) could not be found.");
+                Logger.Log($"[ModLogs] Moderation log channel ({Config.ModLogChannelId}) could not be found.");
                 return;
             }
 
             await channel.SendMessageAsync(embed: embed);
 
-            Logger.Log($"[Debug] Sent moderation log: {embed.Title}");
+            Logger.Log($"[ModLogs] Sent moderation log: {embed.Title}");
         }
         catch (Exception ex)
         {
-            Logger.Log($"[Error] Failed to send moderation log: {ex}");
+            Logger.Log($"[ModLogs] Failed to send moderation log: {ex}");
         }
     }
 
@@ -80,7 +80,7 @@ public class ModerationLogs
         if (before.Content == after.Content)
             return;
 
-        Logger.Log($"[Log] Message edited by {before.Author.Username} in #{channel.Name}");
+        Logger.Log($"[ModLogs] Message edited by {before.Author.Username} in #{channel.Name}");
 
         var embed = CreateEmbed("✏️ Message Edited", Color.Orange)
             .AddField("User", before.Author.Mention, true)
@@ -107,7 +107,7 @@ public class ModerationLogs
 
         var channel = await channelCache.GetOrDownloadAsync();
 
-        Logger.Log($"[Log] Message deleted by {message.Author.Username} in #{channel?.Name ?? "Unknown"}");
+        Logger.Log($"[ModLogs] Message deleted by {message.Author.Username} in #{channel?.Name ?? "Unknown"}");
 
         var embed = CreateEmbed("🗑️ Message Deleted", Color.Red)
             .AddField("User", message.Author.Mention, true)
@@ -124,7 +124,7 @@ public class ModerationLogs
 
     private async Task OnUserJoined(SocketGuildUser user)
     {
-        Logger.Log($"[Log] {user.Username} joined {user.Guild.Name}");
+        Logger.Log($"[ModLogs] {user.Username} joined {user.Guild.Name}");
 
         var embed = CreateEmbed("📥 Member Joined", Color.Green)
             .AddField("User", user.Mention, true)
@@ -136,7 +136,7 @@ public class ModerationLogs
 
     private async Task OnUserLeft(SocketGuild guild, SocketUser user)
     {
-        Logger.Log($"[Log] {user.Username} left {guild.Name}");
+        Logger.Log($"[ModLogs] {user.Username} left {guild.Name}");
 
         var embed = CreateEmbed("📤 Member Left", Color.DarkGrey)
             .AddField("User", user.Mention, true)
@@ -161,7 +161,7 @@ public class ModerationLogs
         // Nickname changed
         if (before.Nickname != after.Nickname)
         {
-            Logger.Log($"[Log] {after.Username} changed nickname from '{before.Nickname ?? "None"}' to '{after.Nickname ?? "None"}'");
+            Logger.Log($"[ModLogs] {after.Username} changed nickname from '{before.Nickname ?? "None"}' to '{after.Nickname ?? "None"}'");
 
             var embed = CreateEmbed("📝 Nickname Changed", Color.Blue)
                 .AddField("User", after.Mention)
@@ -174,7 +174,7 @@ public class ModerationLogs
         // Roles Added
         foreach (var role in after.Roles.Except(before.Roles))
         {
-            Logger.Log($"[Log] Role '{role.Name}' added to {after.Username}");
+            Logger.Log($"[ModLogs] Role '{role.Name}' added to {after.Username}");
 
             var embed = CreateEmbed("➕ Role Added", Color.Green)
                 .AddField("User", after.Mention, true)
@@ -186,7 +186,7 @@ public class ModerationLogs
         // Roles Removed
         foreach (var role in before.Roles.Except(after.Roles))
         {
-            Logger.Log($"[Log] Role '{role.Name}' removed from {after.Username}");
+            Logger.Log($"[ModLogs] Role '{role.Name}' removed from {after.Username}");
 
             var embed = CreateEmbed("➖ Role Removed", Color.Red)
                 .AddField("User", after.Mention, true)
@@ -205,7 +205,7 @@ public class ModerationLogs
         // Username changed
         if (before.Username != after.Username)
         {
-            Logger.Log($"[Log] Username changed from '{before.Username}' to '{after.Username}'");
+            Logger.Log($"[ModLogs] Username changed from '{before.Username}' to '{after.Username}'");
 
             var embed = CreateEmbed("👤 Username Changed", Color.Purple)
                 .AddField("User", after.Mention)
@@ -218,7 +218,7 @@ public class ModerationLogs
         // Avatar changed
         if (before.GetAvatarUrl() != after.GetAvatarUrl())
         {
-            Logger.Log($"[Log] {after.Username} changed their avatar.");
+            Logger.Log($"[ModLogs] {after.Username} changed their avatar.");
 
             var embed = CreateEmbed("🖼️ Avatar Changed", Color.Teal)
                 .AddField("User", after.Mention);
