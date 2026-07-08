@@ -7,6 +7,22 @@ namespace DiscordBot.Modules;
 
 public class ModerationLogs
 {
+    enum LogCategory
+    {
+        Message,
+        Member,
+        Voice,
+        Channel,
+        Role,
+        Invite,
+        Thread,
+        AutoMod,
+        ScheduledEvent,
+        Webhook,
+        Integration
+    }
+    
+    
     readonly DiscordSocketClient _client;
 
     // Tracks in-progress voice channel sessions: channelId -> session info
@@ -23,7 +39,33 @@ public class ModerationLogs
         _client = client;
 
         Logger.Log("[ModLogs] Initializing moderation logger...");
+        
+        RegisterEvents();
 
+        Logger.Log("[ModLogs] Moderation logger initialized.");
+    }
+    
+    static bool IsEnabled(LogCategory category)
+    {
+        return category switch
+        {
+            LogCategory.Message => Config.LogMessages,
+            LogCategory.Member => Config.LogMembers,
+            LogCategory.Voice => Config.LogVoice,
+            LogCategory.Channel => Config.LogChannels,
+            LogCategory.Role => Config.LogRoles,
+            LogCategory.Invite => Config.LogInvites,
+            LogCategory.Thread => Config.LogThreads,
+            LogCategory.AutoMod => Config.LogAutoMod,
+            LogCategory.ScheduledEvent => Config.LogEvents,
+            LogCategory.Webhook => Config.LogWebhooks,
+            LogCategory.Integration => Config.LogIntegrations,
+            _ => true
+        };
+    }
+
+    void RegisterEvents()
+    {
         RegisterMessageEvents();
         RegisterMemberEvents();
         RegisterVoiceEvents();
@@ -35,8 +77,6 @@ public class ModerationLogs
         RegisterScheduledEventEvents();
         RegisterWebhookEvents();
         RegisterIntegrationEvents();
-
-        Logger.Log("[ModLogs] Moderation logger initialized.");
     }
 
     void RegisterMessageEvents()
@@ -578,39 +618,4 @@ public class ModerationLogs
             }
         }
     }
-
-    enum LogCategory
-    {
-        Message,
-        Member,
-        Voice,
-        Channel,
-        Role,
-        Invite,
-        Thread,
-        AutoMod,
-        ScheduledEvent,
-        Webhook,
-        Integration
-    }
-
-    static bool IsEnabled(LogCategory category)
-    {
-        return category switch
-        {
-            LogCategory.Message => Config.LogMessages,
-            LogCategory.Member => Config.LogMembers,
-            LogCategory.Voice => Config.LogVoice,
-            LogCategory.Channel => Config.LogChannels,
-            LogCategory.Role => Config.LogRoles,
-            LogCategory.Invite => Config.LogInvites,
-            LogCategory.Thread => Config.LogThreads,
-            LogCategory.AutoMod => Config.LogAutoMod,
-            LogCategory.ScheduledEvent => Config.LogEvents,
-            LogCategory.Webhook => Config.LogWebhooks,
-            LogCategory.Integration => Config.LogIntegrations,
-            _ => true
-        };
-    }
-
 }
