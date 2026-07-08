@@ -1,11 +1,22 @@
+using System.Collections.Concurrent;
 using Discord;
+using Discord.Rest;
 using Discord.WebSocket;
 
 namespace DiscordBot.Modules;
 
 public class ModerationLogs
 {
-    private readonly DiscordSocketClient _client;
+     readonly DiscordSocketClient _client;
+
+    // Tracks in-progress voice channel sessions: channelId -> session info
+     readonly ConcurrentDictionary<ulong, VoiceSessionInfo> _voiceSessions = new();
+
+     class VoiceSessionInfo
+    {
+        public DateTimeOffset StartTime { get; init; }
+        public Dictionary<ulong, string> Participants { get; } = new();
+    }
 
     public ModerationLogs(DiscordSocketClient client)
     {
@@ -19,18 +30,23 @@ public class ModerationLogs
         _client.UserJoined += OnUserJoined;
         _client.UserLeft += OnUserLeft;
 
+        _client.UserBanned += OnUserBanned;
+        _client.UserUnbanned += OnUserUnbanned;
+
         _client.GuildMemberUpdated += OnGuildMemberUpdated;
         _client.UserUpdated += OnUserUpdated;
+
+        _client.UserVoiceStateUpdated += OnUserVoiceStateUpdated;
 
         Logger.Log("[ModLogs] Moderation logger initialized.");
     }
 
-    private async Task<IMessageChannel?> GetLogChannel()
+     async Task<IMessageChannel?> GetLogChannel()
     {
         return _client.GetChannel(Config.ModLogChannelId) as IMessageChannel;
     }
 
-    private EmbedBuilder CreateEmbed(string title, Color color)
+     EmbedBuilder CreateEmbed(string title, Color color)
     {
         return new EmbedBuilder()
             .WithTitle(title)
@@ -38,7 +54,7 @@ public class ModerationLogs
             .WithCurrentTimestamp();
     }
 
-    private async Task LogAsync(Embed embed)
+     async Task LogAsync(Embed embed)
     {
         try
         {
@@ -61,10 +77,60 @@ public class ModerationLogs
     }
 
     // =====================================================
+    // AUDIT LOG HELPER
+    // =====================================================
+    // Every "who did this" lookup below shares this one method.
+    // Discord doesn't push audit log entries to us directly, so
+    // whenever we see an event that could've been caused by a mod
+    // action (kick, ban, role change, message delete) we pull the
+    // most recent matching audit log entry and check it happened
+    // just now (within `maxAge`) so we don't misattribute an old
+    // unrelated action to a fresh event.
+
+     async Task<(IUser? Moderator, string? Reason)> TryGetAuditLogModeratorAsync(
+        SocketGuild guild,
+        ActionType actionType,
+        Func<Discord.Rest.RestAuditLogEntry, bool> matches,
+        TimeSpan maxAge)
+    {
+        try
+        {
+            await foreach (var page in guild.GetAuditLogsAsync(10, actionType: actionType))
+            {
+                foreach (var entry in page)
+                {
+                    if (DateTimeOffset.UtcNow - entry.CreatedAt > maxAge)
+                        continue;
+
+                    if (matches(entry))
+                        return (entry.User, entry.Reason);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[ModLogs] Failed to query audit logs ({actionType}): {ex.Message}");
+        }
+
+        return (null, null);
+    }
+
+     static string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalDays >= 1)
+            return $"{(int)duration.TotalDays}d {duration.Hours}h {duration.Minutes}m";
+        if (duration.TotalHours >= 1)
+            return $"{(int)duration.TotalHours}h {duration.Minutes}m {duration.Seconds}s";
+        if (duration.TotalMinutes >= 1)
+            return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
+        return $"{duration.Seconds}s";
+    }
+
+    // =====================================================
     // MESSAGE LOGS
     // =====================================================
 
-    private async Task OnMessageUpdated(
+     async Task OnMessageUpdated(
         Cacheable<IMessage, ulong> beforeCache,
         SocketMessage after,
         ISocketMessageChannel channel)
@@ -93,7 +159,7 @@ public class ModerationLogs
         await LogAsync(embed.Build());
     }
 
-    private async Task OnMessageDeleted(
+     async Task OnMessageDeleted(
         Cacheable<IMessage, ulong> cache,
         Cacheable<IMessageChannel, ulong> channelCache)
     {
@@ -115,6 +181,25 @@ public class ModerationLogs
             .AddField("Content",
                 string.IsNullOrWhiteSpace(message.Content) ? "*No text*" : message.Content);
 
+        // Try to attribute the deletion to a moderator (if it wasn't the author deleting their own message).
+        if (channel is SocketGuildChannel guildChannel)
+        {
+            var (moderator, reason) = await TryGetAuditLogModeratorAsync(
+                guildChannel.Guild,
+                ActionType.MessageDeleted,
+                entry => entry.Data is MessageDeleteAuditLogData data
+                    && data.Target.Id == message.Author.Id
+                    && data.ChannelId == channel.Id,
+                TimeSpan.FromSeconds(10));
+
+            if (moderator != null)
+            {
+                embed.AddField("Deleted By", moderator.Mention, true);
+                if (!string.IsNullOrWhiteSpace(reason))
+                    embed.AddField("Reason", reason);
+            }
+        }
+
         await LogAsync(embed.Build());
     }
 
@@ -122,7 +207,7 @@ public class ModerationLogs
     // MEMBER LOGS
     // =====================================================
 
-    private async Task OnUserJoined(SocketGuildUser user)
+     async Task OnUserJoined(SocketGuildUser user)
     {
         Logger.Log($"[ModLogs] {user.Username} joined {user.Guild.Name}");
 
@@ -134,8 +219,33 @@ public class ModerationLogs
         await LogAsync(embed.Build());
     }
 
-    private async Task OnUserLeft(SocketGuild guild, SocketUser user)
+     async Task OnUserLeft(SocketGuild guild, SocketUser user)
     {
+        // A kick looks identical to a normal leave from Discord's gateway perspective —
+        // the only way to tell them apart is checking the audit log for a very recent
+        // Kick entry targeting this user.
+        var (moderator, reason) = await TryGetAuditLogModeratorAsync(
+            guild,
+            ActionType.Kick,
+            entry => entry.Data is KickAuditLogData data && data.Target.Id == user.Id,
+            TimeSpan.FromSeconds(5));
+
+        if (moderator != null)
+        {
+            Logger.Log($"[ModLogs] {user.Username} was kicked from {guild.Name} by {moderator.Username}");
+
+            var kickEmbed = CreateEmbed("👢 Member Kicked", Color.DarkOrange)
+                .AddField("User", user.Mention, true)
+                .AddField("Username", user.Username, true)
+                .AddField("Kicked By", moderator.Mention, true);
+
+            if (!string.IsNullOrWhiteSpace(reason))
+                kickEmbed.AddField("Reason", reason);
+
+            await LogAsync(kickEmbed.Build());
+            return;
+        }
+
         Logger.Log($"[ModLogs] {user.Username} left {guild.Name}");
 
         var embed = CreateEmbed("📤 Member Left", Color.DarkGrey)
@@ -146,10 +256,62 @@ public class ModerationLogs
     }
 
     // =====================================================
+    // BAN / UNBAN
+    // =====================================================
+
+     async Task OnUserBanned(SocketUser user, SocketGuild guild)
+    {
+        var (moderator, reason) = await TryGetAuditLogModeratorAsync(
+            guild,
+            ActionType.Ban,
+            entry => entry.Data is BanAuditLogData data && data.Target.Id == user.Id,
+            TimeSpan.FromSeconds(5));
+
+        Logger.Log($"[ModLogs] {user.Username} was banned from {guild.Name}" +
+                   (moderator != null ? $" by {moderator.Username}" : ""));
+
+        var embed = CreateEmbed("🔨 Member Banned", Color.Red)
+            .AddField("User", user.Mention, true)
+            .AddField("Username", user.Username, true);
+
+        if (moderator != null)
+            embed.AddField("Banned By", moderator.Mention, true);
+
+        if (!string.IsNullOrWhiteSpace(reason))
+            embed.AddField("Reason", reason);
+
+        await LogAsync(embed.Build());
+    }
+
+     async Task OnUserUnbanned(SocketUser user, SocketGuild guild)
+    {
+        var (moderator, reason) = await TryGetAuditLogModeratorAsync(
+            guild,
+            ActionType.Unban,
+            entry => entry.Data is UnbanAuditLogData data && data.Target.Id == user.Id,
+            TimeSpan.FromSeconds(5));
+
+        Logger.Log($"[ModLogs] {user.Username} was unbanned from {guild.Name}" +
+                   (moderator != null ? $" by {moderator.Username}" : ""));
+
+        var embed = CreateEmbed("🕊️ Member Unbanned", Color.Teal)
+            .AddField("User", user.Mention, true)
+            .AddField("Username", user.Username, true);
+
+        if (moderator != null)
+            embed.AddField("Unbanned By", moderator.Mention, true);
+
+        if (!string.IsNullOrWhiteSpace(reason))
+            embed.AddField("Reason", reason);
+
+        await LogAsync(embed.Build());
+    }
+
+    // =====================================================
     // MEMBER / ROLE CHANGES
     // =====================================================
 
-    private async Task OnGuildMemberUpdated(
+     async Task OnGuildMemberUpdated(
         Cacheable<SocketGuildUser, ulong> beforeCache,
         SocketGuildUser after)
     {
@@ -171,28 +333,51 @@ public class ModerationLogs
             await LogAsync(embed.Build());
         }
 
-        // Roles Added
-        foreach (var role in after.Roles.Except(before.Roles))
+        // Roles Added / Removed — look up who made the change once, reuse for both.
+        var rolesAdded = after.Roles.Except(before.Roles).ToList();
+        var rolesRemoved = before.Roles.Except(after.Roles).ToList();
+
+        if (rolesAdded.Count > 0 || rolesRemoved.Count > 0)
         {
-            Logger.Log($"[ModLogs] Role '{role.Name}' added to {after.Username}");
+            var (moderator, reason) = await TryGetAuditLogModeratorAsync(
+                after.Guild,
+                ActionType.MemberRoleUpdated,
+                entry => entry.Data is MemberRoleAuditLogData data && data.Target.Id == after.Id,
+                TimeSpan.FromSeconds(5));
 
-            var embed = CreateEmbed("➕ Role Added", Color.Green)
-                .AddField("User", after.Mention, true)
-                .AddField("Role", role.Mention, true);
+            foreach (var role in rolesAdded)
+            {
+                Logger.Log($"[ModLogs] Role '{role.Name}' added to {after.Username}" +
+                           (moderator != null ? $" by {moderator.Username}" : ""));
 
-            await LogAsync(embed.Build());
-        }
+                var embed = CreateEmbed("➕ Role Added", Color.Green)
+                    .AddField("User", after.Mention, true)
+                    .AddField("Role", role.Mention, true);
 
-        // Roles Removed
-        foreach (var role in before.Roles.Except(after.Roles))
-        {
-            Logger.Log($"[ModLogs] Role '{role.Name}' removed from {after.Username}");
+                if (moderator != null)
+                    embed.AddField("Changed By", moderator.Mention, true);
+                if (!string.IsNullOrWhiteSpace(reason))
+                    embed.AddField("Reason", reason);
 
-            var embed = CreateEmbed("➖ Role Removed", Color.Red)
-                .AddField("User", after.Mention, true)
-                .AddField("Role", role.Mention, true);
+                await LogAsync(embed.Build());
+            }
 
-            await LogAsync(embed.Build());
+            foreach (var role in rolesRemoved)
+            {
+                Logger.Log($"[ModLogs] Role '{role.Name}' removed from {after.Username}" +
+                           (moderator != null ? $" by {moderator.Username}" : ""));
+
+                var embed = CreateEmbed("➖ Role Removed", Color.Red)
+                    .AddField("User", after.Mention, true)
+                    .AddField("Role", role.Mention, true);
+
+                if (moderator != null)
+                    embed.AddField("Changed By", moderator.Mention, true);
+                if (!string.IsNullOrWhiteSpace(reason))
+                    embed.AddField("Reason", reason);
+
+                await LogAsync(embed.Build());
+            }
         }
     }
 
@@ -200,7 +385,7 @@ public class ModerationLogs
     // USER PROFILE CHANGES
     // =====================================================
 
-    private async Task OnUserUpdated(SocketUser before, SocketUser after)
+     async Task OnUserUpdated(SocketUser before, SocketUser after)
     {
         // Username changed
         if (before.Username != after.Username)
@@ -226,6 +411,63 @@ public class ModerationLogs
             embed.WithThumbnailUrl(after.GetAvatarUrl() ?? after.GetDefaultAvatarUrl());
 
             await LogAsync(embed.Build());
+        }
+    }
+
+    // =====================================================
+    // VOICE CHANNEL ACTIVITY
+    // =====================================================
+    // Tracks who's been in a voice channel since it first became non-empty.
+    // When the last person leaves, posts a summary: how long the channel
+    // was active, who left last, and everyone who passed through it during
+    // that session (not just who happened to be there at the end).
+
+     async Task OnUserVoiceStateUpdated(SocketUser user, SocketVoiceState before, SocketVoiceState after)
+    {
+        var leftChannel = before.VoiceChannel;
+        var joinedChannel = after.VoiceChannel;
+
+        if (leftChannel?.Id == joinedChannel?.Id)
+            return; // mute/deafen/etc. toggle, no channel change
+
+        if (joinedChannel != null)
+        {
+            var session = _voiceSessions.GetOrAdd(joinedChannel.Id,
+                _ => new VoiceSessionInfo { StartTime = DateTimeOffset.UtcNow });
+
+            lock (session.Participants)
+            {
+                session.Participants[user.Id] = user.Username;
+            }
+
+            Logger.Log($"[ModLogs] {user.Username} joined voice channel '{joinedChannel.Name}'");
+        }
+
+        if (leftChannel != null)
+        {
+            Logger.Log($"[ModLogs] {user.Username} left voice channel '{leftChannel.Name}'");
+
+            // Only fire the summary once the channel is actually empty.
+            if (leftChannel.ConnectedUsers.Count == 0 && _voiceSessions.TryRemove(leftChannel.Id, out var session))
+            {
+                var duration = DateTimeOffset.UtcNow - session.StartTime;
+
+                string participantList;
+                lock (session.Participants)
+                {
+                    participantList = session.Participants.Count > 0
+                        ? string.Join("\n", session.Participants.Values)
+                        : "*Unknown*";
+                }
+
+                var embed = CreateEmbed("🔇 Voice Channel Emptied", Color.DarkGrey)
+                    .AddField("Channel", leftChannel.Name, true)
+                    .AddField("Active For", FormatDuration(duration), true)
+                    .AddField("Last To Leave", user.Username, true)
+                    .AddField($"All Participants ({session.Participants.Count})", participantList);
+
+                await LogAsync(embed.Build());
+            }
         }
     }
 }
