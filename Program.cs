@@ -24,7 +24,8 @@ DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
                      | GatewayIntents.GuildMessageReactions
                      | GatewayIntents.GuildMembers
                      | GatewayIntents.MessageContent
-                     | GatewayIntents.DirectMessages,
+                     | GatewayIntents.DirectMessages
+                     | GatewayIntents.GuildVoiceStates,
 
     MessageCacheSize = 1000,
 

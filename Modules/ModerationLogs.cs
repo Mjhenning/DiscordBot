@@ -24,22 +24,81 @@ public class ModerationLogs
 
         Logger.Log("[ModLogs] Initializing moderation logger...");
 
-        _client.MessageUpdated += OnMessageUpdated;
-        _client.MessageDeleted += OnMessageDeleted;
-
-        _client.UserJoined += OnUserJoined;
-        _client.UserLeft += OnUserLeft;
-
-        _client.UserBanned += OnUserBanned;
-        _client.UserUnbanned += OnUserUnbanned;
-
-        _client.GuildMemberUpdated += OnGuildMemberUpdated;
-        _client.UserUpdated += OnUserUpdated;
-
-        _client.UserVoiceStateUpdated += OnUserVoiceStateUpdated;
+        RegisterMessageEvents();
+        RegisterMemberEvents();
+        RegisterVoiceEvents();
+        RegisterChannelEvents();
+        RegisterRoleEvents();
+        RegisterInviteEvents();
+        RegisterThreadEvents();
+        RegisterAutoModEvents();
+        RegisterScheduledEventEvents();
+        RegisterWebhookEvents();
+        RegisterIntegrationEvents();
 
         Logger.Log("[ModLogs] Moderation logger initialized.");
     }
+
+    private void RegisterMessageEvents()
+    {
+        _client.MessageUpdated += OnMessageUpdated;
+        _client.MessageDeleted += OnMessageDeleted;
+        // _client.MessagesBulkDeleted += OnMessagesBulkDeleted;
+        // _client.ReactionAdded += OnReactionAdded;
+        // _client.ReactionRemoved += OnReactionRemoved;
+        // _client.ReactionsCleared += OnReactionsCleared;
+        // _client.ReactionsRemovedForEmote += OnReactionsRemovedForEmote;
+    }
+
+    private void RegisterMemberEvents()
+    {
+        _client.UserJoined += OnUserJoined;
+        _client.UserLeft += OnUserLeft;
+        _client.UserBanned += OnUserBanned;
+        _client.UserUnbanned += OnUserUnbanned;
+        _client.GuildMemberUpdated += OnGuildMemberUpdated;
+        _client.UserUpdated += OnUserUpdated;
+    }
+
+    private void RegisterVoiceEvents()
+    {
+        _client.UserVoiceStateUpdated += OnUserVoiceStateUpdated;
+        // _client.VoiceChannelStatusUpdated += OnVoiceChannelStatusUpdated;
+    }
+
+    private void RegisterChannelEvents()
+    {
+        // _client.ChannelCreated += OnChannelCreated;
+        // _client.ChannelDestroyed += OnChannelDestroyed;
+        // _client.ChannelUpdated += OnChannelUpdated;
+    }
+
+    private void RegisterRoleEvents()
+    {
+        // _client.RoleCreated += OnRoleCreated;
+        // _client.RoleDeleted += OnRoleDeleted;
+        // _client.RoleUpdated += OnRoleUpdated;
+    }
+
+    private void RegisterInviteEvents()
+    {
+        // _client.InviteCreated += OnInviteCreated;
+        // _client.InviteDeleted += OnInviteDeleted;
+    }
+
+    private void RegisterThreadEvents()
+    {
+        // _client.ThreadCreated += OnThreadCreated;
+        // _client.ThreadUpdated += OnThreadUpdated;
+        // _client.ThreadDeleted += OnThreadDeleted;
+        // _client.ThreadMemberJoined += OnThreadMemberJoined;
+        // _client.ThreadMemberLeft += OnThreadMemberLeft;
+    }
+
+    private void RegisterAutoModEvents() { }
+    private void RegisterScheduledEventEvents() { }
+    private void RegisterWebhookEvents() { }
+    private void RegisterIntegrationEvents() { }
 
      async Task<IMessageChannel?> GetLogChannel()
     {
