@@ -52,6 +52,19 @@ public static class Config
         "{user} connected successfully. Active connections increasing 🟢",
         "{user} has joined... Fox should be happy 🫧"
     ];
+    
+    //What Type Of Logs To Push
+    public static bool LogMessages = true;
+    public static bool LogMembers = true;
+    public static bool LogVoice = true;
+    public static bool LogChannels = true;
+    public static bool LogRoles = true;
+    public static bool LogInvites = true;
+    public static bool LogThreads = true;
+    public static bool LogAutoMod = true;
+    public static bool LogEvents = true;
+    public static bool LogWebhooks = true;
+    public static bool LogIntegrations = true;
 
     // -----------------------------
     // Data Files

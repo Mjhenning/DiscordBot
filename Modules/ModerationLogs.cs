@@ -7,12 +7,12 @@ namespace DiscordBot.Modules;
 
 public class ModerationLogs
 {
-     readonly DiscordSocketClient _client;
+    readonly DiscordSocketClient _client;
 
     // Tracks in-progress voice channel sessions: channelId -> session info
-     readonly ConcurrentDictionary<ulong, VoiceSessionInfo> _voiceSessions = new();
+    readonly ConcurrentDictionary<ulong, VoiceSessionInfo> _voiceSessions = new();
 
-     class VoiceSessionInfo
+    class VoiceSessionInfo
     {
         public DateTimeOffset StartTime { get; init; }
         public Dictionary<ulong, string> Participants { get; } = new();
@@ -39,8 +39,11 @@ public class ModerationLogs
         Logger.Log("[ModLogs] Moderation logger initialized.");
     }
 
-    private void RegisterMessageEvents()
+    void RegisterMessageEvents()
     {
+        if (!IsEnabled(LogCategory.Message))
+            return;
+
         _client.MessageUpdated += OnMessageUpdated;
         _client.MessageDeleted += OnMessageDeleted;
         // _client.MessagesBulkDeleted += OnMessagesBulkDeleted;
@@ -50,8 +53,11 @@ public class ModerationLogs
         // _client.ReactionsRemovedForEmote += OnReactionsRemovedForEmote;
     }
 
-    private void RegisterMemberEvents()
+    void RegisterMemberEvents()
     {
+        if (!IsEnabled(LogCategory.Member))
+            return;
+
         _client.UserJoined += OnUserJoined;
         _client.UserLeft += OnUserLeft;
         _client.UserBanned += OnUserBanned;
@@ -60,34 +66,49 @@ public class ModerationLogs
         _client.UserUpdated += OnUserUpdated;
     }
 
-    private void RegisterVoiceEvents()
+    void RegisterVoiceEvents()
     {
+        if (!IsEnabled(LogCategory.Voice))
+            return;
+
         _client.UserVoiceStateUpdated += OnUserVoiceStateUpdated;
         // _client.VoiceChannelStatusUpdated += OnVoiceChannelStatusUpdated;
     }
 
-    private void RegisterChannelEvents()
+    void RegisterChannelEvents()
     {
+        if (!IsEnabled(LogCategory.Channel))
+            return;
+
         // _client.ChannelCreated += OnChannelCreated;
         // _client.ChannelDestroyed += OnChannelDestroyed;
         // _client.ChannelUpdated += OnChannelUpdated;
     }
 
-    private void RegisterRoleEvents()
+    void RegisterRoleEvents()
     {
+        if (!IsEnabled(LogCategory.Role))
+            return;
+
         // _client.RoleCreated += OnRoleCreated;
         // _client.RoleDeleted += OnRoleDeleted;
         // _client.RoleUpdated += OnRoleUpdated;
     }
 
-    private void RegisterInviteEvents()
+    void RegisterInviteEvents()
     {
+        if (!IsEnabled(LogCategory.Invite))
+            return;
+
         // _client.InviteCreated += OnInviteCreated;
         // _client.InviteDeleted += OnInviteDeleted;
     }
 
-    private void RegisterThreadEvents()
+    void RegisterThreadEvents()
     {
+        if (!IsEnabled(LogCategory.Thread))
+            return;
+
         // _client.ThreadCreated += OnThreadCreated;
         // _client.ThreadUpdated += OnThreadUpdated;
         // _client.ThreadDeleted += OnThreadDeleted;
@@ -95,17 +116,17 @@ public class ModerationLogs
         // _client.ThreadMemberLeft += OnThreadMemberLeft;
     }
 
-    private void RegisterAutoModEvents() { }
-    private void RegisterScheduledEventEvents() { }
-    private void RegisterWebhookEvents() { }
-    private void RegisterIntegrationEvents() { }
+    void RegisterAutoModEvents() { }
+    void RegisterScheduledEventEvents() { }
+    void RegisterWebhookEvents() { }
+    void RegisterIntegrationEvents() { }
 
-     async Task<IMessageChannel?> GetLogChannel()
+    async Task<IMessageChannel?> GetLogChannel()
     {
         return _client.GetChannel(Config.ModLogChannelId) as IMessageChannel;
     }
 
-     EmbedBuilder CreateEmbed(string title, Color color)
+    EmbedBuilder CreateEmbed(string title, Color color)
     {
         return new EmbedBuilder()
             .WithTitle(title)
@@ -113,7 +134,7 @@ public class ModerationLogs
             .WithCurrentTimestamp();
     }
 
-     async Task LogAsync(Embed embed)
+    async Task LogAsync(Embed embed)
     {
         try
         {
@@ -194,6 +215,9 @@ public class ModerationLogs
         SocketMessage after,
         ISocketMessageChannel channel)
     {
+        if (!IsEnabled(LogCategory.Message))
+            return;
+        
         var before = await beforeCache.GetOrDownloadAsync();
 
         if (before == null)
@@ -222,6 +246,9 @@ public class ModerationLogs
         Cacheable<IMessage, ulong> cache,
         Cacheable<IMessageChannel, ulong> channelCache)
     {
+        if (!IsEnabled(LogCategory.Message))
+            return;
+        
         var message = await cache.GetOrDownloadAsync();
 
         if (message == null)
@@ -268,6 +295,9 @@ public class ModerationLogs
 
      async Task OnUserJoined(SocketGuildUser user)
     {
+        if (!IsEnabled(LogCategory.Member))
+            return;
+        
         Logger.Log($"[ModLogs] {user.Username} joined {user.Guild.Name}");
 
         var embed = CreateEmbed("📥 Member Joined", Color.Green)
@@ -283,6 +313,10 @@ public class ModerationLogs
         // A kick looks identical to a normal leave from Discord's gateway perspective —
         // the only way to tell them apart is checking the audit log for a very recent
         // Kick entry targeting this user.
+        
+        if (!IsEnabled(LogCategory.Member))
+            return;
+        
         var (moderator, reason) = await TryGetAuditLogModeratorAsync(
             guild,
             ActionType.Kick,
@@ -320,6 +354,9 @@ public class ModerationLogs
 
      async Task OnUserBanned(SocketUser user, SocketGuild guild)
     {
+        if (!IsEnabled(LogCategory.Member))
+            return;
+        
         var (moderator, reason) = await TryGetAuditLogModeratorAsync(
             guild,
             ActionType.Ban,
@@ -344,6 +381,9 @@ public class ModerationLogs
 
      async Task OnUserUnbanned(SocketUser user, SocketGuild guild)
     {
+        if (!IsEnabled(LogCategory.Member))
+            return;
+        
         var (moderator, reason) = await TryGetAuditLogModeratorAsync(
             guild,
             ActionType.Unban,
@@ -374,6 +414,9 @@ public class ModerationLogs
         Cacheable<SocketGuildUser, ulong> beforeCache,
         SocketGuildUser after)
     {
+        if (!IsEnabled(LogCategory.Member))
+            return;
+        
         var before = await beforeCache.GetOrDownloadAsync();
 
         if (before == null)
@@ -446,6 +489,9 @@ public class ModerationLogs
 
      async Task OnUserUpdated(SocketUser before, SocketUser after)
     {
+        if (!IsEnabled(LogCategory.Member))
+            return;
+        
         // Username changed
         if (before.Username != after.Username)
         {
@@ -483,6 +529,9 @@ public class ModerationLogs
 
      async Task OnUserVoiceStateUpdated(SocketUser user, SocketVoiceState before, SocketVoiceState after)
     {
+        if (!IsEnabled(LogCategory.Voice))
+            return;
+        
         var leftChannel = before.VoiceChannel;
         var joinedChannel = after.VoiceChannel;
 
@@ -529,4 +578,39 @@ public class ModerationLogs
             }
         }
     }
+
+    enum LogCategory
+    {
+        Message,
+        Member,
+        Voice,
+        Channel,
+        Role,
+        Invite,
+        Thread,
+        AutoMod,
+        ScheduledEvent,
+        Webhook,
+        Integration
+    }
+
+    static bool IsEnabled(LogCategory category)
+    {
+        return category switch
+        {
+            LogCategory.Message => Config.LogMessages,
+            LogCategory.Member => Config.LogMembers,
+            LogCategory.Voice => Config.LogVoice,
+            LogCategory.Channel => Config.LogChannels,
+            LogCategory.Role => Config.LogRoles,
+            LogCategory.Invite => Config.LogInvites,
+            LogCategory.Thread => Config.LogThreads,
+            LogCategory.AutoMod => Config.LogAutoMod,
+            LogCategory.ScheduledEvent => Config.LogEvents,
+            LogCategory.Webhook => Config.LogWebhooks,
+            LogCategory.Integration => Config.LogIntegrations,
+            _ => true
+        };
+    }
+
 }
