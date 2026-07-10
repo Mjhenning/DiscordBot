@@ -199,14 +199,14 @@ public class ModerationLogs
     // =====================================================
     // USER FORMATTING
     // =====================================================
-    // Plain username first, with the ID in a code block afterward — tappable
-    // to copy on both desktop and mobile, and handy to paste straight into a
-    // mod command. Deliberately not using a real mention here: mentions inside
-    // embed fields depend on the client having that user cached to resolve
-    // <@id> into a display name, which mobile often doesn't have, so the same
-    // log would otherwise show "@username" on PC and a raw "<@id>" on mobile.
+    // Plain username first (always readable), with a real mention afterward
+    // so it's actually clickable to open the user's profile — a code-formatted
+    // ID is copyable but not a link, only a true mention opens a profile card.
+    // Note: on a client that hasn't cached this user yet, the mention may
+    // display as a raw "<@id>" instead of resolving to their name — that's
+    // cosmetic only, it's still clickable and opens the right profile either way.
 
-    static string FormatUser(IUser user) => $"@{user.Username} (`{user.Id}`)";
+    static string FormatUser(IUser user) => $"@{user.Username} ({user.Mention})";
 
     // =====================================================
     // AUDIT LOG HELPER
