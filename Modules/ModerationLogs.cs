@@ -199,13 +199,12 @@ public class ModerationLogs
     // =====================================================
     // USER FORMATTING
     // =====================================================
-    // Deliberately NOT using IUser.Mention here. Mentions inside embed
-    // fields (as opposed to regular message content) rely on the client
-    // having that user cached to resolve <@id> into a display name —
-    // desktop usually has it cached, mobile often doesn't, so the same
-    // log shows "@username" on PC and a raw "<@1234567890>" on mobile.
-    // Plain text sidesteps that entirely and renders identically everywhere,
-    // plus the ID is handy to copy straight into a mod command.
+    // Plain username first, with the ID in a code block afterward — tappable
+    // to copy on both desktop and mobile, and handy to paste straight into a
+    // mod command. Deliberately not using a real mention here: mentions inside
+    // embed fields depend on the client having that user cached to resolve
+    // <@id> into a display name, which mobile often doesn't have, so the same
+    // log would otherwise show "@username" on PC and a raw "<@id>" on mobile.
 
     static string FormatUser(IUser user) => $"@{user.Username} (`{user.Id}`)";
 
@@ -289,7 +288,7 @@ public class ModerationLogs
         Logger.Log($"[ModLogs] Message edited by {before.Author.Username} in #{channel.Name}");
 
         var embed = CreateEmbed("Message edited", Color.Orange)
-            .AddField("Channel", $"<#{channel.Id}>")
+            .AddField("Channel", $"{channel.Name} (<#{channel.Id}>)")
             .AddField("Message ID", $"[{after.Id}]({after.GetJumpUrl()})")
             .AddField("Message author", FormatUser(after.Author))
             .AddField("Message created", $"<t:{after.CreatedAt.ToUnixTimeSeconds()}:R>")
@@ -321,7 +320,7 @@ public class ModerationLogs
         Logger.Log($"[ModLogs] Message deleted by {message.Author.Username} in #{channel?.Name ?? "Unknown"}");
 
         var embed = CreateEmbed("Message deleted", Color.Red)
-            .AddField("Channel", channel != null ? $"<#{channel.Id}>" : "Unknown")
+            .AddField("Channel", channel != null ? $"{channel.Name} (<#{channel.Id}>)" : "Unknown")
             .AddField("Message ID", $"[{message.Id}]({message.GetJumpUrl()})")
             .AddField("Message author", FormatUser(message.Author))
             .AddField("Message created", $"<t:{message.CreatedAt.ToUnixTimeSeconds()}:R>")
@@ -363,7 +362,7 @@ public class ModerationLogs
 
         var embed = CreateEmbed("Member joined", Color.Green)
             .AddField("User", FormatUser(user), true)
-            .AddField("Account Created", $"<t:{user.CreatedAt.ToUnixTimeSeconds()}:F>", true);
+            .AddField("Account Created", $"<t:{user.CreatedAt.ToUnixTimeSeconds()}:F> (<t:{user.CreatedAt.ToUnixTimeSeconds()}:R>)", true);
 
         await LogAsync(embed.Build());
     }
@@ -389,10 +388,8 @@ public class ModerationLogs
 
             var kickEmbed = CreateEmbed("Member kicked", Color.DarkOrange)
                 .AddField("User", FormatUser(user), true)
-                .AddField("Kicked By", FormatUser(moderator), true);
-
-            if (!string.IsNullOrWhiteSpace(reason))
-                kickEmbed.AddField("Reason", reason);
+                .AddField("Kicked By", FormatUser(moderator), true)
+                .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason);
 
             await LogAsync(kickEmbed.Build());
             return;
@@ -425,13 +422,9 @@ public class ModerationLogs
                    (moderator != null ? $" by {moderator.Username}" : ""));
 
         var embed = CreateEmbed("Member banned", Color.Red)
-            .AddField("User", FormatUser(user), true);
-
-        if (moderator != null)
-            embed.AddField("Banned By", FormatUser(moderator), true);
-
-        if (!string.IsNullOrWhiteSpace(reason))
-            embed.AddField("Reason", reason);
+            .AddField("User", FormatUser(user), true)
+            .AddField("Banned By", moderator != null ? FormatUser(moderator) : "*Unknown*", true)
+            .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason);
 
         await LogAsync(embed.Build());
     }
@@ -451,13 +444,9 @@ public class ModerationLogs
                    (moderator != null ? $" by {moderator.Username}" : ""));
 
         var embed = CreateEmbed("Member unbanned", Color.Teal)
-            .AddField("User", FormatUser(user), true);
-
-        if (moderator != null)
-            embed.AddField("Unbanned By", FormatUser(moderator), true);
-
-        if (!string.IsNullOrWhiteSpace(reason))
-            embed.AddField("Reason", reason);
+            .AddField("User", FormatUser(user), true)
+            .AddField("Unbanned By", moderator != null ? FormatUser(moderator) : "*Unknown*", true)
+            .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason);
 
         await LogAsync(embed.Build());
     }
@@ -510,12 +499,9 @@ public class ModerationLogs
 
                 var embed = CreateEmbed("Role added", Color.Green)
                     .AddField("User", FormatUser(after), true)
-                    .AddField("Role", role.Mention, true);
-
-                if (moderator != null)
-                    embed.AddField("Changed By", FormatUser(moderator), true);
-                if (!string.IsNullOrWhiteSpace(reason))
-                    embed.AddField("Reason", reason);
+                    .AddField("Role", role.Mention, true)
+                    .AddField("Changed By", moderator != null ? FormatUser(moderator) : "*Unknown*", true)
+                    .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason);
 
                 await LogAsync(embed.Build());
             }
@@ -527,12 +513,9 @@ public class ModerationLogs
 
                 var embed = CreateEmbed("Role removed", Color.Red)
                     .AddField("User", FormatUser(after), true)
-                    .AddField("Role", role.Mention, true);
-
-                if (moderator != null)
-                    embed.AddField("Changed By", FormatUser(moderator), true);
-                if (!string.IsNullOrWhiteSpace(reason))
-                    embed.AddField("Reason", reason);
+                    .AddField("Role", role.Mention, true)
+                    .AddField("Changed By", moderator != null ? FormatUser(moderator) : "*Unknown*", true)
+                    .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason);
 
                 await LogAsync(embed.Build());
             }
@@ -625,7 +608,7 @@ public class ModerationLogs
                 }
 
                 var embed = CreateEmbed("Voice channel emptied", Color.DarkGrey)
-                    .AddField("Channel", leftChannel.Name, true)
+                    .AddField("Channel", $"{leftChannel.Name} (<#{leftChannel.Id}>)", true)
                     .AddField("Active For", FormatDuration(duration), true)
                     .AddField("Last To Leave", $"@{user.Username}", true)
                     .AddField($"All Participants ({session.Participants.Count})", participantList);
