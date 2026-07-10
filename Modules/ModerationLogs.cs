@@ -21,8 +21,8 @@ public class ModerationLogs
         Webhook,
         Integration
     }
-    
-    
+
+
     readonly DiscordSocketClient _client;
 
     // Tracks in-progress voice channel sessions: channelId -> session info
@@ -39,12 +39,12 @@ public class ModerationLogs
         _client = client;
 
         Logger.Log("[ModLogs] Initializing moderation logger...");
-        
+
         RegisterEvents();
 
         Logger.Log("[ModLogs] Moderation logger initialized.");
     }
-    
+
     static bool IsEnabled(LogCategory category)
     {
         return category switch
@@ -197,6 +197,19 @@ public class ModerationLogs
     }
 
     // =====================================================
+    // USER FORMATTING
+    // =====================================================
+    // Deliberately NOT using IUser.Mention here. Mentions inside embed
+    // fields (as opposed to regular message content) rely on the client
+    // having that user cached to resolve <@id> into a display name —
+    // desktop usually has it cached, mobile often doesn't, so the same
+    // log shows "@username" on PC and a raw "<@1234567890>" on mobile.
+    // Plain text sidesteps that entirely and renders identically everywhere,
+    // plus the ID is handy to copy straight into a mod command.
+
+    static string FormatUser(IUser user) => $"@{user.Username} (`{user.Id}`)";
+
+    // =====================================================
     // AUDIT LOG HELPER
     // =====================================================
     // Every "who did this" lookup below shares this one method.
@@ -207,7 +220,7 @@ public class ModerationLogs
     // just now (within `maxAge`) so we don't misattribute an old
     // unrelated action to a fresh event.
 
-     async Task<(IUser? Moderator, string? Reason)> TryGetAuditLogModeratorAsync(
+    async Task<(IUser? Moderator, string? Reason)> TryGetAuditLogModeratorAsync(
         SocketGuild guild,
         ActionType actionType,
         Func<Discord.Rest.RestAuditLogEntry, bool> matches,
@@ -235,7 +248,7 @@ public class ModerationLogs
         return (null, null);
     }
 
-     static string FormatDuration(TimeSpan duration)
+    static string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalDays >= 1)
             return $"{(int)duration.TotalDays}d {duration.Hours}h {duration.Minutes}m";
@@ -249,15 +262,19 @@ public class ModerationLogs
     // =====================================================
     // MESSAGE LOGS
     // =====================================================
+    // Styled to match the reference layout: sentence-case title, no emoji,
+    // channel as a mention, message ID linked to its jump URL, author shown
+    // via FormatUser (see note above on why not .Mention), and a relative
+    // "created" timestamp.
 
-     async Task OnMessageUpdated(
+    async Task OnMessageUpdated(
         Cacheable<IMessage, ulong> beforeCache,
         SocketMessage after,
         ISocketMessageChannel channel)
     {
         if (!IsEnabled(LogCategory.Message))
             return;
-        
+
         var before = await beforeCache.GetOrDownloadAsync();
 
         if (before == null)
@@ -271,9 +288,11 @@ public class ModerationLogs
 
         Logger.Log($"[ModLogs] Message edited by {before.Author.Username} in #{channel.Name}");
 
-        var embed = CreateEmbed("✏️ Message Edited", Color.Orange)
-            .AddField("User", before.Author.Mention, true)
-            .AddField("Channel", channel.Name, true)
+        var embed = CreateEmbed("Message edited", Color.Orange)
+            .AddField("Channel", $"<#{channel.Id}>")
+            .AddField("Message ID", $"[{after.Id}]({after.GetJumpUrl()})")
+            .AddField("Message author", FormatUser(after.Author))
+            .AddField("Message created", $"<t:{after.CreatedAt.ToUnixTimeSeconds()}:R>")
             .AddField("Before",
                 string.IsNullOrWhiteSpace(before.Content) ? "*No text*" : before.Content)
             .AddField("After",
@@ -282,13 +301,13 @@ public class ModerationLogs
         await LogAsync(embed.Build());
     }
 
-     async Task OnMessageDeleted(
+    async Task OnMessageDeleted(
         Cacheable<IMessage, ulong> cache,
         Cacheable<IMessageChannel, ulong> channelCache)
     {
         if (!IsEnabled(LogCategory.Message))
             return;
-        
+
         var message = await cache.GetOrDownloadAsync();
 
         if (message == null)
@@ -301,9 +320,11 @@ public class ModerationLogs
 
         Logger.Log($"[ModLogs] Message deleted by {message.Author.Username} in #{channel?.Name ?? "Unknown"}");
 
-        var embed = CreateEmbed("🗑️ Message Deleted", Color.Red)
-            .AddField("User", message.Author.Mention, true)
-            .AddField("Channel", channel?.Name ?? "Unknown", true)
+        var embed = CreateEmbed("Message deleted", Color.Red)
+            .AddField("Channel", channel != null ? $"<#{channel.Id}>" : "Unknown")
+            .AddField("Message ID", $"[{message.Id}]({message.GetJumpUrl()})")
+            .AddField("Message author", FormatUser(message.Author))
+            .AddField("Message created", $"<t:{message.CreatedAt.ToUnixTimeSeconds()}:R>")
             .AddField("Content",
                 string.IsNullOrWhiteSpace(message.Content) ? "*No text*" : message.Content);
 
@@ -320,9 +341,9 @@ public class ModerationLogs
 
             if (moderator != null)
             {
-                embed.AddField("Deleted By", moderator.Mention, true);
+                embed.AddField("Deleted by", FormatUser(moderator), true);
                 if (!string.IsNullOrWhiteSpace(reason))
-                    embed.AddField("Reason", reason);
+                    embed.AddField("Reason", reason, true);
             }
         }
 
@@ -333,30 +354,29 @@ public class ModerationLogs
     // MEMBER LOGS
     // =====================================================
 
-     async Task OnUserJoined(SocketGuildUser user)
+    async Task OnUserJoined(SocketGuildUser user)
     {
         if (!IsEnabled(LogCategory.Member))
             return;
-        
+
         Logger.Log($"[ModLogs] {user.Username} joined {user.Guild.Name}");
 
-        var embed = CreateEmbed("📥 Member Joined", Color.Green)
-            .AddField("User", user.Mention, true)
-            .AddField("Username", user.Username, true)
-            .AddField("Account Created", $"<t:{user.CreatedAt.ToUnixTimeSeconds()}:F>");
+        var embed = CreateEmbed("Member joined", Color.Green)
+            .AddField("User", FormatUser(user), true)
+            .AddField("Account Created", $"<t:{user.CreatedAt.ToUnixTimeSeconds()}:F>", true);
 
         await LogAsync(embed.Build());
     }
 
-     async Task OnUserLeft(SocketGuild guild, SocketUser user)
+    async Task OnUserLeft(SocketGuild guild, SocketUser user)
     {
         // A kick looks identical to a normal leave from Discord's gateway perspective —
         // the only way to tell them apart is checking the audit log for a very recent
         // Kick entry targeting this user.
-        
+
         if (!IsEnabled(LogCategory.Member))
             return;
-        
+
         var (moderator, reason) = await TryGetAuditLogModeratorAsync(
             guild,
             ActionType.Kick,
@@ -367,10 +387,9 @@ public class ModerationLogs
         {
             Logger.Log($"[ModLogs] {user.Username} was kicked from {guild.Name} by {moderator.Username}");
 
-            var kickEmbed = CreateEmbed("👢 Member Kicked", Color.DarkOrange)
-                .AddField("User", user.Mention, true)
-                .AddField("Username", user.Username, true)
-                .AddField("Kicked By", moderator.Mention, true);
+            var kickEmbed = CreateEmbed("Member kicked", Color.DarkOrange)
+                .AddField("User", FormatUser(user), true)
+                .AddField("Kicked By", FormatUser(moderator), true);
 
             if (!string.IsNullOrWhiteSpace(reason))
                 kickEmbed.AddField("Reason", reason);
@@ -381,9 +400,8 @@ public class ModerationLogs
 
         Logger.Log($"[ModLogs] {user.Username} left {guild.Name}");
 
-        var embed = CreateEmbed("📤 Member Left", Color.DarkGrey)
-            .AddField("User", user.Mention, true)
-            .AddField("Username", user.Username, true);
+        var embed = CreateEmbed("Member left", Color.DarkGrey)
+            .AddField("User", FormatUser(user), true);
 
         await LogAsync(embed.Build());
     }
@@ -392,11 +410,11 @@ public class ModerationLogs
     // BAN / UNBAN
     // =====================================================
 
-     async Task OnUserBanned(SocketUser user, SocketGuild guild)
+    async Task OnUserBanned(SocketUser user, SocketGuild guild)
     {
         if (!IsEnabled(LogCategory.Member))
             return;
-        
+
         var (moderator, reason) = await TryGetAuditLogModeratorAsync(
             guild,
             ActionType.Ban,
@@ -406,12 +424,11 @@ public class ModerationLogs
         Logger.Log($"[ModLogs] {user.Username} was banned from {guild.Name}" +
                    (moderator != null ? $" by {moderator.Username}" : ""));
 
-        var embed = CreateEmbed("🔨 Member Banned", Color.Red)
-            .AddField("User", user.Mention, true)
-            .AddField("Username", user.Username, true);
+        var embed = CreateEmbed("Member banned", Color.Red)
+            .AddField("User", FormatUser(user), true);
 
         if (moderator != null)
-            embed.AddField("Banned By", moderator.Mention, true);
+            embed.AddField("Banned By", FormatUser(moderator), true);
 
         if (!string.IsNullOrWhiteSpace(reason))
             embed.AddField("Reason", reason);
@@ -419,11 +436,11 @@ public class ModerationLogs
         await LogAsync(embed.Build());
     }
 
-     async Task OnUserUnbanned(SocketUser user, SocketGuild guild)
+    async Task OnUserUnbanned(SocketUser user, SocketGuild guild)
     {
         if (!IsEnabled(LogCategory.Member))
             return;
-        
+
         var (moderator, reason) = await TryGetAuditLogModeratorAsync(
             guild,
             ActionType.Unban,
@@ -433,12 +450,11 @@ public class ModerationLogs
         Logger.Log($"[ModLogs] {user.Username} was unbanned from {guild.Name}" +
                    (moderator != null ? $" by {moderator.Username}" : ""));
 
-        var embed = CreateEmbed("🕊️ Member Unbanned", Color.Teal)
-            .AddField("User", user.Mention, true)
-            .AddField("Username", user.Username, true);
+        var embed = CreateEmbed("Member unbanned", Color.Teal)
+            .AddField("User", FormatUser(user), true);
 
         if (moderator != null)
-            embed.AddField("Unbanned By", moderator.Mention, true);
+            embed.AddField("Unbanned By", FormatUser(moderator), true);
 
         if (!string.IsNullOrWhiteSpace(reason))
             embed.AddField("Reason", reason);
@@ -450,13 +466,13 @@ public class ModerationLogs
     // MEMBER / ROLE CHANGES
     // =====================================================
 
-     async Task OnGuildMemberUpdated(
+    async Task OnGuildMemberUpdated(
         Cacheable<SocketGuildUser, ulong> beforeCache,
         SocketGuildUser after)
     {
         if (!IsEnabled(LogCategory.Member))
             return;
-        
+
         var before = await beforeCache.GetOrDownloadAsync();
 
         if (before == null)
@@ -467,8 +483,8 @@ public class ModerationLogs
         {
             Logger.Log($"[ModLogs] {after.Username} changed nickname from '{before.Nickname ?? "None"}' to '{after.Nickname ?? "None"}'");
 
-            var embed = CreateEmbed("📝 Nickname Changed", Color.Blue)
-                .AddField("User", after.Mention)
+            var embed = CreateEmbed("Nickname changed", Color.Blue)
+                .AddField("User", FormatUser(after))
                 .AddField("Before", before.Nickname ?? "*None*")
                 .AddField("After", after.Nickname ?? "*None*");
 
@@ -492,12 +508,12 @@ public class ModerationLogs
                 Logger.Log($"[ModLogs] Role '{role.Name}' added to {after.Username}" +
                            (moderator != null ? $" by {moderator.Username}" : ""));
 
-                var embed = CreateEmbed("➕ Role Added", Color.Green)
-                    .AddField("User", after.Mention, true)
+                var embed = CreateEmbed("Role added", Color.Green)
+                    .AddField("User", FormatUser(after), true)
                     .AddField("Role", role.Mention, true);
 
                 if (moderator != null)
-                    embed.AddField("Changed By", moderator.Mention, true);
+                    embed.AddField("Changed By", FormatUser(moderator), true);
                 if (!string.IsNullOrWhiteSpace(reason))
                     embed.AddField("Reason", reason);
 
@@ -509,12 +525,12 @@ public class ModerationLogs
                 Logger.Log($"[ModLogs] Role '{role.Name}' removed from {after.Username}" +
                            (moderator != null ? $" by {moderator.Username}" : ""));
 
-                var embed = CreateEmbed("➖ Role Removed", Color.Red)
-                    .AddField("User", after.Mention, true)
+                var embed = CreateEmbed("Role removed", Color.Red)
+                    .AddField("User", FormatUser(after), true)
                     .AddField("Role", role.Mention, true);
 
                 if (moderator != null)
-                    embed.AddField("Changed By", moderator.Mention, true);
+                    embed.AddField("Changed By", FormatUser(moderator), true);
                 if (!string.IsNullOrWhiteSpace(reason))
                     embed.AddField("Reason", reason);
 
@@ -527,18 +543,18 @@ public class ModerationLogs
     // USER PROFILE CHANGES
     // =====================================================
 
-     async Task OnUserUpdated(SocketUser before, SocketUser after)
+    async Task OnUserUpdated(SocketUser before, SocketUser after)
     {
         if (!IsEnabled(LogCategory.Member))
             return;
-        
+
         // Username changed
         if (before.Username != after.Username)
         {
             Logger.Log($"[ModLogs] Username changed from '{before.Username}' to '{after.Username}'");
 
-            var embed = CreateEmbed("👤 Username Changed", Color.Purple)
-                .AddField("User", after.Mention)
+            var embed = CreateEmbed("Username changed", Color.Purple)
+                .AddField("User", FormatUser(after))
                 .AddField("Before", before.Username)
                 .AddField("After", after.Username);
 
@@ -550,8 +566,8 @@ public class ModerationLogs
         {
             Logger.Log($"[ModLogs] {after.Username} changed their avatar.");
 
-            var embed = CreateEmbed("🖼️ Avatar Changed", Color.Teal)
-                .AddField("User", after.Mention);
+            var embed = CreateEmbed("Avatar changed", Color.Teal)
+                .AddField("User", FormatUser(after));
 
             embed.WithThumbnailUrl(after.GetAvatarUrl() ?? after.GetDefaultAvatarUrl());
 
@@ -567,11 +583,11 @@ public class ModerationLogs
     // was active, who left last, and everyone who passed through it during
     // that session (not just who happened to be there at the end).
 
-     async Task OnUserVoiceStateUpdated(SocketUser user, SocketVoiceState before, SocketVoiceState after)
+    async Task OnUserVoiceStateUpdated(SocketUser user, SocketVoiceState before, SocketVoiceState after)
     {
         if (!IsEnabled(LogCategory.Voice))
             return;
-        
+
         var leftChannel = before.VoiceChannel;
         var joinedChannel = after.VoiceChannel;
 
@@ -604,14 +620,14 @@ public class ModerationLogs
                 lock (session.Participants)
                 {
                     participantList = session.Participants.Count > 0
-                        ? string.Join("\n", session.Participants.Values)
+                        ? string.Join("\n", session.Participants.Values.Select(name => $"@{name}"))
                         : "*Unknown*";
                 }
 
-                var embed = CreateEmbed("🔇 Voice Channel Emptied", Color.DarkGrey)
+                var embed = CreateEmbed("Voice channel emptied", Color.DarkGrey)
                     .AddField("Channel", leftChannel.Name, true)
                     .AddField("Active For", FormatDuration(duration), true)
-                    .AddField("Last To Leave", user.Username, true)
+                    .AddField("Last To Leave", $"@{user.Username}", true)
                     .AddField($"All Participants ({session.Participants.Count})", participantList);
 
                 await LogAsync(embed.Build());
