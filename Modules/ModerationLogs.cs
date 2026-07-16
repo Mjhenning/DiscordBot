@@ -413,6 +413,8 @@ public class ModerationLogs
                             $"[{a.Filename}]({a.Url})")));
             }
 
+            AddAttachmentsToEmbed(embed, after.Attachments);
+            
             AddEmbedsToEmbed(embed, after.Embeds);
 
             AddStickersToEmbed(embed, after.Stickers);
