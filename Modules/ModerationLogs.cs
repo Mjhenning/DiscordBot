@@ -257,6 +257,77 @@ public class ModerationLogs
             return $"{(int)duration.TotalMinutes}m {duration.Seconds}s";
         return $"{duration.Seconds}s";
     }
+    
+    static string FormatBytes(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+
+        double size = bytes;
+        int unit = 0;
+
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+
+        return $"{size:0.##} {units[unit]}";
+    }
+
+    static void AddAttachmentsToEmbed(EmbedBuilder embed, IReadOnlyCollection<IAttachment> attachments)
+    {
+        if (attachments.Count == 0)
+            return;
+
+        var lines = new List<string>();
+
+        foreach (var attachment in attachments)
+        {
+            var spoiler = attachment.IsSpoiler() ? "🕵️ **Spoiler** • " : "";
+
+            lines.Add(
+                $"{spoiler}[{attachment.Filename}]({attachment.Url})\n" +
+                $"Type: `{attachment.ContentType ?? "Unknown"}` • {FormatBytes(attachment.Size)}");
+        }
+
+        embed.AddField("Attachments", string.Join("\n\n", lines));
+
+        var image = attachments.FirstOrDefault(a =>
+            a.ContentType?.StartsWith("image/") == true);
+
+        if (image != null)
+            embed.WithImageUrl(image.Url);
+    }
+
+    static void AddEmbedsToEmbed(EmbedBuilder embed, IReadOnlyCollection<IEmbed> embeds)
+    {
+        if (embeds.Count == 0)
+            return;
+
+        var lines = new List<string>();
+
+        foreach (var e in embeds)
+        {
+            if (!string.IsNullOrWhiteSpace(e.Url))
+                lines.Add($"• {e.Type}: {e.Url}");
+            else if (!string.IsNullOrWhiteSpace(e.Title))
+                lines.Add($"• {e.Type}: {e.Title}");
+            else
+                lines.Add($"• {e.Type}");
+        }
+
+        embed.AddField("Embeds", string.Join("\n", lines));
+    }
+
+    static void AddStickersToEmbed(EmbedBuilder embed, IReadOnlyCollection<IStickerItem> stickers)
+    {
+        if (stickers.Count == 0)
+            return;
+
+        embed.AddField(
+            "Stickers",
+            string.Join("\n", stickers.Select(s => $"• {s.Name}")));
+    }
 
     // =====================================================
     // MESSAGE LOGS
@@ -282,7 +353,23 @@ public class ModerationLogs
         if (before.Author.IsBot)
             return;
 
-        if (before.Content == after.Content)
+        bool textChanged = before.Content != after.Content;
+
+        var addedAttachments =
+            after.Attachments
+                .Where(a => before.Attachments.All(b => b.Id != a.Id))
+                .ToList();
+
+        var removedAttachments =
+            before.Attachments
+                .Where(a => after.Attachments.All(b => b.Id != a.Id))
+                .ToList();
+
+        bool attachmentChanged =
+            addedAttachments.Count > 0 ||
+            removedAttachments.Count > 0;
+
+        if (!textChanged && !attachmentChanged)
             return;
 
         Logger.Log($"[ModLogs] Message edited by {before.Author.Username} in #{channel.Name}");
@@ -291,11 +378,44 @@ public class ModerationLogs
             .AddField("Channel", $"{channel.Name} (<#{channel.Id}>)")
             .AddField("Message ID", $"[{after.Id}]({after.GetJumpUrl()})")
             .AddField("Message author", FormatUser(after.Author))
-            .AddField("Message created", $"<t:{after.CreatedAt.ToUnixTimeSeconds()}:R>")
-            .AddField("Before",
-                string.IsNullOrWhiteSpace(before.Content) ? "*No text*" : before.Content)
-            .AddField("After",
-                string.IsNullOrWhiteSpace(after.Content) ? "*No text*" : after.Content);
+            .AddField("Message created", $"<t:{after.CreatedAt.ToUnixTimeSeconds()}:R>");
+        
+            if (textChanged)
+            {
+                embed.AddField(
+                    "Content Before",
+                    string.IsNullOrWhiteSpace(before.Content)
+                        ? "*No text*"
+                        : before.Content);
+
+                embed.AddField(
+                    "Content After",
+                    string.IsNullOrWhiteSpace(after.Content)
+                        ? "*No text*"
+                        : after.Content);
+            }
+            
+            if (addedAttachments.Count > 0)
+            {
+                embed.AddField(
+                    "Attachments Added",
+                    string.Join("\n",
+                        addedAttachments.Select(a =>
+                            $"[{a.Filename}]({a.Url})")));
+            }
+
+            if (removedAttachments.Count > 0)
+            {
+                embed.AddField(
+                    "Attachments Removed",
+                    string.Join("\n",
+                        removedAttachments.Select(a =>
+                            $"[{a.Filename}]({a.Url})")));
+            }
+
+            AddEmbedsToEmbed(embed, after.Embeds);
+
+            AddStickersToEmbed(embed, after.Stickers);
 
         await LogAsync(embed.Build());
     }
@@ -320,29 +440,70 @@ public class ModerationLogs
         Logger.Log($"[ModLogs] Message deleted by {message.Author.Username} in #{channel?.Name ?? "Unknown"}");
 
         var embed = CreateEmbed("Message deleted", Color.Red)
-            .AddField("Channel", channel != null ? $"{channel.Name} (<#{channel.Id}>)" : "Unknown")
-            .AddField("Message ID", $"[{message.Id}]({message.GetJumpUrl()})")
-            .AddField("Message author", FormatUser(message.Author))
-            .AddField("Message created", $"<t:{message.CreatedAt.ToUnixTimeSeconds()}:R>")
-            .AddField("Content",
-                string.IsNullOrWhiteSpace(message.Content) ? "*No text*" : message.Content);
+        .AddField("Channel", channel != null ? $"{channel.Name} (<#{channel.Id}>)" : "Unknown")
+        .AddField("Message ID", $"[{message.Id}]({message.GetJumpUrl()})")
+        .AddField("Message author", FormatUser(message.Author))
+        .AddField("Message created", $"<t:{message.CreatedAt.ToUnixTimeSeconds()}:R>");
 
-        // Try to attribute the deletion to a moderator (if it wasn't the author deleting their own message).
+        embed.AddField(
+            "Content",
+            string.IsNullOrWhiteSpace(message.Content)
+                ? "*No text*"
+                : message.Content);
+
+        AddAttachmentsToEmbed(embed, message.Attachments);
+
+        AddEmbedsToEmbed(embed, message.Embeds);
+
+        AddStickersToEmbed(embed, message.Stickers);
+        
         if (channel is SocketGuildChannel guildChannel)
         {
-            var (moderator, reason) = await TryGetAuditLogModeratorAsync(
-                guildChannel.Guild,
-                ActionType.MessageDeleted,
-                entry => entry.Data is MessageDeleteAuditLogData data
-                    && data.Target.Id == message.Author.Id
-                    && data.ChannelId == channel.Id,
-                TimeSpan.FromSeconds(10));
+            var (moderator, reason) =
+                await TryGetAuditLogModeratorAsync(
+                    guildChannel.Guild,
+                    ActionType.MessageDeleted,
+                    entry =>
+                        entry.Data is MessageDeleteAuditLogData data &&
+                        data.Target.Id == message.Author.Id &&
+                        data.ChannelId == channel.Id,
+                    TimeSpan.FromSeconds(10));
 
             if (moderator != null)
             {
                 embed.AddField("Deleted by", FormatUser(moderator), true);
+
                 if (!string.IsNullOrWhiteSpace(reason))
                     embed.AddField("Reason", reason, true);
+            }
+        }
+        
+        if (message.Reference?.MessageId.IsSpecified == true)
+        {
+            try
+            {
+                var replied = await channel.GetMessageAsync(message.Reference.MessageId.Value);
+
+                if (replied != null)
+                {
+                    var text = $"{FormatUser(replied.Author)}";
+
+                    if (!string.IsNullOrWhiteSpace(replied.Content))
+                    {
+                        var preview = replied.Content;
+
+                        if (preview.Length > 150)
+                            preview = preview[..150] + "...";
+
+                        text += $"\n> {preview}";
+                    }
+
+                    embed.AddField("Replying To", text);
+                }
+            }
+            catch
+            {
+                // ignored
             }
         }
 
