@@ -10,6 +10,7 @@ namespace DiscordBot.Modules.SevenTv;
 /// call in Program.cs. No manual wiring needed — just needs to live in the
 /// same project/assembly.
 /// </summary>
+[Group("7tv", "7TV emote commands")]
 public class SevenTvModule : InteractionModuleBase<SocketInteractionContext>
 {
     private static readonly HttpClient Http = new();
@@ -25,7 +26,15 @@ public class SevenTvModule : InteractionModuleBase<SocketInteractionContext>
         try
         {
             var prefs = await SevenTvPreferencesStore.GetPreferencesAsync(Context.User.Id);
-            var emote = await SevenTvApi.SearchEmoteAsync(name, prefs.EmoteSetId, Context.User.Id.ToString());
+            var setId = prefs.EmoteSetId;
+
+            if (string.IsNullOrEmpty(setId))
+            {
+                var defaults = await SevenTvDefaults.ResolveAsync();
+                setId = defaults?.SetId;
+            }
+
+            var emote = await SevenTvApi.SearchEmoteAsync(name, setId, Context.User.Id.ToString());
 
             if (emote == null)
             {

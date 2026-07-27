@@ -19,7 +19,15 @@ public class EmoteAutocompleteHandler : AutocompleteHandler
         try
         {
             var prefs = await SevenTvPreferencesStore.GetPreferencesAsync(context.User.Id);
-            var emotes = await SevenTvApi.SearchEmotesForAutocompleteAsync(focused, prefs.EmoteSetId, context.User.Id.ToString());
+            var setId = prefs.EmoteSetId;
+
+            if (string.IsNullOrEmpty(setId))
+            {
+                var defaults = await SevenTvDefaults.ResolveAsync();
+                setId = defaults?.SetId;
+            }
+
+            var emotes = await SevenTvApi.SearchEmotesForAutocompleteAsync(focused, setId, context.User.Id.ToString());
 
             if (emotes.Count == 0)
             {
@@ -101,8 +109,15 @@ public class EmoteSetAutocompleteHandler : AutocompleteHandler
         try
         {
             var prefs = await SevenTvPreferencesStore.GetPreferencesAsync(context.User.Id);
+            var channelId = prefs.EmoteChannelId;
 
-            if (string.IsNullOrEmpty(prefs.EmoteChannelId))
+            if (string.IsNullOrEmpty(channelId))
+            {
+                var defaults = await SevenTvDefaults.ResolveAsync();
+                channelId = defaults?.ChannelId;
+            }
+
+            if (string.IsNullOrEmpty(channelId))
             {
                 return AutocompletionResult.FromSuccess(new[]
                 {
@@ -110,7 +125,7 @@ public class EmoteSetAutocompleteHandler : AutocompleteHandler
                 });
             }
 
-            var sets = await SevenTvApi.GetUserEmoteSetsAsync(prefs.EmoteChannelId);
+            var sets = await SevenTvApi.GetUserEmoteSetsAsync(channelId);
 
             if (sets.Count == 0)
             {
