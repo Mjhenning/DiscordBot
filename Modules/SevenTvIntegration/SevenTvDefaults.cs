@@ -26,11 +26,22 @@ public static class SevenTvDefaults
             if (_resolved != null) return _resolved;
 
             var channels = await SevenTvApi.SearchChannelsAsync(Config.TwitchChannelName);
-            var channel = channels.FirstOrDefault(c => c.MainConnection?.PlatformUsername == Config.TwitchChannelName);
+
+            // Case-insensitive match, since 7TV's stored username casing doesn't
+            // necessarily match how the channel name is cased in config (e.g.
+            // Twitch handles are case-insensitive everywhere else too). Falls
+            // back to the top search result if nothing matches exactly — we're
+            // specifically searching for this name, so the first hit should
+            // almost always be the right channel.
+            var channel = channels.FirstOrDefault(c =>
+                    string.Equals(c.MainConnection?.PlatformUsername, Config.TwitchChannelName, StringComparison.OrdinalIgnoreCase))
+                ?? channels.FirstOrDefault(c => c.MainConnection != null);
 
             if (channel == null)
             {
-                Logger.Log($"[7TV] Default channel \"{Config.TwitchChannelName}\" not found on 7TV.");
+                Logger.Log($"[7TV] Default channel \"{Config.TwitchChannelName}\" not found on 7TV. " +
+                           $"Search returned {channels.Count} result(s): " +
+                           string.Join(", ", channels.Select(c => c.MainConnection?.PlatformUsername ?? "(no connection)")));
                 return null;
             }
 
