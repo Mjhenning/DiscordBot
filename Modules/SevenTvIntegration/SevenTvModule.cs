@@ -39,7 +39,7 @@ public class SevenTvModule : InteractionModuleBase<SocketInteractionContext>
             using var stream = new MemoryStream(imageBytes);
             await ModifyOriginalResponseAsync(m =>
             {
-                m.Content = "";
+                m.Content = $":{emoteInfo.Name}:";
                 m.Attachments = new[] { new FileAttachment(stream, $"{emoteInfo.Name}.{emoteInfo.Format}") };
             });
         }
