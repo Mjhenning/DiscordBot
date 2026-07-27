@@ -39,7 +39,7 @@ public class SevenTvModule : InteractionModuleBase<SocketInteractionContext>
             using var stream = new MemoryStream(imageBytes);
             await ModifyOriginalResponseAsync(m =>
             {
-                m.Content = $":{emoteInfo.Name}:";
+                m.Content = "\u200B"; // zero-width space — satisfies Discord.Net's "Content can't be empty" check, renders as nothing visible
                 m.Attachments = new[] { new FileAttachment(stream, $"{emoteInfo.Name}.{emoteInfo.Format}") };
             });
         }
