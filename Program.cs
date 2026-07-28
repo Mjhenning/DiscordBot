@@ -32,6 +32,8 @@ DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
     LogLevel = LogSeverity.Info
 });
 
+    Logger.Init(client);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Service provider — registers singletons for DI injection into modules
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,24 +177,6 @@ client.Ready += async () =>
             $"[Error] Twitch initialization failed: {ex}");
     }
 };
-
-// ── Schedule reset DM notification ───────────────────────────────────────────
-ScheduleData scheduleData = services.GetRequiredService<ScheduleData>();
-scheduleData.OnWeekReset += async () =>
-{
-    try
-    {
-        var appInfo = await client.GetApplicationInfoAsync();
-        var dm      = await appInfo.Owner.CreateDMChannelAsync();
-        await dm.SendMessageAsync("📅 The stream schedule has been automatically cleared for the new week. Don't forget to add your streams!");
-        Logger.Log("[Info] Week reset DM sent to owner");
-    }
-    catch (Exception ex)
-    {
-        Logger.Log($"[Warning] Failed to send week reset DM: {ex.Message}");
-    }
-};
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Interaction routing — forwards all interactions to the interaction service

@@ -105,10 +105,8 @@ public class ScheduleData
         WeekStart          = weekStart.Date.ToString("yyyy-MM-dd");
         Save();
     }
-
-    public event Func<Task>? OnWeekReset;
     
-    public void ClearPublished()
+    public void ClearPublished(bool auto = false)
     {
         PublishedMessageId = 0;
         PublishedChannelId = 0;
@@ -116,8 +114,9 @@ public class ScheduleData
         EntriesWeekStart   = GetCurrentWeekStart().ToString("yyyy-MM-dd");
         ScheduleEntries.Clear();
         Save();
-        
-        OnWeekReset?.Invoke();
+
+        string reason = auto ? "automatically cleared for the new week" : "manually force-reset";
+        Logger.Log($"📅 The stream schedule has been {reason}. Don't forget to add your streams!", true);
     }
 
     // Returns true if a message is published for the current week
@@ -149,9 +148,8 @@ public class ScheduleData
         _resetTimer = new Timer(_ =>
         {
             Logger.Log("[Info] Scheduled week reset triggered");
-            EnsureCurrentWeek();
+            ClearPublished(auto: true);
 
-            // Reschedule for next week
             TimeSpan nextInterval = TimeSpan.FromDays(7);
             _resetTimer.Change(nextInterval, TimeSpan.FromDays(7));
         }, null, initialDelay, TimeSpan.FromDays(7));
