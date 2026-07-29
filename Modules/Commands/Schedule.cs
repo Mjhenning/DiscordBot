@@ -17,7 +17,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     [SlashCommand("resetschedule", "Force reset the schedule — delete after use")]
     public async Task ForceReset()
     {
-        _data.ClearPublished();
+        await _data.ClearPublishedAsync();
         Logger.Log("[Info] Schedule force reset by command");
         await RespondAsync("🗑️ Schedule has been force reset.", ephemeral: true);
     }
@@ -133,7 +133,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             ScheduledAt = scheduledAt.ToUniversalTime().ToString("o")
         };
 
-        _data.AddEntry(entry);
+        await _data.AddEntryAsync(entry);
 
         Logger.Log($"[Info] Schedule entry added: {entry.Description} — {entry.ScheduledAtDisplay}");
 
@@ -191,7 +191,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         {
             if (ulong.TryParse(idStr, out ulong id))
             {
-                _data.RemoveEntry(id);
+                await _data.RemoveEntryAsync(id);
                 removed++;
             }
         }

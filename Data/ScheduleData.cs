@@ -4,6 +4,7 @@
 
 namespace DiscordBot.Data;
 using Newtonsoft.Json;
+using DiscordBot.Services;
 
 public class ScheduleData
 {
@@ -14,7 +15,8 @@ public class ScheduleData
     const int       ResetHour   = 23;   // 24-hour local time
     const int       ResetMinute = 30;
     // ─────────────────────────────────────────────────────────────────────
-    
+
+    readonly TwitchScheduleService _twitchSchedule;
     Timer _resetTimer;
 
     public List<ScheduleEntry> ScheduleEntries { get; private set; } = new();
@@ -25,7 +27,11 @@ public class ScheduleData
     public string WeekStart          { get; private set; } = ""; // ISO 8601 UTC — Monday of published week
     public string EntriesWeekStart   { get; private set; } = ""; // ISO 8601 UTC — Monday of the week current entries belong to
 
-    public ScheduleData() => Initialize();
+    public ScheduleData(TwitchScheduleService twitchSchedule)
+    {
+        _twitchSchedule = twitchSchedule;
+        Initialize();
+    }
 
     void Initialize()
     {
@@ -82,18 +88,45 @@ public class ScheduleData
         return ScheduleEntries.FirstOrDefault(x => x.Id == id);
     }
 
-    public void AddEntry(ScheduleEntry entry)
+    public async Task AddEntryAsync(ScheduleEntry entry)
     {
         // Stamp the entries-week if it's somehow unset (e.g. list was empty going in)
         if (string.IsNullOrWhiteSpace(EntriesWeekStart))
             EntriesWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
 
+        try
+        {
+            string? segmentId = await _twitchSchedule.CreateSegmentAsync(entry);
+            entry.TwitchSegmentId = segmentId;
+
+            if (segmentId == null)
+                Logger.Log($"[Warning] Twitch segment not created for '{entry.Description}' — added to Discord schedule only.", true);
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[Warning] Failed to push '{entry.Description}' to Twitch schedule: {ex.Message}", true);
+        }
+
         ScheduleEntries.Add(entry);
         Save();
     }
 
-    public void RemoveEntry(ulong id)
+    public async Task RemoveEntryAsync(ulong id)
     {
+        ScheduleEntry? entry = GetEntry(id);
+
+        if (entry != null && !string.IsNullOrWhiteSpace(entry.TwitchSegmentId))
+        {
+            try
+            {
+                await _twitchSchedule.DeleteSegmentAsync(entry.TwitchSegmentId!);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[Warning] Failed to delete Twitch segment for '{entry.Description}': {ex.Message}", true);
+            }
+        }
+
         ScheduleEntries.RemoveAll(x => x.Id == id);
         Save();
     }
@@ -106,8 +139,25 @@ public class ScheduleData
         Save();
     }
     
-    public void ClearPublished(bool auto = false)
+    public async Task ClearPublishedAsync(bool auto = false)
     {
+        // Snapshot before clearing so we still have segment IDs to delete
+        List<ScheduleEntry> toClean = ScheduleEntries
+            .Where(e => !string.IsNullOrWhiteSpace(e.TwitchSegmentId))
+            .ToList();
+
+        foreach (ScheduleEntry entry in toClean)
+        {
+            try
+            {
+                await _twitchSchedule.DeleteSegmentAsync(entry.TwitchSegmentId!);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[Warning] Failed to delete Twitch segment {entry.TwitchSegmentId} for '{entry.Description}': {ex.Message}");
+            }
+        }
+
         PublishedMessageId = 0;
         PublishedChannelId = 0;
         WeekStart          = "";
@@ -145,10 +195,18 @@ public class ScheduleData
         DateTime nextReset    = GetNextResetTime(now);
         TimeSpan initialDelay = nextReset - now;
 
-        _resetTimer = new Timer(_ =>
+        _resetTimer = new Timer(async _ =>
         {
             Logger.Log("[Info] Scheduled week reset triggered");
-            ClearPublished(auto: true);
+
+            try
+            {
+                await ClearPublishedAsync(auto: true);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[Error] Scheduled week reset failed: {ex.Message}", true);
+            }
 
             TimeSpan nextInterval = TimeSpan.FromDays(7);
             _resetTimer.Change(nextInterval, TimeSpan.FromDays(7));
@@ -189,7 +247,11 @@ public class ScheduleData
 
         Logger.Log("[Info] Week rollover detected — clearing previous schedule");
 
-        ClearPublished();
+        // Fire-and-forget: this runs from the sync Initialize() path at startup,
+        // so we can't await here. The Twitch segment deletes happen best-effort
+        // in the background; the local/Discord state clear still completes
+        // synchronously inside ClearPublishedAsync before the delete loop finishes.
+        _ = ClearPublishedAsync(auto: true);
     }
 }
 
@@ -205,9 +267,10 @@ public class ScheduleStore
 
 public class ScheduleEntry
 {
-    public ulong  Id          { get; set; } = 0;
-    public string Description { get; set; } = "";
-    public string ScheduledAt { get; set; } = "";
+    public ulong   Id              { get; set; } = 0;
+    public string  Description     { get; set; } = "";
+    public string  ScheduledAt     { get; set; } = "";
+    public string? TwitchSegmentId { get; set; } = null; // set once pushed to Twitch's schedule
 
     [JsonIgnore]
     public DateTimeOffset ScheduledAtParsed => DateTimeOffset.Parse(ScheduledAt);

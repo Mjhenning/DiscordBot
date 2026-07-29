@@ -61,6 +61,7 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<Twitch_Notifier>()
     .AddSingleton<TwitchRedeemHandler>()
     .AddSingleton<FavouritesLiveNoti>()
+    .AddSingleton<TwitchScheduleService>()
     
     //TWITCH RECONNECT HANDLER
     .AddSingleton<EventSubReconnectService>()
