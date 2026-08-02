@@ -217,6 +217,7 @@ public class ArgFilesystem
     public bool IsEventUnlocked(string? eventName)
     {
         if (string.IsNullOrEmpty(eventName)) return true;
+        Logger.Log($"[Terminal] {eventName} found.");
 
         try
         {
@@ -224,8 +225,11 @@ public class ArgFilesystem
             Dictionary<string, PortDef>? ports =
                 JsonConvert.DeserializeObject<Dictionary<string, PortDef>>(portsJson);
             if (ports == null) return false;
+            
+            Logger.Log($"[Terminal] {ports.Count} ports found.");
 
             string foundJson = File.ReadAllText(FoundPortsPath);
+            Logger.Log($"[Terminal] {foundJson} json found.");
             FoundPortsFile? found =
                 JsonConvert.DeserializeObject<FoundPortsFile>(foundJson);
             if (found == null) return false;

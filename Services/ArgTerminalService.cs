@@ -82,22 +82,26 @@ public class ArgTerminalService
     {
         StringBuilder sb = new();
 
-        foreach (FsNode child in node.Children.Values)
+        // Directories
+        foreach (FsNode dir in node.Children.Values
+                     .Where(c => c.IsDirectory)
+                     .OrderBy(c => c.Name))
         {
-            if (child.IsDirectory)
-            {
-                sb.AppendLine($"├📁 /{child.Name}/");
-            }
-            else
-            {
-                if (child.UnlockedAtCoherence.HasValue &&
-                    coherence < child.UnlockedAtCoherence.Value)
-                    continue;
+            sb.AppendLine($"├📁 /{dir.Name}/");
+        }
 
-                sb.AppendLine(child.Corrupted
-                    ? $"├📄 {child.Filename} [CORRUPTED]"
-                    : $"├📄 {child.Filename}");
-            }
+        // Files (already filtered)
+        string cwd = node == _fs.Root
+            ? "/"
+            : node.FullPath
+                .Replace(_fs.RootPath, "")
+                .Replace("\\", "/");
+
+        foreach (FsNode file in _fs.GetReadableFiles(cwd, coherence))
+        {
+            sb.AppendLine(file.Corrupted
+                ? $"├📄 {file.Filename} [CORRUPTED]"
+                : $"├📄 {file.Filename}");
         }
 
         return sb.Length > 0 ? sb.ToString() : "*empty*";
