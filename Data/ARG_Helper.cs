@@ -72,6 +72,8 @@ public class ArgFilesystem
                 Filename            = json.Filename,
                 Corrupted           = json.Corrupted,
                 UnlockedAtCoherence = json.UnlockedAtCoherence,
+                UnlockedByEvent     = json.UnlockedByEvent,
+                CorruptedContent    = json.CorruptedContent,
                 Content             = json.Content
             };
 
@@ -105,6 +107,8 @@ public class ArgFilesystem
                 node.Filename            = json.Filename;
                 node.Corrupted           = json.Corrupted;
                 node.UnlockedAtCoherence = json.UnlockedAtCoherence;
+                node.UnlockedByEvent     = json.UnlockedByEvent;
+                node.CorruptedContent    = json.CorruptedContent;
                 node.Content             = json.Content;
             }
             catch { /* file mid-write, ignore */ }
@@ -182,12 +186,58 @@ public class ArgFilesystem
         return node.Children.Values
             .Where(c =>
                 !c.IsDirectory &&
-                (
-                    !c.UnlockedAtCoherence.HasValue ||
-                    coherence >= c.UnlockedAtCoherence.Value
-                ))
+                (!c.UnlockedAtCoherence.HasValue || coherence >= c.UnlockedAtCoherence.Value) &&
+                (string.IsNullOrEmpty(c.UnlockedByEvent) || IsEventUnlocked(c.UnlockedByEvent)))
             .OrderBy(c => c.Filename)
             .ToList();
+    }
+    
+    //PORTS
+    
+    static readonly string PortsPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+            "TwitchBot", "ARG", "data", "ports.json"));
+
+    static readonly string FoundPortsPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+            "TwitchBot", "ARG", "data", "found_ports.json"));
+
+    class PortDef
+    {
+        [JsonProperty("label")]
+        public string? Label { get; set; }
+    }
+
+    class FoundPortsFile
+    {
+        [JsonProperty("probed")]
+        public Dictionary<string, string> Probed { get; set; } = new();
+    }
+
+    public bool IsEventUnlocked(string? eventName)
+    {
+        if (string.IsNullOrEmpty(eventName)) return true;
+
+        try
+        {
+            string portsJson = File.ReadAllText(PortsPath);
+            Dictionary<string, PortDef>? ports =
+                JsonConvert.DeserializeObject<Dictionary<string, PortDef>>(portsJson);
+            if (ports == null) return false;
+
+            string foundJson = File.ReadAllText(FoundPortsPath);
+            FoundPortsFile? found =
+                JsonConvert.DeserializeObject<FoundPortsFile>(foundJson);
+            if (found == null) return false;
+
+            return ports.Any(kv =>
+                kv.Value.Label == eventName &&
+                found.Probed.ContainsKey(kv.Key));
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
 
@@ -203,6 +253,8 @@ public class FsNode
     public string?   Filename            { get; set; }
     public bool      Corrupted           { get; set; }
     public int?      UnlockedAtCoherence { get; set; }
+    public string?   UnlockedByEvent     { get; set; }
+    public string[]? CorruptedContent    { get; set; }
     public string[]? Content             { get; set; }
 }
 
@@ -216,6 +268,12 @@ public class FsFileContent
 
     [JsonProperty("unlockedAtCoherence")]
     public int? UnlockedAtCoherence { get; set; }
+
+    [JsonProperty("unlockedByEvent")]
+    public string? UnlockedByEvent { get; set; }
+
+    [JsonProperty("corruptedContent")]
+    public string[]? CorruptedContent { get; set; }
 
     [JsonProperty("content")]
     public string[]? Content { get; set; }

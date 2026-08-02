@@ -315,17 +315,27 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        _data.ReadMessageFile =
-            node.Filename ?? "unknown_file";
+        _data.ReadMessageFile = node.Filename ?? "unknown_file";
 
-        string content = node.Content == null
-            ? "*empty file*"
-            : string.Join("\n", node.Content);
+        int coherence = _data.GetCoherence();
+
+        string content;
+        if (node.Corrupted && coherence < 60)
+        {
+            content = node.CorruptedContent is { Length: > 0 }
+                ? string.Join("\n", node.CorruptedContent)
+                : "*file corrupted — cannot render*";
+        }
+        else
+        {
+            content = node.Content == null
+                ? "*empty file*"
+                : string.Join("\n", node.Content);
+        }
 
         if (content.Length > 4000)
         {
-            content = content[..4000] +
-                      "\n\n[FILE TRUNCATED]";
+            content = content[..4000] + "\n\n[FILE TRUNCATED]";
         }
 
         _data.ReadMessageContent = content;
