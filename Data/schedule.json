@@ -1,6 +1,26 @@
 {
-  "Entries": [],
-  "MessageId": 0,
-  "ChannelId": 0,
-  "WeekStart": ""
+  "Entries": [
+    {
+      "Id": 1785760843414,
+      "Description": "Dark Souls 2 Part 2",
+      "ScheduledAt": "2026-08-04T18:00:00.0000000+00:00",
+      "TwitchSegmentId": "eyJzZWdtZW50SUQiOiIxMTYzZmJkOS0zNzQ3LTQ0MTAtYmYwZC1jY2UxMjM0OWVlODkiLCJpc29ZZWFyIjoyMDI2LCJpc29XZWVrIjozMn0="
+    },
+    {
+      "Id": 1785760866520,
+      "Description": "Webfishing Wednesday!",
+      "ScheduledAt": "2026-08-05T20:00:00.0000000+00:00",
+      "TwitchSegmentId": "eyJzZWdtZW50SUQiOiI0MDkxMTlmOS1iOGM3LTQ0NGQtYTZlZS1hODQ4MDNjOWNkNjgiLCJpc29ZZWFyIjoyMDI2LCJpc29XZWVrIjozMn0="
+    },
+    {
+      "Id": 1785760892276,
+      "Description": "Community Friday!",
+      "ScheduledAt": "2026-08-07T18:00:00.0000000+00:00",
+      "TwitchSegmentId": "eyJzZWdtZW50SUQiOiIzNjFhMWE5Ny0zNWNjLTQ4OGEtODQzNC1lYTA5YTE3NzdmZTEiLCJpc29ZZWFyIjoyMDI2LCJpc29XZWVrIjozMn0="
+    }
+  ],
+  "MessageId": 1533817199423262894,
+  "ChannelId": 1488624519391478001,
+  "WeekStart": "2026-08-03",
+  "EntriesWeekStart": "2026-07-27"
 }

@@ -20,6 +20,18 @@ public class TwitchScheduleService
         _api    = api;
         _tokens = tokens;
     }
+    
+    public async Task<string?> GetCategoryIdAsync(string gameName)
+    {
+        List<string> games = new List<string>();
+        games.Add(gameName);
+        // Twitch API: https://dev.twitch.tv/docs/api/reference#get-games
+        var response = await _tokens.WithTokenRetryAsync(TwitchProfile.Broadcaster, token =>
+            _api.Helix.Games.GetGamesAsync(gameNames: games, accessToken: token));
+
+        var game = response?.Data?.FirstOrDefault();
+        return game?.Id;   // null if not found
+    }
 
     public async Task<string?> CreateSegmentAsync(ScheduleEntry entry)
     {
@@ -31,6 +43,9 @@ public class TwitchScheduleService
             IsRecurring = false,
             Title       = entry.Description
         };
+
+        if (!string.IsNullOrWhiteSpace(entry.TwitchSegmentId))
+            payload.CategoryId = entry.TwitchSegmentId;
 
         var response = await _tokens.WithTokenRetryAsync(TwitchProfile.Broadcaster, token =>
             _api.Helix.Schedule.CreateChannelStreamScheduleSegmentAsync(Config.TwitchUserId, payload, token));

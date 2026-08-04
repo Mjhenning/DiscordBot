@@ -350,11 +350,13 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         foreach (ScheduleEntry entry in entries)
         {
             long unixSeconds = entry.ScheduledAtParsed.ToUnixTimeSeconds();
-            builder.AddField(
-                $"⚠️ {entry.Description}",
-                $"> <t:{unixSeconds}:F>",
-                inline: false
-            );
+            string fieldName = $"⚠️ {entry.Description}";
+            string fieldValue = $"> <t:{unixSeconds}:F>";
+
+            if (!string.IsNullOrWhiteSpace(entry.GameName))
+                fieldValue += $"\n> Game: {entry.GameName}";
+
+            builder.AddField(fieldName, fieldValue, inline: false);
         }
 
         return builder.Build();
@@ -366,12 +368,14 @@ public class ScheduleEntryModal : IModal
     public string Title => "Add Stream Entry";
 
     [InputLabel("Game / Stream Title")]
-    [ModalTextInput("schedule_description",
-        placeholder: "Atomic Heart Part 3!! Let's go find some bunkers!",
-        maxLength: 100)]
+    [ModalTextInput("schedule_description", placeholder: "Atomic Heart Part 3!!", maxLength: 100)]
     public string Description { get; set; } = "";
 
     [InputLabel("Start Time (e.g. 10 PM or 22:00)")]
     [ModalTextInput("schedule_time", placeholder: "10 PM")]
     public string Time { get; set; } = "";
+
+    [InputLabel("Game name (e.g. *Atomic Heart*)")]
+    [ModalTextInput("schedule_game", placeholder: "Atomic Heart", maxLength: 50)]
+    public string Game { get; set; } = "";
 }
