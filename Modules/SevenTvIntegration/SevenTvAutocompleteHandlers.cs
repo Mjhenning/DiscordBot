@@ -41,8 +41,8 @@ public class EmoteAutocompleteHandler : AutocompleteHandler
             {
                 var score = emote.Scores.TopAllTime;
                 var scoreEmoji = score > 1000 ? "🔥" : score > 500 ? "⭐" : "";
-                var name = $"{scoreEmoji} {emote.DisplayName} ({score:N0} uses)".Trim();
-                return new AutocompleteResult(name.Length > 100 ? name[..100] : name, emote.DisplayName);
+                var name = $"{scoreEmoji} {emote.DefaultName} ({score:N0} uses)".Trim();
+                return new AutocompleteResult(name.Length > 100 ? name[..100] : name, emote.DefaultName);
             });
 
             return AutocompletionResult.FromSuccess(choices);
