@@ -277,12 +277,10 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
                 ButtonStyle.Danger)
             .Build();
         
-        await ModifyOriginalResponseAsync(msg =>
-        {
-            msg.Content = "";
-            msg.Embed = builder.Build();
-            msg.Components = buttons;
-        });
+        await RespondAsync(
+            embed: builder.Build(),
+            components: buttons,
+            ephemeral: true);
     }
     
     [ComponentInteraction("collab_create:*", ignoreGroupNames: true)]
