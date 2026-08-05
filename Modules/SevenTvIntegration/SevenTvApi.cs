@@ -22,6 +22,7 @@ public static class SevenTvApi
             emotes(query:$emoteName){
               items{
                 id
+                name
                 emote{
                   id
                   defaultName
@@ -202,8 +203,20 @@ public static class SevenTvApi
 
             foreach (var item in emotesContainer.GetProperty("items").EnumerateArray())
             {
-                if (item.TryGetProperty("emote", out var emoteEl))
-                    results.Add(ParseEmote(emoteEl));
+                if (!item.TryGetProperty("emote", out var emoteEl)) continue;
+
+                var emote = ParseEmote(emoteEl);
+
+                if (item.TryGetProperty("name", out var nameEl) && nameEl.ValueKind == JsonValueKind.String)
+                {
+                    var setAlias = nameEl.GetString();
+                    // Only treat it as an override if it actually differs — 7TV
+                    // returns the item's name either way, renamed or not.
+                    if (!string.IsNullOrEmpty(setAlias) && setAlias != emote.DefaultName)
+                        emote.SetName = setAlias;
+                }
+
+                results.Add(emote);
             }
         }
         else
@@ -228,7 +241,7 @@ public static class SevenTvApi
         var lastResults = GetLastAutocompleteResults(userId, setId);
         if (lastResults != null)
         {
-            var exactMatch = lastResults.Value.Emotes.FirstOrDefault(e => e.DefaultName == emoteName);
+            var exactMatch = lastResults.Value.Emotes.FirstOrDefault(e => e.DisplayName == emoteName);
             if (exactMatch != null) return exactMatch;
         }
 
@@ -242,7 +255,7 @@ public static class SevenTvApi
         try
         {
             var emotes = ParseEmoteSearchResponse(doc, isSetQuery);
-            return emotes.FirstOrDefault(e => e.DefaultName == emoteName);
+            return emotes.FirstOrDefault(e => e.DisplayName == emoteName);
         }
         catch (Exception ex)
         {
@@ -316,7 +329,7 @@ public static class SevenTvApi
             Url = final?.Url ?? "",
             Format = format,
             IsAnimated = final?.Mime == "image/avif",
-            Name = emote.DefaultName
+            Name = emote.DisplayName
         };
     }
 

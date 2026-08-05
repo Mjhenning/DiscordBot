@@ -16,6 +16,21 @@ public class SevenTvEmote
 {
     public string Id { get; set; } = "";
     public string DefaultName { get; set; } = "";
+
+    /// <summary>
+    /// The emote's custom name within a specific set (an "alias"), if it was
+    /// renamed there — null when searching globally (no set context) or when
+    /// the emote wasn't renamed in the set. Prefer DisplayName over either of
+    /// these two fields directly.
+    /// </summary>
+    public string? SetName { get; set; }
+
+    /// <summary>
+    /// What to actually show/match against: the set-specific alias if present,
+    /// otherwise the emote's global default name.
+    /// </summary>
+    public string DisplayName => !string.IsNullOrEmpty(SetName) ? SetName : DefaultName;
+
     public SevenTvEmoteScores Scores { get; set; } = new();
     public List<SevenTvImage> Images { get; set; } = new();
 }
