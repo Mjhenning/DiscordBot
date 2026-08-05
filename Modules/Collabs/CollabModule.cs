@@ -286,6 +286,8 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("collab_create:*", ignoreGroupNames: true)]
     public async Task CreateRequest(string idString)
     {
+        await DeferAsync(ephemeral: true);
+        
         if (!ulong.TryParse(idString, out ulong id))
             return;
 
@@ -331,7 +333,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             request,
             Context.Client);
 
-        await RespondAsync(
+        await FollowupAsync(
             "✅ Collaboration request sent!",
             ephemeral: true);
     }
