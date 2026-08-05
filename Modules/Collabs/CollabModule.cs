@@ -82,7 +82,14 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
             GameName = string.IsNullOrWhiteSpace(modal.Game)
                 ? null
-                : modal.Game.Trim()
+                : modal.Game.Trim(),
+            
+            ExternalCollaborators = modal.ExternalCollaborators
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList()
         };
 
         _cache.Add(pending);
@@ -90,7 +97,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
         var menu = new SelectMenuBuilder()
             .WithCustomId($"collab_users:{pending.Id}")
             .WithPlaceholder("Select collaborators")
-            .WithMinValues(1)
+            .WithMinValues(0)
             .WithMaxValues(10)
             .WithType(ComponentType.UserSelect);
 
@@ -137,6 +144,8 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
         participant.Status = ParticipantStatus.Accepted;
         participant.DeclineReason = null;
 
+        request.LastUpdated = DateTimeOffset.UtcNow;
+
         _data.Update(request);
 
         await _collabService.UpdateMessagesAsync(
@@ -175,6 +184,8 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             return;
 
         participant.Status = ParticipantStatus.Declined;
+
+        request.LastUpdated = DateTimeOffset.UtcNow;
 
         participant.DeclineReason =
             string.IsNullOrWhiteSpace(modal.Reason)
@@ -255,14 +266,31 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
         builder.AddField(
             "👥 Invited Collaborators",
-            string.Join(
-                "\n",
-                pending.Collaborators.Select(x => $"• <@{x}>")),
+            pending.Collaborators.Any()
+                ? string.Join(
+                    "\n",
+                    pending.Collaborators.Select(x => $"• <@{x}>"))
+                : "*None*",
             false);
+        
+        if (pending.ExternalCollaborators.Any())
+        {
+            builder.AddField(
+                "🌐 External Collaborators",
+                string.Join(
+                    "\n",
+                    pending.ExternalCollaborators.Select(x => $"• {x}")),
+                false);
+        }
+
+        string count =
+            pending.Collaborators.Count == 1
+                ? "1 collaborator"
+                : $"{pending.Collaborators.Count} collaborators";
 
         builder.AddField(
             "Confirmation",
-            "⚠️ Invitations will be sent immediately after pressing **Create Request**.",
+            $"⚠️ Invitations will be sent immediately to **{count}**.",
             false);
         
         var buttons = new ComponentBuilder()
@@ -295,7 +323,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
         if (pending == null)
         {
-            await RespondAsync(
+            await FollowupAsync(
                 "This request expired.",
                 ephemeral: true);
 
@@ -308,7 +336,9 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             OwnerId = pending.OwnerId,
             Description = pending.Description,
             ScheduledAt = pending.ScheduledAt,
-            GameName = pending.GameName
+            GameName = pending.GameName,
+            ExternalCollaborators = pending.ExternalCollaborators.ToList(),
+            LastUpdated = DateTimeOffset.UtcNow
         };
 
         request.Participants.Add(new CollabParticipant
@@ -402,10 +432,23 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
         foreach (var collab in collabs)
         {
-            string collaborators = string.Join(
-                "\n",
-                collab.Participants
-                    .Select(p => $"<@{p.UserId}>"));
+            string collaborators =
+                collab.Participants.Any()
+                    ? string.Join(
+                        "\n",
+                        collab.Participants.Select(p => $"<@{p.UserId}>"))
+                    : "*None*";
+            
+            string external = "";
+
+            if (collab.ExternalCollaborators.Any())
+            {
+                external =
+                    "\n\n**External Collaborators**\n" +
+                    string.Join(
+                        "\n",
+                        collab.ExternalCollaborators.Select(x => $"• {x}"));
+            }
 
             builder.AddField(
                 $"🎮 {collab.Description}",
@@ -417,6 +460,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
                  **Collaborators**
                  {collaborators}
+                 {external}
                  """);
         }
 

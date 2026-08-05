@@ -256,6 +256,9 @@ public class CollabService
         builder.AddField(
             "Participants",
             participants);
+        
+        builder.WithDescription(
+            $"Last updated <t:{request.LastUpdated.ToUnixTimeSeconds()}:R>");
 
         builder.WithFooter("This message updates automatically.");
 

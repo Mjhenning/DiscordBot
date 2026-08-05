@@ -23,6 +23,10 @@ public class CollabEntry
 
     // participantId -> messageId
     public Dictionary<ulong, CollabDmReference> ParticipantDmMessages { get; set; } = new();
+    
+    public List<string> ExternalCollaborators { get; set; } = new();
+    
+    public DateTimeOffset LastUpdated { get; set; } = DateTimeOffset.UtcNow;
 
     [JsonIgnore]
     public DateTimeOffset ScheduledAtParsed
@@ -50,4 +54,6 @@ public class PendingCollabRequest
     public string? GameName { get; set; }
 
     public List<ulong> Collaborators { get; set; } = new();
+    
+    public List<string> ExternalCollaborators { get; set; } = new();
 }

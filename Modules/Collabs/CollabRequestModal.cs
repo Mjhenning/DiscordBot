@@ -26,4 +26,12 @@ public class CollabRequestModal : IModal
         placeholder: "Minecraft",
         maxLength: 50)]
     public string Game { get; set; } = "";
+    
+    [InputLabel("🌐 External Collaborators (optional)")]
+    [ModalTextInput(
+        "external_collaborators",
+        TextInputStyle.Paragraph,
+        placeholder: "One name per line",
+        maxLength: 300)]
+    public string ExternalCollaborators { get; set; } = "";
 }
