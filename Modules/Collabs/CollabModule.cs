@@ -10,13 +10,16 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 {
     readonly CollabData _data;
     readonly CollabService _collabService;
+    readonly CollabRequestCache _cache;
 
     public CollabModule(
         CollabData data,
-        CollabService collabService)
+        CollabService collabService,
+        CollabRequestCache cache)
     {
         _data = data;
         _collabService = collabService;
+        _cache = cache;
     }
 
     [SlashCommand("collab", "Manage Collabs")]
@@ -61,13 +64,13 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
         if (!DateTimeOffset.TryParse(combined, out DateTimeOffset scheduled))
         {
             await RespondAsync(
-                "❌ Couldn't parse that time. Use something like `20:00` or `8 PM`.",
+                "❌ Couldn't parse that time.",
                 ephemeral: true);
 
             return;
         }
 
-        CollabEntry request = new()
+        PendingCollabRequest pending = new()
         {
             Id = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
 
@@ -82,35 +85,23 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
                 : modal.Game.Trim()
         };
 
-        // Owner is automatically accepted
-        request.Participants.Add(new CollabParticipant
-        {
-            UserId = Context.User.Id,
-            Status = ParticipantStatus.Accepted
-        });
+        _cache.Add(pending);
 
-        foreach (ulong id in ParseUsers(modal.Collaborators))
-        {
-            if (id == Context.User.Id)
-                continue;
+        var menu = new SelectMenuBuilder()
+            .WithCustomId($"collab_users:{pending.Id}")
+            .WithPlaceholder("Select collaborators")
+            .WithMinValues(1)
+            .WithMaxValues(10)
+            .WithType(ComponentType.UserSelect);
 
-            // Don't add duplicates
-            if (request.Participants.Any(p => p.UserId == id))
-                continue;
-
-            request.Participants.Add(new CollabParticipant
-            {
-                UserId = id
-            });
-        }
-
-        _data.Add(request);
+        var components = new ComponentBuilder()
+            .WithSelectMenu(menu)
+            .Build();
 
         await RespondAsync(
-            $"✅ Collaboration request created with **{request.Participants.Count}** participant(s).",
+            "Select everyone you'd like to invite.",
+            components: components,
             ephemeral: true);
-
-        await _collabService.SendRequestAsync(request, Context.Client);
     }
     
     [ComponentInteraction("collab_accept:*", ignoreGroupNames: true)]
@@ -209,6 +200,157 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
                 $"collab_decline_modal:{id}");
     }
     
+    [ComponentInteraction("collab_users:*", ignoreGroupNames: true)]
+    public async Task OnUsersSelected(
+        string requestId,
+        string[] selectedUsers)
+    {
+        if (!ulong.TryParse(requestId, out ulong id))
+            return;
+
+        PendingCollabRequest? pending = _cache.Get(id);
+
+        if (pending == null)
+        {
+            await RespondAsync(
+                "This request expired.",
+                ephemeral: true);
+
+            return;
+        }
+
+        pending.Collaborators = selectedUsers
+            .Select(ulong.Parse)
+            .Where(id => id != pending.OwnerId)
+            .Distinct()
+            .ToList();
+        
+        EmbedBuilder builder = new EmbedBuilder()
+            .WithTitle("🌏 Proxy Collaboration Request")
+            .WithColor(new Color(0x5865F2))
+            .WithDescription("Please confirm the details before invitations are sent.");
+
+        builder.AddField(
+            "📝 Description",
+            pending.Description,
+            false);
+
+        if (!string.IsNullOrWhiteSpace(pending.GameName))
+        {
+            builder.AddField(
+                "🎮 Game",
+                pending.GameName,
+                true);
+        }
+
+        builder.AddField(
+            "📅 Scheduled",
+            $"<t:{DateTimeOffset.Parse(pending.ScheduledAt).ToUnixTimeSeconds()}:F>",
+            true);
+
+        builder.AddField(
+            "👤 Host",
+            $"<@{pending.OwnerId}>",
+            true);
+
+        builder.AddField(
+            "👥 Invited Collaborators",
+            string.Join(
+                "\n",
+                pending.Collaborators.Select(x => $"• <@{x}>")),
+            false);
+
+        builder.AddField(
+            "Confirmation",
+            "⚠️ Invitations will be sent immediately after pressing **Create Request**.",
+            false);
+        
+        var buttons = new ComponentBuilder()
+            .WithButton(
+                "✅ Create Request",
+                $"collab_create:{pending.Id}",
+                ButtonStyle.Success)
+
+            .WithButton(
+                "✖ Cancel",
+                $"collab_cancel:{pending.Id}",
+                ButtonStyle.Danger)
+            .Build();
+        
+        await ModifyOriginalResponseAsync(msg =>
+        {
+            msg.Content = "";
+            msg.Embed = builder.Build();
+            msg.Components = buttons;
+        });
+    }
+    
+    [ComponentInteraction("collab_create:*", ignoreGroupNames: true)]
+    public async Task CreateRequest(string idString)
+    {
+        if (!ulong.TryParse(idString, out ulong id))
+            return;
+
+        PendingCollabRequest? pending = _cache.Get(id);
+
+        if (pending == null)
+        {
+            await RespondAsync(
+                "This request expired.",
+                ephemeral: true);
+
+            return;
+        }
+
+        CollabEntry request = new()
+        {
+            Id = pending.Id,
+            OwnerId = pending.OwnerId,
+            Description = pending.Description,
+            ScheduledAt = pending.ScheduledAt,
+            GameName = pending.GameName
+        };
+
+        request.Participants.Add(new CollabParticipant
+        {
+            UserId = pending.OwnerId,
+            Status = ParticipantStatus.Accepted
+        });
+
+        foreach (ulong collaborator in pending.Collaborators)
+        {
+            request.Participants.Add(new CollabParticipant
+            {
+                UserId = collaborator
+            });
+        }
+
+        _data.Add(request);
+
+        _cache.Remove(id);
+
+        await _collabService.SendRequestAsync(
+            request,
+            Context.Client);
+
+        await RespondAsync(
+            "✅ Collaboration request sent!",
+            ephemeral: true);
+    }
+    
+    [ComponentInteraction("collab_cancel:*", ignoreGroupNames: true)]
+    public async Task CancelRequest(string idString)
+    {
+        if (ulong.TryParse(idString, out ulong id))
+        {
+            _cache.Remove(id);
+        }
+
+        await RespondAsync(
+            "❌ Collaboration request cancelled.",
+            ephemeral: true);
+    }
+    
     // ─── REQUESTS ──────────────────────────────────────────────────────────────────
     public async Task RequestStart()
     {
@@ -216,7 +358,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
         DateTimeOffset now = DateTimeOffset.Now;
 
-        for (int i = 0; i < 30; i++)
+        for (int i = 0; i < 25; i++)
         {
             DateTimeOffset day = now.Date.AddDays(i);
 
@@ -281,30 +423,5 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
         await RespondAsync(
             embed: builder.Build(),
             ephemeral: true);
-    }
-    
-    
-    
-    // ─── HELPERS ──────────────────────────────────────────────────────────────────
-    
-    private IEnumerable<ulong> ParseUsers(string input)
-    {
-        HashSet<ulong> ids = new();
-
-        foreach (string word in input.Split(' ', '\n', ',', ';'))
-        {
-            if (MentionUtils.TryParseUser(word, out ulong id))
-            {
-                ids.Add(id);
-                continue;
-            }
-
-            if (ulong.TryParse(word, out id))
-            {
-                ids.Add(id);
-            }
-        }
-
-        return ids;
     }
 }

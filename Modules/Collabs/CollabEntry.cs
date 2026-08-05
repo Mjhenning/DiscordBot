@@ -36,3 +36,18 @@ public class CollabEntry
     public bool FullyAccepted =>
         Participants.All(x => x.Status == ParticipantStatus.Accepted);
 }
+
+public class PendingCollabRequest
+{
+    public ulong Id { get; set; }
+
+    public ulong OwnerId { get; set; }
+
+    public string Description { get; set; } = "";
+
+    public string ScheduledAt { get; set; } = "";
+
+    public string? GameName { get; set; }
+
+    public List<ulong> Collaborators { get; set; } = new();
+}

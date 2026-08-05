@@ -49,6 +49,7 @@ ServiceProvider services = new ServiceCollection()
     //DATA RELATED
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
+    .AddSingleton<CollabData>()
     
     //TWITCH RELATED
     .AddSingleton<TwitchAPI>()
@@ -62,6 +63,7 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<TwitchRedeemHandler>()
     .AddSingleton<FavouritesLiveNoti>()
     .AddSingleton<TwitchScheduleService>()
+    .AddSingleton<CollabRequestCache>()
     .AddSingleton<CollabService>()
     
     //TWITCH RECONNECT HANDLER

@@ -26,12 +26,4 @@ public class CollabRequestModal : IModal
         placeholder: "Minecraft",
         maxLength: 50)]
     public string Game { get; set; } = "";
-
-    [InputLabel("Collaborators")]
-    [ModalTextInput(
-        "collab_users",
-        TextInputStyle.Paragraph,
-        placeholder: "@Laya @Fox",
-        maxLength: 300)]
-    public string Collaborators { get; set; } = "";
 }
