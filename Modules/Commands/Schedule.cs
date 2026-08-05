@@ -2,16 +2,19 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using DiscordBot.Data;
+using DiscordBot.Services;
 
 namespace DiscordBot.Modules;
 
 public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 {
     readonly ScheduleData _data;
+    private readonly TwitchScheduleService _twitchSchedule;
 
-    public ScheduleModule(ScheduleData data)
+    public ScheduleModule(ScheduleData data, TwitchScheduleService twitchSchedule)
     {
         _data = data;
+        _twitchSchedule = twitchSchedule;
     }
     
     [SlashCommand("resetschedule", "Force reset the schedule — delete after use")]
@@ -126,12 +129,28 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
+        // Build the entry – we’ll add the game name and category ID next
         ScheduleEntry entry = new()
         {
             Id          = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             Description = modal.Description.Trim(),
-            ScheduledAt = scheduledAt.ToUniversalTime().ToString("o")
+            ScheduledAt = scheduledAt.ToUniversalTime().ToString("o"),
+            GameName    = string.IsNullOrWhiteSpace(modal.Game) ? null : modal.Game.Trim()
         };
+
+        // If a game name was supplied, look up its Twitch category ID
+        if (!string.IsNullOrWhiteSpace(entry.GameName))
+        {
+            string? catId = await _twitchSchedule.GetCategoryIdAsync(entry.GameName);
+            if (catId != null)
+            {
+                entry.CategoryId = catId;   // <-- store the ID for the segment
+            }
+            else
+            {
+                Logger.Log($"[Warning] No Twitch category found for '{entry.GameName}'. Stream will be uncategorised.");
+            }
+        }
 
         await _data.AddEntryAsync(entry);
 

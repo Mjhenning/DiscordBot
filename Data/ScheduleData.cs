@@ -267,11 +267,12 @@ public class ScheduleStore
 
 public class ScheduleEntry
 {
-    public ulong   Id          { get; set; } = 0;
-    public string  Description { get; set; } = "";
-    public string  ScheduledAt { get; set; } = "";
-    public string? TwitchSegmentId { get; set; } = null;   // set once pushed to Twitch
-    public string? GameName     { get; set; } = null;      
+    public ulong   Id              { get; set; } = 0;
+    public string  Description     { get; set; } = "";
+    public string  ScheduledAt     { get; set; } = "";
+    public string? TwitchSegmentId { get; set; } = null;   // set after segment creation
+    public string? CategoryId     { get; set; } = null;
+    public string? GameName       { get; set; } = null;
 
     [JsonIgnore]
     public DateTimeOffset ScheduledAtParsed => DateTimeOffset.Parse(ScheduledAt);

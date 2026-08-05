@@ -44,8 +44,8 @@ public class TwitchScheduleService
             Title       = entry.Description
         };
 
-        if (!string.IsNullOrWhiteSpace(entry.TwitchSegmentId))
-            payload.CategoryId = entry.TwitchSegmentId;
+        if (!string.IsNullOrWhiteSpace(entry.CategoryId))
+            payload.CategoryId = entry.CategoryId;
 
         var response = await _tokens.WithTokenRetryAsync(TwitchProfile.Broadcaster, token =>
             _api.Helix.Schedule.CreateChannelStreamScheduleSegmentAsync(Config.TwitchUserId, payload, token));
