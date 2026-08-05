@@ -1,0 +1,78 @@
+using DiscordBot.Models;
+using Newtonsoft.Json;
+
+namespace DiscordBot.Data;
+
+public class CollabData
+{
+    private const string FilePath = "Data/collabs.json";
+
+    public List<CollabEntry> Collabs { get; private set; } = new();
+
+    public CollabData()
+    {
+        Load();
+    }
+
+    private void Load()
+    {
+        if (!File.Exists(FilePath))
+        {
+            Directory.CreateDirectory("Data");
+            Save();
+            return;
+        }
+
+        string json = File.ReadAllText(FilePath);
+
+        Collabs =
+            JsonConvert.DeserializeObject<List<CollabEntry>>(json)
+            ?? new();
+    }
+
+    public void Save()
+    {
+        string json = JsonConvert.SerializeObject(
+            Collabs,
+            Formatting.Indented);
+
+        File.WriteAllText(FilePath, json);
+    }
+
+    public void Add(CollabEntry entry)
+    {
+        Collabs.Add(entry);
+        Save();
+    }
+
+    public void Update(CollabEntry entry)
+    {
+        int index = Collabs.FindIndex(x => x.Id == entry.Id);
+
+        if (index == -1)
+            return;
+
+        Collabs[index] = entry;
+
+        Save();
+    }
+
+    public void Remove(ulong id)
+    {
+        Collabs.RemoveAll(x => x.Id == id);
+
+        Save();
+    }
+
+    public CollabEntry? Get(ulong id)
+    {
+        return Collabs.FirstOrDefault(x => x.Id == id);
+    }
+
+    public IEnumerable<CollabEntry> Accepted()
+    {
+        return Collabs
+            .Where(x => x.FullyAccepted)
+            .OrderBy(x => x.ScheduledAtParsed);
+    }
+}

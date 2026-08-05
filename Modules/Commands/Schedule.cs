@@ -18,6 +18,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     }
     
     [SlashCommand("resetschedule", "Force reset the schedule — delete after use")]
+    [RequireRole("🔧 Processes")] 
     public async Task ForceReset()
     {
         await _data.ClearPublishedAsync();

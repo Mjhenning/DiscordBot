@@ -46,7 +46,7 @@ public class ReactionsData
         Save();
     }
     
-    public void RemoveEntry(ulong messageId, string emoji) //removes an anetry and saves json
+    public void RemoveEntry(ulong messageId, string emoji) //removes an entry and saves json
     {
         ReactionMessages.RemoveAll(x => 
         x.Message == messageId &&
