@@ -35,10 +35,6 @@ public class CollabEntry
     [JsonIgnore]
     public string ScheduledDisplay
         => ScheduledAtParsed.ToLocalTime().ToString("dddd, MMMM d • HH:mm");
-
-    [JsonIgnore]
-    public bool FullyAccepted =>
-        Participants.All(x => x.Status == ParticipantStatus.Accepted);
 }
 
 public class PendingCollabRequest

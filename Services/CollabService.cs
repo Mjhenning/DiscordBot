@@ -108,12 +108,6 @@ public class CollabService
                 participant,
                 client);
         }
-        
-        if (request.Participants.Any(p => p.Status == ParticipantStatus.Declined))
-        {
-            _data.Remove(request.Id);
-            return;
-        }
     }
     
     async Task UpdateOwnerMessage(

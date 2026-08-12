@@ -414,12 +414,12 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
     
     public async Task View()
     {
-        var collabs = _data.Accepted().ToList();
+        var collabs = _data.GetFoxCollabs(Config.FoxId).ToList();
 
         if (collabs.Count == 0)
         {
             await RespondAsync(
-                "There are no confirmed collaborations.",
+                "There are no confirmed collaborations involving Fox.",
                 ephemeral: true);
 
             return;

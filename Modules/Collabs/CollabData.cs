@@ -69,10 +69,20 @@ public class CollabData
         return Collabs.FirstOrDefault(x => x.Id == id);
     }
 
-    public IEnumerable<CollabEntry> Accepted()
+    public IEnumerable<CollabEntry> Confirmed()
     {
-        return Collabs
-            .Where(x => x.FullyAccepted)
-            .OrderBy(x => x.ScheduledAtParsed);
+        return Collabs.Where(x =>
+            x.Participants.Any(p =>
+                p.UserId != x.OwnerId &&
+                p.Status == ParticipantStatus.Accepted));
+    }
+    
+    public IEnumerable<CollabEntry> GetFoxCollabs(ulong foxId)
+    {
+        return Confirmed().Where(x =>
+            x.OwnerId == foxId ||
+            x.Participants.Any(p =>
+                p.UserId == foxId &&
+                p.Status == ParticipantStatus.Accepted));
     }
 }

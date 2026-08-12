@@ -16,6 +16,7 @@ public static class Config
     
     public const string TwitchChannelName = "F0XTA1L";
     public const string TwitchUserId = "202188873";
+    public const ulong FoxId = 287669796730830849;
 
     public const string TwitchChannelUrl = "https://www.twitch.tv/f0xta1l";
     
