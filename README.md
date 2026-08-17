@@ -41,6 +41,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
 | **Discord Bot Token** | Bot authentication | Requires intents: `Guilds`, `GuildMessages`, `GuildMessageReactions`, `GuildMembers`, `MessageContent`, `DirectMessages`, `GuildVoiceStates` |
 | **Twitch Application** | EventSub, schedule sync, redemptions | Requires Client ID and Client Secret |
 | **Newtonsoft.Json** | JSON serialization for data files | Bundled via `DiscordBot.csproj` |
+| **DotNetEnv** | Loads `.env` files at startup | Bundled via `DiscordBot.csproj` |
 
 ---
 
@@ -67,8 +68,9 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
    Edit `.env` and set the following:
    - `DISCORD_BOT_TOKEN` - Your Discord bot token
    - `DISCORD_GUILD_ID` - Your Discord server ID
-   - `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` - Twitch API credentials
-   - `TWITCH_CHANNEL_NAME` / `TWITCH_USER_ID` - Your Twitch channel name and numeric ID
+    - `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` - Twitch API credentials
+    - `TWITCH_BROADCASTER_TOKEN` / `TWITCH_BOT_TOKEN` - Twitch OAuth tokens (get from [TwitchTokenGenerator](https://twitchapps.com/tmi/))
+    - `TWITCH_CHANNEL_NAME` / `TWITCH_USER_ID` - Your Twitch channel name and numeric ID
    - `FOX_DISCORD_ID` - Your Discord user ID (used for collab view filtering)
    
    Channel and role IDs (all numeric):

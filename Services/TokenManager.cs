@@ -220,127 +220,38 @@ public class TokenManager
     }
 
     // ─────────────────────────────
-    // INITIAL OAUTH AUTHORIZATION
+    // LOAD FROM ENV (INITIAL TOKENS)
     // ─────────────────────────────
 
-    private static readonly string[] RequiredScopes =
-    [
-        "analytics:read:extensions",
-        "analytics:read:games",
-        "bits:read",
-        "channel:edit:commercial",
-        "channel:manage:broadcast",
-        "channel:manage:moderators",
-        "channel:manage:polls",
-        "channel:manage:predictions",
-        "channel:manage:redemptions",
-        "channel:manage:schedule",
-        "channel:manage:videos",
-        "channel:moderate",
-        "channel:read:editors",
-        "channel:read:goals",
-        "channel:read:hype_train",
-        "channel:read:polls",
-        "channel:read:predictions",
-        "channel:read:redemptions",
-        "channel:read:stream_key",
-        "channel:read:subscriptions",
-        "chat:edit",
-        "chat:read",
-        "clips:edit",
-        "moderation:read",
-        "moderator:manage:announcements",
-        "moderator:manage:automod",
-        "moderator:manage:banned_users",
-        "moderator:manage:blocked_terms",
-        "moderator:manage:chat_messages",
-        "moderator:read:chatters",
-        "moderator:read:followers",
-        "user:edit",
-        "user:edit:broadcast",
-        "user:manage:blocked_users",
-        "user:manage:whispers",
-        "user:read:blocked_users",
-        "user:read:broadcast",
-        "user:read:email",
-        "user:read:follows",
-        "user:read:subscriptions",
-        "whispers:read"
-    ];
-
-    public bool HasValidTokens(TwitchProfile profile)
+    public void LoadFromEnvironment()
     {
-        var key = Key(profile);
-        if (!_tokens.TryGetValue(key, out var token))
-            return false;
-        return !IsExpired(token) && !string.IsNullOrWhiteSpace(token.RefreshToken);
+        LoadTokenFromEnv(TwitchProfile.Broadcaster, "TWITCH_BROADCASTER_TOKEN");
+        LoadTokenFromEnv(TwitchProfile.Bot, "TWITCH_BOT_TOKEN");
     }
 
-    public async Task AuthorizeAsync(TwitchProfile profile)
+    private void LoadTokenFromEnv(TwitchProfile profile, string envKey)
     {
-        string scope = string.Join("+", RequiredScopes);
-        string state = Guid.NewGuid().ToString("N");
-
-        string authUrl =
-            $"https://id.twitch.tv/oauth2/authorize" +
-            $"?client_id={Config.TwitchClientId}" +
-            $"&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob" +
-            $"&response_type=code" +
-            $"&scope={scope}" +
-            $"&state={state}";
-
-        Logger.Log($"[TokenManager] Open this URL to authorize the {profile} account:");
-        Logger.Log($"[TokenManager] {authUrl}");
-        Logger.Log($"[TokenManager] After authorizing, paste the authorization code here:");
-
-        string? authCode = null;
-
-        try
-        {
-            authCode = Console.ReadLine()?.Trim();
-        }
-        catch
-        {
-            // Console may not be available in some hosting environments
-        }
-
-        if (string.IsNullOrWhiteSpace(authCode))
-        {
-            Logger.Log($"[TokenManager] No authorization code provided for {profile}. Skipping.");
-            return;
-        }
-
-        var request = new FormUrlEncodedContent(new[]
-        {
-            new KeyValuePair<string, string>("client_id", Config.TwitchClientId),
-            new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
-            new KeyValuePair<string, string>("code", authCode),
-            new KeyValuePair<string, string>("grant_type", "authorization_code"),
-        });
-
-        var response = await _http.PostAsync("", request);
-        var json = await response.Content.ReadAsStringAsync();
-        var data = JsonConvert.DeserializeObject<TwitchTokenResponse>(json);
-
-        if (string.IsNullOrWhiteSpace(data?.AccessToken))
-        {
-            Logger.Log($"[TokenManager] Token exchange failed for {profile}: {json}");
-            return;
-        }
-
         var key = Key(profile);
+        string? token = Environment.GetEnvironmentVariable(envKey);
+
+        if (string.IsNullOrWhiteSpace(token))
+            return;
+
+        if (_tokens.TryGetValue(key, out var existing) && !IsExpired(existing))
+            return;
+
         _tokens[key] = new TwitchTokenSet
         {
-            AccessToken = data.AccessToken,
-            RefreshToken = data.RefreshToken,
-            ExpiresAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + data.ExpiresIn
+            AccessToken = token,
+            RefreshToken = "",
+            ExpiresAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600
         };
 
         SaveToFile();
 
         if (profile == TwitchProfile.Broadcaster)
-            _twitchApi.Settings.AccessToken = data.AccessToken;
+            _twitchApi.Settings.AccessToken = token;
 
-        Logger.Log($"[TokenManager] Authorized and saved: {profile}");
+        Logger.Log($"[TokenManager] Loaded {profile} token from environment");
     }
 }
