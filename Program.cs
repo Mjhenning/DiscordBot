@@ -99,6 +99,23 @@ ModerationLogs modLogs = services.GetRequiredService<ModerationLogs>();
 InteractionService interactions = services.GetRequiredService<InteractionService>();
 ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
 CoherenceWatcher watcher = services.GetRequiredService<CoherenceWatcher>();
+TokenManager tokenManager = services.GetRequiredService<TokenManager>();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Twitch token auth - runs OAuth flow if tokens are missing/expired
+// ─────────────────────────────────────────────────────────────────────────────
+
+if (!tokenManager.HasValidTokens(TwitchProfile.Broadcaster))
+{
+    Logger.Log("[Info] No valid Broadcaster token found. Starting Twitch authorization...");
+    await tokenManager.AuthorizeAsync(TwitchProfile.Broadcaster);
+}
+
+if (!tokenManager.HasValidTokens(TwitchProfile.Bot))
+{
+    Logger.Log("[Info] No valid Bot token found. Starting Twitch authorization...");
+    await tokenManager.AuthorizeAsync(TwitchProfile.Bot);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Logging — routes both client and interaction service logs to the console

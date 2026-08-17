@@ -84,7 +84,7 @@ public class Twitch_Notifier
         // to disk and updates it automatically before it expires from now on.
         var token = await _tokenManager.GetValidAccessTokenAsync(TwitchProfile.Broadcaster);
 
-        Logger.Log($"[Info] Token ready ({token[..10]}...)");
+        Logger.Log($"[Info] Token ready ({(token.Length > 10 ? token[..10] : token)}...)");
 
         await _eventSubClient.ConnectAsync();
         Logger.Log("[Info] ConnectAsync returned");

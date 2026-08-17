@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using System.Net;
 using TwitchLib.Api;
 
 namespace DiscordBot.Modules;
@@ -217,5 +218,176 @@ public class TokenManager
     public async Task ForceRefreshAsync(TwitchProfile profile)
     {
         await Refresh(profile);
+    }
+
+    // ─────────────────────────────
+    // INITIAL OAUTH AUTHORIZATION
+    // ─────────────────────────────
+
+    private const int AuthPort = 17563;
+    private const string RedirectUri = "http://localhost:17563/callback";
+
+    private static readonly string[] RequiredScopes =
+    [
+        "analytics:read:extensions",
+        "analytics:read:games",
+        "bits:read",
+        "channel:bot",
+        "channel:edit:commercial",
+        "channel:manage:broadcast",
+        "channel:manage:extensions",
+        "channel:manage:guest_star",
+        "channel:manage:moderators",
+        "channel:manage:polls",
+        "channel:manage:predictions",
+        "channel:manage:raids",
+        "channel:manage:redemptions",
+        "channel:manage:schedule",
+        "channel:manage:videos",
+        "channel:moderate",
+        "channel:read:ads",
+        "channel:read:broadcast",
+        "channel:read:charity",
+        "channel:read:editors",
+        "channel:read:goals",
+        "channel:read:hype_train",
+        "channel:read:polls",
+        "channel:read:predictions",
+        "channel:read:redemptions",
+        "channel:read:stream_key",
+        "channel:read:subscriptions",
+        "channel:read:vips",
+        "moderation:read",
+        "moderator:manage:announcements",
+        "moderator:manage:automod",
+        "moderator:manage:banned_users",
+        "moderator:manage:blocked_terms",
+        "moderator:manage:chat_messages",
+        "moderator:manage:chat_settings",
+        "moderator:read:automod_settings",
+        "moderator:read:blocked_terms",
+        "moderator:read:chat_settings",
+        "moderator:read:chatters",
+        "moderator:read:followers",
+        "moderator:read:moderators",
+        "moderator:read:shield_mode",
+        "moderator:read:suspicious_users",
+        "moderator:read:vips",
+        "user:edit",
+        "user:edit:follows",
+        "user:manage:blocked_users",
+        "user:read:blocked_users",
+        "user:read:broadcast",
+        "user:read:email",
+        "user:read:follows",
+        "user:read:moderated_channels",
+        "user:read:subscriptions",
+        "whisper:edit",
+        "whisper:receive"
+    ];
+
+    public bool HasValidTokens(TwitchProfile profile)
+    {
+        var key = Key(profile);
+        if (!_tokens.TryGetValue(key, out var token))
+            return false;
+        return !IsExpired(token) && !string.IsNullOrWhiteSpace(token.RefreshToken);
+    }
+
+    public async Task AuthorizeAsync(TwitchProfile profile)
+    {
+        string scope = string.Join("+", RequiredScopes);
+        string state = Guid.NewGuid().ToString("N");
+
+        string authUrl =
+            $"https://id.twitch.tv/oauth2/authorize" +
+            $"?client_id={Config.TwitchClientId}" +
+            $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
+            $"&response_type=code" +
+            $"&scope={scope}" +
+            $"&state={state}";
+
+        Logger.Log($"[TokenManager] Open this URL to authorize the {profile} account:");
+        Logger.Log($"[TokenManager] {authUrl}");
+
+        string? authCode = null;
+        var tcs = new TaskCompletionSource<string>();
+
+        var listener = new HttpListener();
+        listener.Prefixes.Add($"http://localhost:{AuthPort}/");
+        listener.Start();
+
+        Logger.Log($"[TokenManager] Waiting for authorization on port {AuthPort}...");
+
+        try
+        {
+            var context = await listener.GetContextAsync();
+            var code = context.Request.QueryString["code"];
+            var returnedState = context.Request.QueryString["state"];
+
+            string responseHtml;
+            if (code != null && returnedState == state)
+            {
+                authCode = code;
+                responseHtml = "<html><body><h2>Authorized! You can close this tab.</h2></body></html>";
+                Logger.Log($"[TokenManager] Authorization code received for {profile}");
+            }
+            else
+            {
+                responseHtml = "<html><body><h2>Authorization failed. Close this tab and try again.</h2></body></html>";
+                Logger.Log($"[TokenManager] Authorization failed for {profile}");
+            }
+
+            var buffer = System.Text.Encoding.UTF8.GetBytes(responseHtml);
+            context.Response.ContentType = "text/html";
+            context.Response.ContentLength64 = buffer.Length;
+            await context.Response.OutputStream.WriteAsync(buffer);
+            context.Response.Close();
+        }
+        finally
+        {
+            listener.Stop();
+            listener.Close();
+        }
+
+        if (authCode == null)
+        {
+            Logger.Log($"[TokenManager] No authorization code received for {profile}. Skipping.");
+            return;
+        }
+
+        var request = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("client_id", Config.TwitchClientId),
+            new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
+            new KeyValuePair<string, string>("code", authCode),
+            new KeyValuePair<string, string>("grant_type", "authorization_code"),
+            new KeyValuePair<string, string>("redirect_uri", RedirectUri),
+        });
+
+        var response = await _http.PostAsync("", request);
+        var json = await response.Content.ReadAsStringAsync();
+        var data = JsonConvert.DeserializeObject<TwitchTokenResponse>(json);
+
+        if (string.IsNullOrWhiteSpace(data?.AccessToken))
+        {
+            Logger.Log($"[TokenManager] Token exchange failed for {profile}: {json}");
+            return;
+        }
+
+        var key = Key(profile);
+        _tokens[key] = new TwitchTokenSet
+        {
+            AccessToken = data.AccessToken,
+            RefreshToken = data.RefreshToken,
+            ExpiresAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + data.ExpiresIn
+        };
+
+        SaveToFile();
+
+        if (profile == TwitchProfile.Broadcaster)
+            _twitchApi.Settings.AccessToken = data.AccessToken;
+
+        Logger.Log($"[TokenManager] Authorized and saved: {profile}");
     }
 }
