@@ -1,5 +1,4 @@
 using Newtonsoft.Json;
-using System.Net;
 using TwitchLib.Api;
 
 namespace DiscordBot.Modules;
@@ -224,9 +223,6 @@ public class TokenManager
     // INITIAL OAUTH AUTHORIZATION
     // ─────────────────────────────
 
-    private const int AuthPort = 17563;
-    private const string RedirectUri = "http://localhost:17563/callback";
-
     private static readonly string[] RequiredScopes =
     [
         "analytics:read:extensions",
@@ -288,57 +284,29 @@ public class TokenManager
         string authUrl =
             $"https://id.twitch.tv/oauth2/authorize" +
             $"?client_id={Config.TwitchClientId}" +
-            $"&redirect_uri={Uri.EscapeDataString(RedirectUri)}" +
+            $"&redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob" +
             $"&response_type=code" +
             $"&scope={scope}" +
             $"&state={state}";
 
         Logger.Log($"[TokenManager] Open this URL to authorize the {profile} account:");
         Logger.Log($"[TokenManager] {authUrl}");
+        Logger.Log($"[TokenManager] After authorizing, paste the authorization code here:");
 
         string? authCode = null;
-        var tcs = new TaskCompletionSource<string>();
-
-        var listener = new HttpListener();
-        listener.Prefixes.Add($"http://localhost:{AuthPort}/");
-        listener.Start();
-
-        Logger.Log($"[TokenManager] Waiting for authorization on port {AuthPort}...");
 
         try
         {
-            var context = await listener.GetContextAsync();
-            var code = context.Request.QueryString["code"];
-            var returnedState = context.Request.QueryString["state"];
-
-            string responseHtml;
-            if (code != null && returnedState == state)
-            {
-                authCode = code;
-                responseHtml = "<html><body><h2>Authorized! You can close this tab.</h2></body></html>";
-                Logger.Log($"[TokenManager] Authorization code received for {profile}");
-            }
-            else
-            {
-                responseHtml = "<html><body><h2>Authorization failed. Close this tab and try again.</h2></body></html>";
-                Logger.Log($"[TokenManager] Authorization failed for {profile}");
-            }
-
-            var buffer = System.Text.Encoding.UTF8.GetBytes(responseHtml);
-            context.Response.ContentType = "text/html";
-            context.Response.ContentLength64 = buffer.Length;
-            await context.Response.OutputStream.WriteAsync(buffer);
-            context.Response.Close();
+            authCode = Console.ReadLine()?.Trim();
         }
-        finally
+        catch
         {
-            listener.Stop();
-            listener.Close();
+            // Console may not be available in some hosting environments
         }
 
-        if (authCode == null)
+        if (string.IsNullOrWhiteSpace(authCode))
         {
-            Logger.Log($"[TokenManager] No authorization code received for {profile}. Skipping.");
+            Logger.Log($"[TokenManager] No authorization code provided for {profile}. Skipping.");
             return;
         }
 
@@ -348,7 +316,6 @@ public class TokenManager
             new KeyValuePair<string, string>("client_secret", Config.TwitchClientSecret),
             new KeyValuePair<string, string>("code", authCode),
             new KeyValuePair<string, string>("grant_type", "authorization_code"),
-            new KeyValuePair<string, string>("redirect_uri", RedirectUri),
         });
 
         var response = await _http.PostAsync("", request);
