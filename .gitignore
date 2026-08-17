@@ -1,5 +1,6 @@
 # Secrets / local config
-#Config.cs
+Config.cs
+.env
 
 # Build output
 bin/
@@ -11,9 +12,15 @@ obj/
 
 # Visual Studio
 .vs/
+Folder.DotSettings.user
 
 # Logs
 *.log
+bot-log.txt
+
+# Runtime state / data (these are generated at runtime)
+Data/
+argData.json
 
 # OS junk
 .DS_Store
