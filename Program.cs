@@ -9,6 +9,8 @@ using DiscordBot.Services;
 using TwitchLib.Api;
 using TwitchLib.EventSub.Websockets.Extensions;
 
+DotNetEnv.Env.Load();
+
 bool _ready = false;
 
 
