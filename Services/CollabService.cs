@@ -7,7 +7,7 @@ namespace DiscordBot.Services;
 
 public class CollabService
 {
-    private readonly CollabData _data;
+     readonly CollabData _data;
 
     public CollabService(CollabData data)
     {

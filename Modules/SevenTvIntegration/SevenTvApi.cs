@@ -10,12 +10,12 @@ namespace DiscordBot.Modules.SevenTv;
 /// </summary>
 public static class SevenTvApi
 {
-    private const string GraphQlEndpoint = "https://7tv.io/v4/gql";
-    private static readonly HttpClient Http = new();
+     const string GraphQlEndpoint = "https://7tv.io/v4/gql";
+     static readonly HttpClient Http = new();
 
     // ---------- GraphQL queries (unchanged from the original project) ----------
 
-    private const string EmoteInSetQuery = @"
+     const string EmoteInSetQuery = @"
       query getEmoteInEmoteSet($setId:Id!, $emoteName:String){
         emoteSets{
           emoteSet(id:$setId){
@@ -34,7 +34,7 @@ public static class SevenTvApi
         }
       }";
 
-    private const string EmoteQuery = @"
+     const string EmoteQuery = @"
       query GetEmoteByName($emoteName:String){
         emotes{
           search(query:$emoteName, sort:{sortBy:TOP_ALL_TIME, order:DESCENDING}){
@@ -49,7 +49,7 @@ public static class SevenTvApi
         }
       }";
 
-    private const string ChannelQuery = @"
+     const string ChannelQuery = @"
       query GetChannel($channelName:String!){
         users{
           search(query:$channelName){
@@ -61,7 +61,7 @@ public static class SevenTvApi
         }
       }";
 
-    private const string EmoteSetQuery = @"
+     const string EmoteSetQuery = @"
       query GetEmoteSetByChannelID($userId:Id!){
         users{
           user(id:$userId){
@@ -70,7 +70,7 @@ public static class SevenTvApi
         }
       }";
 
-    private static async Task<JsonDocument?> PostGraphQlAsync(string query, object variables)
+     static async Task<JsonDocument?> PostGraphQlAsync(string query, object variables)
     {
         try
         {
@@ -162,7 +162,7 @@ public static class SevenTvApi
 
     // ---------- Emotes ----------
 
-    private static SevenTvEmote ParseEmote(JsonElement el)
+     static SevenTvEmote ParseEmote(JsonElement el)
     {
         var emote = new SevenTvEmote
         {
@@ -189,7 +189,7 @@ public static class SevenTvApi
         return emote;
     }
 
-    private static List<SevenTvEmote> ParseEmoteSearchResponse(JsonDocument doc, bool isSetQuery)
+     static List<SevenTvEmote> ParseEmoteSearchResponse(JsonDocument doc, bool isSetQuery)
     {
         var data = doc.RootElement.GetProperty("data");
         var results = new List<SevenTvEmote>();
@@ -325,12 +325,12 @@ public static class SevenTvApi
     // results (keyed by user+query+set, 5 min TTL), and one tracking each user's
     // *last* autocomplete results so /emote can resolve an exact pick instantly.
 
-    private static readonly Dictionary<string, (List<SevenTvEmote> Emotes, DateTime Timestamp)> AutocompleteCache = new();
-    private static readonly Dictionary<string, (List<SevenTvEmote> Emotes, string Query, DateTime Timestamp)> LastAutocompleteCache = new();
-    private static readonly object CacheLock = new();
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+     static readonly Dictionary<string, (List<SevenTvEmote> Emotes, DateTime Timestamp)> AutocompleteCache = new();
+     static readonly Dictionary<string, (List<SevenTvEmote> Emotes, string Query, DateTime Timestamp)> LastAutocompleteCache = new();
+     static readonly object CacheLock = new();
+     static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-    private static List<SevenTvEmote>? GetCachedAutocompleteSearch(string userId, string query, string? setId)
+     static List<SevenTvEmote>? GetCachedAutocompleteSearch(string userId, string query, string? setId)
     {
         var key = $"{userId}:{query.ToLowerInvariant()}:{setId ?? "global"}";
         lock (CacheLock)
@@ -346,7 +346,7 @@ public static class SevenTvApi
         return null;
     }
 
-    private static void SetCachedAutocompleteSearch(string userId, string query, List<SevenTvEmote> emotes, string? setId)
+     static void SetCachedAutocompleteSearch(string userId, string query, List<SevenTvEmote> emotes, string? setId)
     {
         var key = $"{userId}:{query.ToLowerInvariant()}:{setId ?? "global"}";
         lock (CacheLock)
@@ -361,7 +361,7 @@ public static class SevenTvApi
         }
     }
 
-    private static (List<SevenTvEmote> Emotes, string Query, DateTime Timestamp)? GetLastAutocompleteResults(string userId, string? setId)
+     static (List<SevenTvEmote> Emotes, string Query, DateTime Timestamp)? GetLastAutocompleteResults(string userId, string? setId)
     {
         var key = $"{userId}:{setId ?? "global"}";
         lock (CacheLock)
@@ -377,7 +377,7 @@ public static class SevenTvApi
         return null;
     }
 
-    private static void SetLastAutocompleteResults(string userId, string query, List<SevenTvEmote> emotes, string? setId)
+     static void SetLastAutocompleteResults(string userId, string query, List<SevenTvEmote> emotes, string? setId)
     {
         var key = $"{userId}:{setId ?? "global"}";
         lock (CacheLock)

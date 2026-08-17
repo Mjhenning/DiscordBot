@@ -13,7 +13,7 @@ namespace DiscordBot.Modules.SevenTv;
 [Group("7tv", "7TV emote commands")]
 public class SevenTvModule : InteractionModuleBase<SocketInteractionContext>
 {
-    private static readonly HttpClient Http = new();
+     static readonly HttpClient Http = new();
 
     [SlashCommand("emote", "Send a 7TV emote")]
     public async Task EmoteCommand(

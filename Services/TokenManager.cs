@@ -31,12 +31,12 @@ public class TwitchTokenResponse
 
 public class TokenManager
 {
-    private readonly string _path;
-    private readonly TwitchAPI _twitchApi;
-    private readonly HttpClient _http;
-    private readonly SemaphoreSlim _lock = new(1, 1);
+     readonly string _path;
+     readonly TwitchAPI _twitchApi;
+     readonly HttpClient _http;
+     readonly SemaphoreSlim _lock = new(1, 1);
 
-    private Dictionary<string, TwitchTokenSet> _tokens = new();
+     Dictionary<string, TwitchTokenSet> _tokens = new();
 
     public TokenManager(TwitchAPI api, string tokenFilePath)
     {
@@ -66,7 +66,7 @@ public class TokenManager
     // VALIDATION CORE
     // ─────────────────────────────
 
-    private async Task EnsureValid(TwitchProfile profile)
+     async Task EnsureValid(TwitchProfile profile)
     {
         var key = Key(profile);
 
@@ -82,7 +82,7 @@ public class TokenManager
         await Refresh(profile);
     }
 
-    private bool IsExpired(TwitchTokenSet token)
+     bool IsExpired(TwitchTokenSet token)
     {
         if (token.ExpiresAt == 0)
             return true;
@@ -171,7 +171,7 @@ public class TokenManager
         }
     }
 
-    private bool IsAuthError(Exception ex)
+     bool IsAuthError(Exception ex)
     {
         return ex.Message.Contains("401") ||
                ex.Message.Contains("Unauthorized");
@@ -181,9 +181,9 @@ public class TokenManager
     // FILE IO
     // ─────────────────────────────
 
-    private static string Key(TwitchProfile profile) => profile.ToString();
+     static string Key(TwitchProfile profile) => profile.ToString();
 
-    private void LoadFromFile()
+     void LoadFromFile()
     {
         if (!File.Exists(_path))
         {
@@ -197,7 +197,7 @@ public class TokenManager
                   ?? new();
     }
 
-    private void SaveToFile()
+     void SaveToFile()
     {
         File.WriteAllText(
             _path,
@@ -224,10 +224,10 @@ public class TokenManager
     // INITIAL OAUTH AUTHORIZATION
     // ─────────────────────────────
 
-    private const int AuthPort = 17563;
-    private const string RedirectUri = "http://localhost:17563/callback";
+     const int AuthPort = 17563;
+     const string RedirectUri = "http://localhost:17563/callback";
 
-    private static readonly string[] RequiredScopes =
+     static readonly string[] RequiredScopes =
     [
         "channel:manage:schedule",
         "channel:read:redemptions"

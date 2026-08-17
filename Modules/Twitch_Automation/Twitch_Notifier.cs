@@ -22,10 +22,10 @@ public class Twitch_Notifier
 
     // int instead of bool so Interlocked can atomically check-and-set it,
     // preventing two updater loops from starting simultaneously
-    private int _liveUpdaterRunning = 0;
+     int _liveUpdaterRunning = 0;
 
     // Ensures only one thread reads or writes TwitchSession/TwitchVOD at a time
-    private readonly SemaphoreSlim _sessionLock = new(1, 1);
+     readonly SemaphoreSlim _sessionLock = new(1, 1);
 
     static readonly HttpClient HttpClient = new();
 

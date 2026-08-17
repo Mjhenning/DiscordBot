@@ -9,7 +9,7 @@ namespace DiscordBot.Modules;
 public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
 {
     readonly ScheduleData _data;
-    private readonly TwitchScheduleService _twitchSchedule;
+     readonly TwitchScheduleService _twitchSchedule;
 
     public ScheduleModule(ScheduleData data, TwitchScheduleService twitchSchedule)
     {

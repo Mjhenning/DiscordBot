@@ -4,7 +4,7 @@ namespace DiscordBot.Services;
 
 public class CollabRequestCache
 {
-    private readonly Dictionary<ulong, PendingCollabRequest> _pending = new();
+     readonly Dictionary<ulong, PendingCollabRequest> _pending = new();
 
     public void Add(PendingCollabRequest request)
     {

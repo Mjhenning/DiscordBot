@@ -14,8 +14,8 @@ public class ArgFilesystem
                 "_filesystem"));
     
     public string RootPath => FsRoot;
-    public FsNode Root { get; private set; }
-    public Dictionary<string, FsNode> PathIndex { get; private set; } = new();
+    public FsNode Root { get;  set; }
+    public Dictionary<string, FsNode> PathIndex { get;  set; } = new();
 
     public ArgFilesystem()
     {

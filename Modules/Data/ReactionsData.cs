@@ -4,7 +4,7 @@ public class ReactionsData
 {
     const string FilePath = "Data/reactions.json";
     
-    public List<ReactionEntry> ReactionMessages { get; private set; } = new();
+    public List<ReactionEntry> ReactionMessages { get;  set; } = new();
 
     public ReactionsData()
     {

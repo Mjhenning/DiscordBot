@@ -15,11 +15,11 @@ namespace DiscordBot
     // ─────────────────────────────────────────────────────────────────────────
     public static class Logger
     {
-        private static readonly StreamWriter _logFile =
+         static readonly StreamWriter _logFile =
             new StreamWriter("bot-log.txt", append: true) { AutoFlush = true };
 
-        private static DiscordSocketClient? _client;
-        private static IDMChannel? _ownerDm;
+         static DiscordSocketClient? _client;
+         static IDMChannel? _ownerDm;
 
         // Call once, right after constructing the client (before client.LoginAsync)
         public static void Init(DiscordSocketClient client)
@@ -38,7 +38,7 @@ namespace DiscordBot
                 _ = SendDmAsync(msg); // fire-and-forget so callers stay sync
         }
 
-        private static async Task SendDmAsync(string msg)
+         static async Task SendDmAsync(string msg)
         {
             if (_client == null)
             {

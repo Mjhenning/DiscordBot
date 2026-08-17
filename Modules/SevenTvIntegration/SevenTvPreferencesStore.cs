@@ -10,13 +10,13 @@ namespace DiscordBot.Modules.SevenTv;
 /// </summary>
 public static class SevenTvPreferencesStore
 {
-    private static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "data", "sevenTvPreferences.json");
-    private static readonly string[] ValidSizes = { "1x", "2x", "3x", "4x" };
+     static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "data", "sevenTvPreferences.json");
+     static readonly string[] ValidSizes = { "1x", "2x", "3x", "4x" };
 
-    private static Dictionary<string, SevenTvUserPreferences>? _cache;
-    private static readonly SemaphoreSlim Lock = new(1, 1);
+     static Dictionary<string, SevenTvUserPreferences>? _cache;
+     static readonly SemaphoreSlim Lock = new(1, 1);
 
-    private static async Task<Dictionary<string, SevenTvUserPreferences>> LoadAsync()
+     static async Task<Dictionary<string, SevenTvUserPreferences>> LoadAsync()
     {
         if (_cache != null) return _cache;
 
@@ -53,7 +53,7 @@ public static class SevenTvPreferencesStore
         }
     }
 
-    private static async Task SaveAsync(Dictionary<string, SevenTvUserPreferences> data)
+     static async Task SaveAsync(Dictionary<string, SevenTvUserPreferences> data)
     {
         var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
 

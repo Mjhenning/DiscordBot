@@ -5,16 +5,16 @@ namespace DiscordBot.Data;
 
 public class CollabData
 {
-    private const string FilePath = "Data/collabs.json";
+     const string FilePath = "Data/collabs.json";
 
-    public List<CollabEntry> Collabs { get; private set; } = new();
+    public List<CollabEntry> Collabs { get;  set; } = new();
 
     public CollabData()
     {
         Load();
     }
 
-    private void Load()
+     void Load()
     {
         if (!File.Exists(FilePath))
         {

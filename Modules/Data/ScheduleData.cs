@@ -19,13 +19,13 @@ public class ScheduleData
     readonly TwitchScheduleService _twitchSchedule;
     Timer _resetTimer;
 
-    public List<ScheduleEntry> ScheduleEntries { get; private set; } = new();
+    public List<ScheduleEntry> ScheduleEntries { get;  set; } = new();
 
     // Persistent published message reference
-    public ulong PublishedMessageId  { get; private set; } = 0;
-    public ulong PublishedChannelId  { get; private set; } = 0;
-    public string WeekStart          { get; private set; } = ""; // ISO 8601 UTC — Monday of published week
-    public string EntriesWeekStart   { get; private set; } = ""; // ISO 8601 UTC — Monday of the week current entries belong to
+    public ulong PublishedMessageId  { get;  set; } = 0;
+    public ulong PublishedChannelId  { get;  set; } = 0;
+    public string WeekStart          { get;  set; } = ""; // ISO 8601 UTC — Monday of published week
+    public string EntriesWeekStart   { get;  set; } = ""; // ISO 8601 UTC — Monday of the week current entries belong to
 
     public ScheduleData(TwitchScheduleService twitchSchedule)
     {

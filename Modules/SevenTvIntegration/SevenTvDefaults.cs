@@ -7,8 +7,8 @@ namespace DiscordBot.Modules.SevenTv;
 /// </summary>
 public static class SevenTvDefaults
 {
-    private static (string ChannelId, string SetId, string SetName)? _resolved;
-    private static readonly SemaphoreSlim Lock = new(1, 1);
+     static (string ChannelId, string SetId, string SetName)? _resolved;
+     static readonly SemaphoreSlim Lock = new(1, 1);
 
     /// <summary>
     /// Returns the default channel ID + emote set ID, resolving and caching

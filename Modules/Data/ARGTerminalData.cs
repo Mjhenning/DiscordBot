@@ -29,8 +29,8 @@ public class ArgTerminalData
                 "ARG",
                 "data",
                 "state.json"));
-    public ulong PublishedChannelId  { get; private set; } = 0;
-    public ulong PublishedTMessageId  { get; private set; } = 0;
+    public ulong PublishedChannelId  { get;  set; } = 0;
+    public ulong PublishedTMessageId  { get;  set; } = 0;
     public ulong PublishedRMessageId  { get; set; } = 0;
     public ulong PublishedLMessageId  { get; set; } = 0;
 
@@ -40,7 +40,7 @@ public class ArgTerminalData
     
     public int activeUsers = 0;
     
-    public HashSet<ulong> LoggedInUsers { get; private set; } = new();
+    public HashSet<ulong> LoggedInUsers { get;  set; } = new();
 
     public Queue<string> ActionHistory { get; set; } = new Queue<string>();
     
