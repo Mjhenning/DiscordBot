@@ -69,7 +69,6 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
    - `DISCORD_BOT_TOKEN` - Your Discord bot token
    - `DISCORD_GUILD_ID` - Your Discord server ID
     - `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` - Twitch API credentials
-    - `TWITCH_BROADCASTER_TOKEN` / `TWITCH_BOT_TOKEN` - Twitch OAuth tokens (get from [TwitchTokenGenerator](https://twitchapps.com/tmi/))
     - `TWITCH_CHANNEL_NAME` / `TWITCH_USER_ID` - Your Twitch channel name and numeric ID
    - `FOX_DISCORD_ID` - Your Discord user ID (used for collab view filtering)
    
@@ -93,6 +92,13 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
    dotnet build
    dotnet run
    ```
+   
+   On first run, the bot starts a local HTTP server on port 17563 and prints an authorization URL. Open it in your browser, authorize the app, and Twitch redirects to `localhost:17563` to complete the flow. Tokens are saved to `Data/twitch_tokens.json` and auto-refreshed thereafter.
+   
+   For headless servers, use SSH port forwarding before starting the bot:
+   ```bash
+   ssh -L 17563:localhost:17563 your-server
+   ```
 
 ---
 
@@ -106,14 +112,15 @@ The bot will:
 
 1. Construct the `DiscordSocketClient` with all required gateway intents and initialize the logger.
 2. Build the DI container, registering all singletons (Discord services, data stores, Twitch services, ARG services, moderation logger).
-3. Log in to Discord and start the client.
-4. On the `Ready` event:
+3. Check for valid Twitch tokens. If missing or expired, print an authorization URL and start a local callback server on port 17563 to complete the OAuth flow.
+4. Log in to Discord and start the client.
+5. On the `Ready` event:
    - Register all slash command modules from the assembly.
    - Register commands to the configured guild (instant propagation). For production, switch to `RegisterCommandsGloballyAsync()` (up to 1 hour propagation).
    - Reset the AETHER-OS terminal session.
    - Initialize Twitch services: `TwitchRedeemHandler`, `FavouritesLiveNoti`, `EventSubReconnectService`, and start the `Twitch_Notifier` (connects EventSub websocket, subscribes to `stream.online`, `stream.offline`, and `channel.update`).
-5. Begin listening for Discord events (interactions, reactions, joins) and Twitch EventSub events.
-6. The bot blocks indefinitely with `Task.Delay(Timeout.Infinite)`.
+6. Begin listening for Discord events (interactions, reactions, joins) and Twitch EventSub events.
+7. The bot blocks indefinitely with `Task.Delay(Timeout.Infinite)`.
 
 ---
 
@@ -178,7 +185,7 @@ In-character terminal with three persistent embeds: action log, terminal view (d
 Auto-logs audit events to a Discord channel. Message logs include before/after content, attachment changes, and reply context. Member logs track joins (with account age), leaves, kicks (via audit log), bans/unbans, nickname/role changes. Voice logs track sessions: when a channel empties, posts a summary with total duration and all participants. Each category independently toggleable via `Config` flags.
 
 ### Token Management (`Services/TokenManager.cs`)
-Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
+Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On first run, starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
 
 ---
 
