@@ -5,6 +5,7 @@ using DiscordBot;
 using DiscordBot.Data;
 using Microsoft.Extensions.DependencyInjection;
 using DiscordBot.Modules;
+using DiscordBot.Modules.Moderation;
 using DiscordBot.Services;
 using TwitchLib.Api;
 using TwitchLib.EventSub.Websockets.Extensions;

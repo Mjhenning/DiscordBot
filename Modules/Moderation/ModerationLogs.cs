@@ -3,7 +3,7 @@ using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
 
-namespace DiscordBot.Modules;
+namespace DiscordBot.Modules.Moderation;
 
 public class ModerationLogs
 {

@@ -133,7 +133,7 @@ The bot will:
 | `/streamschedule` | Open the schedule menu: Add, Remove, View, or Publish the weekly stream schedule |
 | `/resetschedule` | Force-clear the published schedule and all entries |
 | `/reactionrole` | Open the reaction role wizard: Add or Remove reaction roles on any message |
-| `/liveguests` | Manage the live guest voice role: Add (user select) or Remove (from current holders) |
+| `/user` | Open the user management menu: warn, ban, kick, manage roles, or assign live guest role (testing) |
 | `/collab` | Start a collaboration request: pick date, fill modal, invite collaborators, confirm and send DMs (requires "Proxy Hosts" role) |
 
 ### AETHER-OS Terminal
@@ -181,8 +181,11 @@ Per-user emote preferences stored in `Data/sevenTvPreferences.json`. Emote searc
 ### AETHER-OS Terminal (`Modules/ARG/` + `Services/ArgTerminalService.cs` + `Services/CoherenceWatcher.cs`)
 In-character terminal with three persistent embeds: action log, terminal view (directory listing + buttons for Navigate, Read, Ping), and file viewer. A virtual filesystem with a coherence percentage (0–100) gates file access - corrupted files show garbled content below 60% coherence. The Ping button increases coherence by 2%. All users share a single session. A `CoherenceWatcher` monitors the state file on disk for external changes (e.g. from an overlay or external tool).
 
-### Moderation Logging (`Modules/ModerationLogs.cs`)
+### Moderation Logging (`Modules/Moderation/ModerationLogs.cs`)
 Auto-logs audit events to a Discord channel. Message logs include before/after content, attachment changes, and reply context. Member logs track joins (with account age), leaves, kicks (via audit log), bans/unbans, nickname/role changes. Voice logs track sessions: when a channel empties, posts a summary with total duration and all participants. Each category independently toggleable via `Config` flags.
+
+### User Management (`Modules/Moderation/UserManagement.cs`) - Testing
+`/user` slash command (requires "🔧 Processes" role). Opens an ephemeral menu with a user select picker, then offers: Warn (DMs the user), Ban, Kick, role management (add/remove any server role), and live guest role management. Includes a reason modal for moderation actions. Automatically removes the live guest role when a user leaves any voice channel. This module is experimental and may have issues.
 
 ### Token Management (`Services/TokenManager.cs`)
 Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On first run, starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
@@ -200,9 +203,10 @@ DiscordBot/
 ├── Modules/
 │   ├── Commands/
 │   │   ├── ReactionRoles.cs        # /reactionrole wizard (add/remove)
-│   │   ├── Schedule.cs             # /streamschedule and /resetschedule
-│   │   ├── LiveGuests.cs           # /liveguests role management
-│   │   └── UserManagement.cs       # (Stubbed out - not active)
+│   │   └── Schedule.cs             # /streamschedule and /resetschedule
+│   ├── Moderation/
+│   │   ├── ModerationLogs.cs       # Audit event handler (messages, members, voice)
+│   │   └── UserManagement.cs       # /user moderation menu (testing)
 │   ├── Collabs/
 │   │   ├── CollabModule.cs         # /collab slash command and UI flow
 │   │   ├── CollabData.cs           # JSON-backed collab persistence
@@ -230,7 +234,6 @@ DiscordBot/
 │   │   ├── ScheduleData.cs         # Schedule data model with weekly reset timer
 │   │   ├── ARGTerminalData.cs      # ARG state persistence
 │   │   └── ARG_Helper.cs           # Virtual filesystem tree
-│   └── ModerationLogs.cs           # Audit event handler (messages, members, voice)
 ├── Services/
 │   ├── Logger.cs                   # Static logger (console + bot-log.txt + optional DM)
 │   ├── TokenManager.cs             # Twitch OAuth2 token management with auto-refresh

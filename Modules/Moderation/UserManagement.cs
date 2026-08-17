@@ -2,7 +2,7 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 
-namespace DiscordBot.Modules;
+namespace DiscordBot.Modules.Moderation;
 
 public class UserManagementModule : InteractionModuleBase<SocketInteractionContext>
 {
