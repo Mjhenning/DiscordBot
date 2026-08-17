@@ -45,6 +45,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:users")]
     public async Task UsersSelected(string[] users)
     {
+        await DeferAsync(ephemeral: true);
+
         Session.SelectedUsers.Clear();
         foreach (var id in users)
             Session.SelectedUsers.Add(ulong.Parse(id));
@@ -60,6 +62,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:warn")]
     public async Task Warn()
     {
+        await DeferAsync(ephemeral: true);
         Session.Page = UmPage.Warn;
         await Refresh();
     }
@@ -67,6 +70,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:ban")]
     public async Task Ban()
     {
+        await DeferAsync(ephemeral: true);
         Session.Page = UmPage.Ban;
         await Refresh();
     }
@@ -74,6 +78,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:kick")]
     public async Task Kick()
     {
+        await DeferAsync(ephemeral: true);
         Session.Page = UmPage.Kick;
         await Refresh();
     }
@@ -81,6 +86,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:roles")]
     public async Task Roles()
     {
+        await DeferAsync(ephemeral: true);
         Session.Page = UmPage.Roles;
         await Refresh();
     }
@@ -88,6 +94,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:liveguest")]
     public async Task LiveGuest()
     {
+        await DeferAsync(ephemeral: true);
         Session.Page = UmPage.LiveGuest;
         await Refresh();
     }
@@ -95,6 +102,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:back")]
     public async Task Back()
     {
+        await DeferAsync(ephemeral: true);
         Session.Page = UmPage.Main;
         await Refresh();
     }
@@ -227,6 +235,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ModalInteraction("um:reason_submit")]
     public async Task ReasonSubmitted(UmReasonModal modal)
     {
+        await DeferAsync(ephemeral: true);
         Session.Reason = modal.Reason;
         await Refresh();
     }
@@ -238,6 +247,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:add_roles")]
     public async Task AddRoles()
     {
+        await DeferAsync(ephemeral: true);
         var roles = Context.Guild.Roles
             .Where(r => r.Id != Context.Guild.Id && !r.IsManaged)
             .OrderByDescending(r => r.Position)
@@ -304,6 +314,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:remove_roles")]
     public async Task RemoveRoles()
     {
+        await DeferAsync(ephemeral: true);
         var roles = Context.Guild.Roles
             .Where(r => r.Id != Context.Guild.Id && !r.IsManaged)
             .OrderByDescending(r => r.Position)
@@ -370,6 +381,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     [ComponentInteraction("um:back_roles")]
     public async Task BackFromRoles()
     {
+        await DeferAsync(ephemeral: true);
         Session.Page = UmPage.Main;
         await Refresh();
     }
