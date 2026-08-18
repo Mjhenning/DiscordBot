@@ -25,7 +25,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
 - **Channel Point Redemptions** - Routes Twitch channel point rewards to Discord: viewer suggestions with an admin "Mark Complete" button, and quote submissions that save to a shared file for OBS overlay integration.
 - **Stream Schedule** - Manage your weekly stream schedule from Discord with add/remove/view/publish. Entries are automatically pushed to your Twitch channel schedule. Auto-resets weekly.
 - **Reaction Roles** - Interactive multi-step wizard for setting up toggle-based reaction roles on any message. Supports multiple roles per emoji with add/remove behavior. Uses a real Discord reaction capture step.
-- **Live Guest Role** - Quickly grant or revoke a "live guest" voice channel role for stream collaborators. Batch operations with skip/error reporting.
+- **Live Guest Role** - Quickly grant or revoke a "live guest" voice channel role for stream collaborators, managed via the `/user` moderation menu. Automatically removed when a user leaves any voice channel.
 - **Collaboration Requests** - Create multi-person stream/event proposals with DM invitations, accept/decline flow, decline reasons, and live status tracking. Hosts and participants receive persistent DM updates.
 - **Moderation Logging** - Comprehensive audit logging: message edits/deletes (with before/after, attachment tracking, and moderator attribution), member joins/leaves/kicks/bans, nickname/role changes, and voice session summaries with duration tracking.
 - **7TV Emote Integration** - Search and send 7TV emotes directly in Discord with autocomplete. Per-user preferences for channel, emote set, and image size (1x–4x). Supports animated and static formats.
@@ -81,7 +81,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
    - `AUTO_ROLE_ID` - Role assigned to new members on join
    - `TWITCH_NOTIFY_ROLE_ID` - Role pinged on go-live notifications
    - `SCHEDULE_NOTI_ROLE_ID` - Role pinged when schedule is published
-   - `LIVE_GUEST_ROLE_ID` - Voice channel guest role managed by `/liveguests`
+    - `LIVE_GUEST_ROLE_ID` - Voice channel guest role managed by `/user`
    
    Twitch reward IDs:
    - `SUGGEST_REWARD_ID` - Channel point reward for suggestions
@@ -112,7 +112,7 @@ The bot will:
 
 1. Construct the `DiscordSocketClient` with all required gateway intents and initialize the logger.
 2. Build the DI container, registering all singletons (Discord services, data stores, Twitch services, ARG services, moderation logger).
-3. Check for valid Twitch tokens. If missing or expired, print an authorization URL and start a local callback server on port 17563 to complete the OAuth flow.
+3. Check for valid Twitch tokens. If a refresh token exists but the access token is expired, silently refresh. If no tokens exist at all, print an authorization URL and start a local callback server on port 17563 to complete the OAuth flow.
 4. Log in to Discord and start the client.
 5. On the `Ready` event:
    - Register all slash command modules from the assembly.
@@ -188,7 +188,7 @@ Auto-logs audit events to a Discord channel. Message logs include before/after c
 `/user` slash command (requires "🔧 Processes" role). Opens an ephemeral menu with a user select picker, then offers: Warn (DMs the user), Ban, Kick, role management (add/remove any server role), and live guest role management. Includes a reason modal for moderation actions. Automatically removes the live guest role when a user leaves any voice channel. This module is experimental and may have issues.
 
 ### Token Management (`Services/TokenManager.cs`)
-Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On first run, starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
+Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On startup, if a refresh token exists but the access token is expired, it silently refreshes without user interaction. On first run (no tokens at all), starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
 
 ---
 
