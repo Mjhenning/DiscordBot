@@ -241,6 +241,14 @@ public class TokenManager
         return !IsExpired(token) && !string.IsNullOrWhiteSpace(token.RefreshToken);
     }
 
+    public bool HasRefreshToken(TwitchProfile profile)
+    {
+        var key = Key(profile);
+        if (!_tokens.TryGetValue(key, out var token))
+            return false;
+        return !string.IsNullOrWhiteSpace(token.RefreshToken);
+    }
+
     public async Task AuthorizeAsync(TwitchProfile profile)
     {
         string scope = string.Join("+", RequiredScopes);
