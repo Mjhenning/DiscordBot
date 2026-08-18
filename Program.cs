@@ -89,6 +89,9 @@ ServiceProvider services = new ServiceCollection()
     
     //Mod Logging
     .AddSingleton<ModerationLogs>()
+
+    //Live Guest auto-remove
+    .AddSingleton<LiveGuestService>()
     
     //LOGGER
     .AddLogging()
@@ -427,34 +430,6 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     catch (Exception ex)
     {
         Logger.Log($"[Warning] Failed to remove reaction: {ex.Message}");
-    }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Voice State Updated — auto-remove live guest role when user leaves voice
-// ─────────────────────────────────────────────────────────────────────────────
-
-client.UserVoiceStateUpdated += async (user, oldState, newState) =>
-{
-    // Only trigger when a user leaves a voice channel (moves to null)
-    if (oldState.VoiceChannel == null) return;
-    if (newState.VoiceChannel != null) return;
-
-    if (user is not SocketGuildUser guildUser) return;
-
-    SocketRole? liveGuestRole = guildUser.Guild.GetRole(Config.LiveGuestRoleId);
-    if (liveGuestRole == null) return;
-
-    if (!guildUser.Roles.Any(r => r.Id == liveGuestRole.Id)) return;
-
-    try
-    {
-        await guildUser.RemoveRoleAsync(liveGuestRole, new RequestOptions { AuditLogReason = "Auto-removed: user left voice channel" });
-        Logger.Log($"[Info] Auto-removed live guest role from {guildUser.Username} (left voice)");
-    }
-    catch (Exception ex)
-    {
-        Logger.Log($"[Warning] Failed to auto-remove live guest role from {guildUser.Username}: {ex.Message}");
     }
 };
 

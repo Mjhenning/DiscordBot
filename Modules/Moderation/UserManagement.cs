@@ -30,6 +30,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     public async Task UserMenu()
     {
         Session.Reset();
+        Session.Page = UmPage.Main;
 
         await RespondAsync(
             embed: BuildEmbed(),
@@ -39,7 +40,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     }
 
     // ==========================================================
-    // User Selection
+    // User Selection → routes to pending action
     // ==========================================================
 
     [ComponentInteraction("um:users")]
@@ -51,19 +52,46 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         foreach (var id in users)
             Session.SelectedUsers.Add(ulong.Parse(id));
 
-        Session.Page = UmPage.Main;
+        switch (Session.PendingAction)
+        {
+            case UmAction.Warn:
+            case UmAction.Ban:
+            case UmAction.Kick:
+                Session.Page = Session.PendingAction switch
+                {
+                    UmAction.Warn => UmPage.Warn,
+                    UmAction.Ban => UmPage.Ban,
+                    UmAction.Kick => UmPage.Kick,
+                    _ => UmPage.Main
+                };
+                break;
+
+            case UmAction.AddRoles:
+                await ShowAddRoles();
+                return;
+
+            case UmAction.RemoveRoles:
+                await ShowRemoveRoles();
+                return;
+
+            default:
+                Session.Page = UmPage.Main;
+                break;
+        }
+
         await Refresh();
     }
 
     // ==========================================================
-    // Navigation
+    // Navigation from main menu
     // ==========================================================
 
     [ComponentInteraction("um:warn")]
     public async Task Warn()
     {
         await DeferAsync(ephemeral: true);
-        Session.Page = UmPage.Warn;
+        Session.PendingAction = UmAction.Warn;
+        Session.Page = UmPage.SelectUsers;
         await Refresh();
     }
 
@@ -71,7 +99,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     public async Task Ban()
     {
         await DeferAsync(ephemeral: true);
-        Session.Page = UmPage.Ban;
+        Session.PendingAction = UmAction.Ban;
+        Session.Page = UmPage.SelectUsers;
         await Refresh();
     }
 
@@ -79,7 +108,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     public async Task Kick()
     {
         await DeferAsync(ephemeral: true);
-        Session.Page = UmPage.Kick;
+        Session.PendingAction = UmAction.Kick;
+        Session.Page = UmPage.SelectUsers;
         await Refresh();
     }
 
@@ -171,6 +201,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         );
 
         LogModAction("Ban", Session.SelectedUsers, Session.Reason);
+        await LogModChannel("Ban", Color.Red, Session.SelectedUsers, Session.Reason);
         Session.Reset();
     }
 
@@ -204,6 +235,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         );
 
         LogModAction("Kick", Session.SelectedUsers, Session.Reason);
+        await LogModChannel("Kick", Color.DarkOrange, Session.SelectedUsers, Session.Reason);
         Session.Reset();
     }
 
@@ -234,15 +266,50 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     }
 
     // ==========================================================
-    // Role Management
+    // Role Management - entry points
     // ==========================================================
 
     [ComponentInteraction("um:add_roles")]
-    public async Task AddRoles()
+    public async Task AddRolesEntry()
     {
         await DeferAsync(ephemeral: true);
-        var roles = Context.Guild.Roles
-            .Where(r => r.Id != Context.Guild.Id && !r.IsManaged)
+        Session.PendingAction = UmAction.AddRoles;
+        Session.Page = UmPage.SelectUsers;
+        await Refresh();
+    }
+
+    [ComponentInteraction("um:remove_roles")]
+    public async Task RemoveRolesEntry()
+    {
+        await DeferAsync(ephemeral: true);
+        Session.PendingAction = UmAction.RemoveRoles;
+        Session.Page = UmPage.SelectUsers;
+        await Refresh();
+    }
+
+    // ==========================================================
+    // Role Management - display
+    // ==========================================================
+
+     async Task ShowAddRoles()
+    {
+        IEnumerable<SocketRole> rolePool;
+
+        if (Session.SelectedUsers.Count == 1)
+        {
+            var user = Context.Guild.GetUser(Session.SelectedUsers.First());
+            var userRoleIds = user?.Roles.Select(r => r.Id).ToHashSet() ?? new HashSet<ulong>();
+
+            rolePool = Context.Guild.Roles
+                .Where(r => r.Id != Context.Guild.Id && !r.IsManaged && !userRoleIds.Contains(r.Id));
+        }
+        else
+        {
+            rolePool = Context.Guild.Roles
+                .Where(r => r.Id != Context.Guild.Id && !r.IsManaged);
+        }
+
+        var roles = rolePool
             .OrderByDescending(r => r.Position)
             .Take(25)
             .Select(r => new SelectMenuOptionBuilder()
@@ -256,7 +323,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
                 .WithPlaceholder("Select roles to ADD")
                 .WithOptions(roles)
                 .WithMinValues(1)
-                .WithMaxValues(roles.Count))
+                .WithMaxValues(Math.Max(1, roles.Count)))
             .WithButton("Back", "um:back_roles")
             .Build();
 
@@ -270,6 +337,57 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             msg.Components = menu;
         });
     }
+
+    async Task ShowRemoveRoles()
+    {
+        IEnumerable<SocketRole> rolePool;
+
+        if (Session.SelectedUsers.Count == 1)
+        {
+            var user = Context.Guild.GetUser(Session.SelectedUsers.First());
+            var userRoleIds = user?.Roles.Select(r => r.Id).ToHashSet() ?? new HashSet<ulong>();
+
+            rolePool = Context.Guild.Roles
+                .Where(r => userRoleIds.Contains(r.Id) && !r.IsManaged);
+        }
+        else
+        {
+            rolePool = Context.Guild.Roles
+                .Where(r => r.Id != Context.Guild.Id && !r.IsManaged);
+        }
+
+        var roles = rolePool
+            .OrderByDescending(r => r.Position)
+            .Take(25)
+            .Select(r => new SelectMenuOptionBuilder()
+                .WithLabel(r.Name)
+                .WithValue(r.Id.ToString()))
+            .ToList();
+
+        var menu = new ComponentBuilder()
+            .WithSelectMenu(new SelectMenuBuilder()
+                .WithCustomId("um:pick_remove_roles")
+                .WithPlaceholder("Select roles to REMOVE")
+                .WithOptions(roles)
+                .WithMinValues(1)
+                .WithMaxValues(Math.Max(1, roles.Count)))
+            .WithButton("Back", "um:back_roles")
+            .Build();
+
+        await ModifyOriginalResponseAsync(msg =>
+        {
+            msg.Embed = new EmbedBuilder()
+                .WithTitle("Remove Roles")
+                .WithDescription($"Select roles to remove from {BuildUserList()}")
+                .WithColor(Color.Blue)
+                .Build();
+            msg.Components = menu;
+        });
+    }
+
+    // ==========================================================
+    // Role Management - apply
+    // ==========================================================
 
     [ComponentInteraction("um:pick_add_roles")]
     public async Task PickAddRoles(string[] roleIds)
@@ -300,51 +418,9 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             ephemeral: true
         );
 
+        await LogModChannel("Role add", Color.Green, Session.SelectedUsers, null);
         Session.Page = UmPage.Main;
         await Refresh();
-    }
-
-    [ComponentInteraction("um:remove_roles")]
-    public async Task RemoveRoles()
-    {
-        await DeferAsync(ephemeral: true);
-
-        var userRoleIds = Session.SelectedUsers
-            .Select(id => Context.Guild.GetUser(id))
-            .Where(u => u != null)
-            .SelectMany(u => u!.Roles.Select(r => r.Id))
-            .Where(id => id != Context.Guild.Id)
-            .Distinct()
-            .ToHashSet();
-
-        var roles = Context.Guild.Roles
-            .Where(r => userRoleIds.Contains(r.Id) && !r.IsManaged)
-            .OrderByDescending(r => r.Position)
-            .Take(25)
-            .Select(r => new SelectMenuOptionBuilder()
-                .WithLabel(r.Name)
-                .WithValue(r.Id.ToString()))
-            .ToList();
-
-        var menu = new ComponentBuilder()
-            .WithSelectMenu(new SelectMenuBuilder()
-                .WithCustomId("um:pick_remove_roles")
-                .WithPlaceholder("Select roles to REMOVE")
-                .WithOptions(roles)
-                .WithMinValues(1)
-                .WithMaxValues(roles.Count))
-            .WithButton("Back", "um:back_roles")
-            .Build();
-
-        await ModifyOriginalResponseAsync(msg =>
-        {
-            msg.Embed = new EmbedBuilder()
-                .WithTitle("Remove Roles")
-                .WithDescription($"Select roles to remove from {BuildUserList()}")
-                .WithColor(Color.Blue)
-                .Build();
-            msg.Components = menu;
-        });
     }
 
     [ComponentInteraction("um:pick_remove_roles")]
@@ -376,6 +452,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             ephemeral: true
         );
 
+        await LogModChannel("Role remove", Color.Red, Session.SelectedUsers, null);
         Session.Page = UmPage.Main;
         await Refresh();
     }
@@ -384,7 +461,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     public async Task BackFromRoles()
     {
         await DeferAsync(ephemeral: true);
-        Session.Page = UmPage.Main;
+        Session.Page = UmPage.Roles;
         await Refresh();
     }
 
@@ -408,16 +485,16 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
 
         switch (Session.Page)
         {
-            case UmPage.SelectUsers:
-                embed
-                    .WithTitle("User Management")
-                    .WithDescription("Select one or more users to begin.");
-                break;
-
             case UmPage.Main:
                 embed
                     .WithTitle("User Management")
-                    .WithDescription(BuildUserList());
+                    .WithDescription("Pick an action, then select the target user(s).");
+                break;
+
+            case UmPage.SelectUsers:
+                embed
+                    .WithTitle("User Management")
+                    .WithDescription($"**{Session.PendingAction}** - Select target user(s).");
                 break;
 
             case UmPage.Warn:
@@ -457,6 +534,14 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
 
         switch (Session.Page)
         {
+            case UmPage.Main:
+                builder
+                    .WithButton("❗ Warn", "um:warn", ButtonStyle.Primary)
+                    .WithButton("🔨 Ban", "um:ban", ButtonStyle.Danger)
+                    .WithButton("👢 Kick", "um:kick", ButtonStyle.Danger)
+                    .WithButton("⚙ Roles", "um:roles", ButtonStyle.Secondary);
+                break;
+
             case UmPage.SelectUsers:
                 builder.WithSelectMenu(new SelectMenuBuilder()
                     .WithCustomId("um:users")
@@ -464,14 +549,6 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
                     .WithPlaceholder("Select users...")
                     .WithMinValues(1)
                     .WithMaxValues(25));
-                break;
-
-            case UmPage.Main:
-                builder
-                    .WithButton("❗ Warn", "um:reason_warn", ButtonStyle.Primary)
-                    .WithButton("🔨 Ban", "um:reason_ban", ButtonStyle.Danger)
-                    .WithButton("👢 Kick", "um:reason_kick", ButtonStyle.Danger)
-                    .WithButton("⚙ Roles", "um:roles", ButtonStyle.Secondary);
                 break;
 
             case UmPage.Warn:
@@ -556,25 +633,37 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
 
      enum UmPage
     {
-        SelectUsers,
         Main,
+        SelectUsers,
         Warn,
         Ban,
         Kick,
         Roles
     }
 
+     enum UmAction
+    {
+        None,
+        Warn,
+        Ban,
+        Kick,
+        AddRoles,
+        RemoveRoles
+    }
+
      sealed class UmSession
     {
         public HashSet<ulong> SelectedUsers { get; } = new();
         public UmPage Page { get; set; }
+        public UmAction PendingAction { get; set; }
         public string? Reason { get; set; }
 
         public void Reset()
         {
             SelectedUsers.Clear();
             Reason = null;
-            Page = UmPage.SelectUsers;
+            PendingAction = UmAction.None;
+            Page = UmPage.Main;
         }
     }
 }
