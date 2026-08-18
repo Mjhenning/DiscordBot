@@ -91,14 +91,6 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         await Refresh();
     }
 
-    [ComponentInteraction("um:liveguest")]
-    public async Task LiveGuest()
-    {
-        await DeferAsync(ephemeral: true);
-        Session.Page = UmPage.LiveGuest;
-        await Refresh();
-    }
-
     [ComponentInteraction("um:back")]
     public async Task Back()
     {
@@ -144,6 +136,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         );
 
         LogModAction("Warn", Session.SelectedUsers, Session.Reason);
+        await LogModChannel("Warn", Color.Orange, Session.SelectedUsers, Session.Reason);
         Session.Reset();
     }
 
@@ -315,8 +308,17 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     public async Task RemoveRoles()
     {
         await DeferAsync(ephemeral: true);
+
+        var userRoleIds = Session.SelectedUsers
+            .Select(id => Context.Guild.GetUser(id))
+            .Where(u => u != null)
+            .SelectMany(u => u!.Roles.Select(r => r.Id))
+            .Where(id => id != Context.Guild.Id)
+            .Distinct()
+            .ToHashSet();
+
         var roles = Context.Guild.Roles
-            .Where(r => r.Id != Context.Guild.Id && !r.IsManaged)
+            .Where(r => userRoleIds.Contains(r.Id) && !r.IsManaged)
             .OrderByDescending(r => r.Position)
             .Take(25)
             .Select(r => new SelectMenuOptionBuilder()
@@ -387,92 +389,6 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     }
 
     // ==========================================================
-    // Live Guest Management
-    // ==========================================================
-
-    [ComponentInteraction("um:lg_add")]
-    public async Task LiveGuestAdd()
-    {
-        await DeferAsync(ephemeral: true);
-
-        SocketRole? role = Context.Guild.GetRole(Config.LiveGuestRoleId);
-        if (role == null)
-        {
-            await FollowupAsync("Live guest role is not configured.", ephemeral: true);
-            return;
-        }
-
-        int success = 0;
-        int skipped = 0;
-        int failed = 0;
-
-        foreach (ulong userId in Session.SelectedUsers)
-        {
-            var user = Context.Guild.GetUser(userId);
-            if (user == null) { failed++; continue; }
-
-            if (user.Roles.Any(r => r.Id == role.Id)) { skipped++; continue; }
-
-            try
-            {
-                await user.AddRoleAsync(role,
-                    new RequestOptions { AuditLogReason = $"Live guest added by {Context.User.Username}" });
-                success++;
-            }
-            catch { failed++; }
-        }
-
-        string summary = $"Added **{role.Name}** to {success} user(s).";
-        if (skipped > 0) summary += $"\nAlready had role: {skipped}";
-        if (failed > 0) summary += $"\nFailed: {failed}";
-
-        await FollowupAsync(summary, ephemeral: true);
-        Session.Page = UmPage.Main;
-        await Refresh();
-    }
-
-    [ComponentInteraction("um:lg_remove")]
-    public async Task LiveGuestRemove()
-    {
-        await DeferAsync(ephemeral: true);
-
-        SocketRole? role = Context.Guild.GetRole(Config.LiveGuestRoleId);
-        if (role == null)
-        {
-            await FollowupAsync("Live guest role is not configured.", ephemeral: true);
-            return;
-        }
-
-        int success = 0;
-        int skipped = 0;
-        int failed = 0;
-
-        foreach (ulong userId in Session.SelectedUsers)
-        {
-            var user = Context.Guild.GetUser(userId);
-            if (user == null) { failed++; continue; }
-
-            if (!user.Roles.Any(r => r.Id == role.Id)) { skipped++; continue; }
-
-            try
-            {
-                await user.RemoveRoleAsync(role,
-                    new RequestOptions { AuditLogReason = $"Live guest removed by {Context.User.Username}" });
-                success++;
-            }
-            catch { failed++; }
-        }
-
-        string summary = $"Removed **{role.Name}** from {success} user(s).";
-        if (skipped > 0) summary += $"\nDidn't have role: {skipped}";
-        if (failed > 0) summary += $"\nFailed: {failed}";
-
-        await FollowupAsync(summary, ephemeral: true);
-        Session.Page = UmPage.Main;
-        await Refresh();
-    }
-
-    // ==========================================================
     // Rendering
     // ==========================================================
 
@@ -530,12 +446,6 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
                     .WithTitle("Manage Roles")
                     .WithDescription(BuildUserList());
                 break;
-
-            case UmPage.LiveGuest:
-                embed
-                    .WithTitle("Live Guest")
-                    .WithDescription(BuildUserList());
-                break;
         }
 
         return embed.Build();
@@ -561,8 +471,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
                     .WithButton("❗ Warn", "um:reason_warn", ButtonStyle.Primary)
                     .WithButton("🔨 Ban", "um:reason_ban", ButtonStyle.Danger)
                     .WithButton("👢 Kick", "um:reason_kick", ButtonStyle.Danger)
-                    .WithButton("⚙ Roles", "um:roles", ButtonStyle.Secondary)
-                    .WithButton("🎙 Live Guest", "um:liveguest", ButtonStyle.Secondary);
+                    .WithButton("⚙ Roles", "um:roles", ButtonStyle.Secondary);
                 break;
 
             case UmPage.Warn:
@@ -592,13 +501,6 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
                     .WithButton("➖ Remove", "um:remove_roles", ButtonStyle.Danger)
                     .WithButton("Back", "um:back");
                 break;
-
-            case UmPage.LiveGuest:
-                builder
-                    .WithButton("➕ Add", "um:lg_add", ButtonStyle.Primary)
-                    .WithButton("➖ Remove", "um:lg_remove", ButtonStyle.Danger)
-                    .WithButton("Back", "um:back");
-                break;
         }
 
         return builder.Build();
@@ -622,6 +524,32 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         Logger.Log($"[UserMgmt] {action} by {Context.User.Username}: {userList} | Reason: {reason ?? "none"}");
     }
 
+     async Task LogModChannel(string action, Color color, HashSet<ulong> users, string? reason)
+    {
+        try
+        {
+            var channel = Context.Client.GetChannel(Config.ModLogChannelId) as IMessageChannel;
+            if (channel == null) return;
+
+            string userList = string.Join("\n", users.Select(id => $"• <@{id}>"));
+
+            var embed = new EmbedBuilder()
+                .WithTitle($"{action} (via /user)")
+                .WithColor(color)
+                .AddField("Target(s)", userList)
+                .AddField("Moderator", Context.User.Mention, true)
+                .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason, true)
+                .WithCurrentTimestamp()
+                .Build();
+
+            await channel.SendMessageAsync(embed: embed);
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[UserMgmt] Failed to send mod log: {ex.Message}");
+        }
+    }
+
     // ==========================================================
     // Models
     // ==========================================================
@@ -633,8 +561,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         Warn,
         Ban,
         Kick,
-        Roles,
-        LiveGuest
+        Roles
     }
 
      sealed class UmSession

@@ -449,8 +449,7 @@ client.UserVoiceStateUpdated += async (user, oldState, newState) =>
 
     try
     {
-        await guildUser.RemoveRoleAsync(liveGuestRole,
-            new RequestOptions { AuditLogReason = "Auto-removed: user left voice channel" });
+        await guildUser.RemoveRoleAsync(liveGuestRole, new RequestOptions { AuditLogReason = "Auto-removed: user left voice channel" });
         Logger.Log($"[Info] Auto-removed live guest role from {guildUser.Username} (left voice)");
     }
     catch (Exception ex)
