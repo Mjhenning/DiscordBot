@@ -61,7 +61,7 @@ ServiceProvider services = new ServiceCollection()
         sp.GetRequiredService<TwitchAPI>(),
         "Data/twitch_tokens.json"
     ))
-    .AddSingleton<TwitchClient>()
+    .AddSingleton<TwitchApiService>()
     .AddSingleton<Twitch_Notifier>()
     .AddSingleton<TwitchRedeemHandler>()
     .AddSingleton<FavouritesLiveNoti>()
@@ -92,6 +92,10 @@ ServiceProvider services = new ServiceCollection()
 
     //Live Guest auto-remove
     .AddSingleton<LiveGuestService>()
+
+    //Linking
+    .AddSingleton<TwitchChatService>()
+    .AddSingleton<LinkedAccountsData>()
     
     //LOGGER
     .AddLogging()
@@ -213,6 +217,9 @@ client.Ready += async () =>
         await notifier.StartAsync();
 
         Logger.Log("[Info] Twitch services started.");
+
+        var chatService = services.GetRequiredService<TwitchChatService>();
+        await chatService.ConnectAsync();
     }
     catch (Exception ex)
     {

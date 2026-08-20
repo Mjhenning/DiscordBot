@@ -14,7 +14,7 @@ public class TwitchRedeemHandler
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
     readonly TokenManager _tokenManager;
-    readonly TwitchClient _twitchClient;
+    readonly TwitchApiService _twitchClient;
 
     readonly Dictionary<string, Func<RedemptionContext, Task>> _handlers;
 
@@ -22,7 +22,7 @@ public class TwitchRedeemHandler
         EventSubWebsocketClient eventSubClient,
         DiscordSocketClient discordSocket,
         TokenManager tokenManager,
-        TwitchClient twitchClient)
+        TwitchApiService twitchClient)
     {
         _tokenManager   = tokenManager;
         _twitchClient   = twitchClient;

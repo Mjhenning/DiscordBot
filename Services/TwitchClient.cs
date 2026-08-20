@@ -2,12 +2,12 @@ using TwitchLib.Api;
 
 namespace DiscordBot.Modules;
 
-public class TwitchClient
+public class TwitchApiService
 {
     readonly TwitchAPI _api;
     readonly TokenManager _tokens;
 
-    public TwitchClient(TwitchAPI api, TokenManager tokens)
+    public TwitchApiService(TwitchAPI api, TokenManager tokens)
     {
         _api = api;
         _tokens = tokens;

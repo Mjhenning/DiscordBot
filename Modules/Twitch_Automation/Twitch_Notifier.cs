@@ -15,7 +15,7 @@ public class Twitch_Notifier
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
     readonly TokenManager _tokenManager;
-    readonly TwitchClient _twitchClient;
+    readonly TwitchApiService _twitchClient;
 
     static StreamSession TwitchSession = new();
     static TwitchVOD TwitchVOD = new();
@@ -31,13 +31,13 @@ public class Twitch_Notifier
 
 
     // ── CONSTRUCTOR ──────────────────────────────────────────────────────────
-    // Inject TokenManager + TwitchClient instead of raw TwitchAPI.
+    // Inject TokenManager + TwitchApiService instead of raw TwitchAPI.
     // DI resolves these automatically because they're registered in Program.cs.
     public Twitch_Notifier(
         EventSubWebsocketClient eventSubClient,
         DiscordSocketClient discordSocket,
         TokenManager tokenManager,
-        TwitchClient twitchClient)
+        TwitchApiService twitchClient)
     {
         _tokenManager   = tokenManager;
         _twitchClient   = twitchClient;
@@ -93,7 +93,7 @@ public class Twitch_Notifier
 
     // ── WEBSOCKET CONNECTED ──────────────────────────────────────────────────
     // Fires when the EventSub websocket connects (or reconnects).
-    // We use TwitchClient.ExecuteAsync here so if the token happens to be
+    // We use TwitchApiService.ExecuteAsync here so if the token happens to be
     // expired at subscription time, it's refreshed and retried automatically.
     async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
@@ -177,7 +177,7 @@ public class Twitch_Notifier
 
     // ── STREAM ONLINE ────────────────────────────────────────────────────────
     // Fires when Twitch detects the channel goes live.
-    // TwitchClient.ExecuteAsync replaces the old try/catch Unauthorized blocks —
+    // TwitchApiService.ExecuteAsync replaces the old try/catch Unauthorized blocks —
     // if the token is stale it refreshes once and retries transparently.
     async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
     {
@@ -366,7 +366,7 @@ public class Twitch_Notifier
         try   { userId = TwitchSession.UserId; }
         finally { _sessionLock.Release(); }
 
-        // TwitchClient handles token refresh automatically if the call fails with 401
+        // TwitchApiService handles token refresh automatically if the call fails with 401
         GetVideosResponse? result = await _twitchClient.ExecuteAsync(
             TwitchProfile.Broadcaster,
             api => api.Helix.Videos.GetVideosAsync(null, userId, null, null, null, 1)
@@ -432,7 +432,7 @@ public class Twitch_Notifier
 
             try
             {
-                // TwitchClient handles 401 retry automatically — no manual catch needed
+                // TwitchApiService handles 401 retry automatically — no manual catch needed
                 GetStreamsResponse? result = await _twitchClient.ExecuteAsync(
                     TwitchProfile.Broadcaster,
                     api => api.Helix.Streams.GetStreamsAsync(
@@ -671,7 +671,7 @@ public class Twitch_Notifier
     }
 
     // NOTE: GetUserToken() and RefreshAccessToken() have been removed.
-    // TokenManager + TwitchClient handle all of that transparently now.
+    // TokenManager + TwitchApiService handle all of that transparently now.
 }
 
 

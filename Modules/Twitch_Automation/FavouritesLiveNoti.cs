@@ -39,12 +39,12 @@ public class FavouritesLiveNoti
 
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
-    readonly TwitchClient _twitchClient;
+    readonly TwitchApiService _twitchClient;
 
     public FavouritesLiveNoti(
         EventSubWebsocketClient eventSubClient,
         DiscordSocketClient discordSocket,
-        TwitchClient twitchClient)
+        TwitchApiService twitchClient)
     {
         _eventSubClient = eventSubClient;
         _discordSocket  = discordSocket;
