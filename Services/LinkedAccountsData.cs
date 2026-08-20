@@ -2,7 +2,7 @@ using Newtonsoft.Json;
 
 namespace DiscordBot.Services;
 
-public class GlosselEntry
+public class UserDataEntry
 {
     [JsonProperty("usrName")]
     public string UsrName { get; set; } = "";
@@ -23,14 +23,14 @@ public class GlosselEntry
 public class LinkedAccountsData
 {
     readonly string _filePath;
-    List<GlosselEntry> _entries = new();
+    List<UserDataEntry> _entries = new();
     readonly object _lock = new();
 
     public LinkedAccountsData()
     {
         _filePath = Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
-                "TwitchBot", "data", "glossels_db.json"));
+                "TwitchBot", "data", "user_data.json"));
         Load();
     }
 
@@ -41,29 +41,29 @@ public class LinkedAccountsData
             if (File.Exists(_filePath))
             {
                 var json = File.ReadAllText(_filePath);
-                _entries = JsonConvert.DeserializeObject<List<GlosselEntry>>(json) ?? new();
+                _entries = JsonConvert.DeserializeObject<List<UserDataEntry>>(json) ?? new();
                 Logger.Log($"[LinkedAccounts] Loaded {_entries.Count} entries from {_filePath}");
             }
             else
             {
-                Logger.Log($"[LinkedAccounts] Glossels file not found at {_filePath}, starting empty");
+                Logger.Log($"[LinkedAccounts] User data file not found at {_filePath}, starting empty");
                 _entries = new();
             }
         }
         catch (Exception ex)
         {
-            Logger.Log($"[LinkedAccounts] Failed to load glossels: {ex.Message}");
+            Logger.Log($"[LinkedAccounts] Failed to load user data: {ex.Message}");
             _entries = new();
         }
     }
 
-    void Save()
+    public void Save()
     {
         var json = JsonConvert.SerializeObject(_entries, Formatting.Indented);
         File.WriteAllText(_filePath, json);
     }
 
-    public GlosselEntry? FindByTwitchId(string twitchUserId)
+    public UserDataEntry? FindByTwitchId(string twitchUserId)
     {
         lock (_lock)
         {
@@ -71,7 +71,7 @@ public class LinkedAccountsData
         }
     }
 
-    public GlosselEntry? FindByDiscordId(ulong discordUserId)
+    public UserDataEntry? FindByDiscordId(ulong discordUserId)
     {
         lock (_lock)
         {
@@ -89,6 +89,35 @@ public class LinkedAccountsData
             entry.DiscordUserId = discordUserId.ToString();
             Save();
             Logger.Log($"[LinkedAccounts] Linked Twitch {twitchUserId} ({entry.UsrName}) to Discord {discordUserId}");
+            return true;
+        }
+    }
+
+    public bool UpdateAmount(string twitchUserId, int newAmount)
+    {
+        lock (_lock)
+        {
+            var entry = _entries.FirstOrDefault(e => e.UsrId == twitchUserId);
+            if (entry == null) return false;
+
+            entry.Amount = newAmount;
+            Save();
+            return true;
+        }
+    }
+
+    public bool TransferAmount(string fromTwitchId, string toTwitchId, int amount)
+    {
+        lock (_lock)
+        {
+            var from = _entries.FirstOrDefault(e => e.UsrId == fromTwitchId);
+            var to = _entries.FirstOrDefault(e => e.UsrId == toTwitchId);
+            if (from == null || to == null) return false;
+            if (from.Amount < amount) return false;
+
+            from.Amount -= amount;
+            to.Amount += amount;
+            Save();
             return true;
         }
     }

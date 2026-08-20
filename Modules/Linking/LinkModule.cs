@@ -124,10 +124,10 @@ public class LinkModule : InteractionModuleBase<SocketInteractionContext>
             Logger.Log($"[Link] Failed to delete Twitch message: {ex.Message}");
         }
 
-        var glosselEntry = _linkedData.FindByTwitchId(twitchUserId);
-        if (glosselEntry == null)
+        var userDataEntry = _linkedData.FindByTwitchId(twitchUserId);
+        if (userDataEntry == null)
         {
-            Logger.Log($"[Link] Twitch user {twitchUsername} ({twitchUserId}) not found in GlosselDB");
+            Logger.Log($"[Link] Twitch user {twitchUsername} ({twitchUserId}) not found in user data");
             await NotifyDiscord(pending.DiscordUserId,
                 $"Twitch user **{twitchUsername}** was not found in the database. Contact a mod.");
             return;
@@ -140,12 +140,12 @@ public class LinkModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        Logger.Log($"[Link] Successfully linked Discord {pending.DiscordUsername} ({pending.DiscordUserId}) to Twitch {glosselEntry.UsrName} ({twitchUserId})");
+        Logger.Log($"[Link] Successfully linked Discord {pending.DiscordUsername} ({pending.DiscordUserId}) to Twitch {userDataEntry.UsrName} ({twitchUserId})");
 
         await NotifyDiscord(pending.DiscordUserId,
-            $"Linked to Twitch user **{glosselEntry.UsrName}**!");
+            $"Linked to Twitch user **{userDataEntry.UsrName}**!");
 
-        await LogModChannel(pending.DiscordUsername, pending.DiscordUserId, glosselEntry.UsrName, twitchUserId);
+        await LogModChannel(pending.DiscordUsername, pending.DiscordUserId, userDataEntry.UsrName, twitchUserId);
     }
 
     async Task ScheduleExpiry(ulong key, PendingLink pending)
