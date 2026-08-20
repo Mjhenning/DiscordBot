@@ -30,6 +30,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
 - **Moderation Logging** - Comprehensive audit logging: message edits/deletes (with before/after, attachment tracking, and moderator attribution), member joins/leaves/kicks/bans, nickname/role changes, and voice session summaries with duration tracking.
 - **7TV Emote Integration** - Search and send 7TV emotes directly in Discord with autocomplete. Per-user preferences for channel, emote set, and image size (1x–4x). Supports animated and static formats.
 - **AETHER-OS Terminal** - An in-character ARG terminal interface with a virtual filesystem, file reading, directory navigation, and a "coherence" mechanic. Corrupted files become readable as coherence increases. All users share a single terminal session.
+- **Twitch-Discord Account Linking** - A persistent embed with a "Link Twitch" button lets users link their accounts. Clicking generates a code, the user types it in Twitch chat within 20 seconds, and the bot matches and writes the link to the GlosselDB.
 
 ---
 
@@ -70,6 +71,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
    - `DISCORD_GUILD_ID` - Your Discord server ID
     - `TWITCH_CLIENT_ID` / `TWITCH_CLIENT_SECRET` - Twitch API credentials
     - `TWITCH_CHANNEL_NAME` / `TWITCH_USER_ID` - Your Twitch channel name and numeric ID
+    - `TWITCH_BOT_NAME` - Your Twitch bot account username (used for IRC chat connection)
    - `FOX_DISCORD_ID` - Your Discord user ID (used for collab view filtering)
    
    Channel and role IDs (all numeric):
@@ -118,7 +120,7 @@ The bot will:
    - Register all slash command modules from the assembly.
    - Register commands to the configured guild (instant propagation). For production, switch to `RegisterCommandsGloballyAsync()` (up to 1 hour propagation).
    - Reset the AETHER-OS terminal session.
-   - Initialize Twitch services: `TwitchRedeemHandler`, `FavouritesLiveNoti`, `EventSubReconnectService`, and start the `Twitch_Notifier` (connects EventSub websocket, subscribes to `stream.online`, `stream.offline`, and `channel.update`).
+   - Initialize Twitch services: `TwitchRedeemHandler`, `FavouritesLiveNoti`, `EventSubReconnectService`, `TwitchChatService` (IRC connection for account linking), and start the `Twitch_Notifier` (connects EventSub websocket, subscribes to `stream.online`, `stream.offline`, and `channel.update`).
 6. Begin listening for Discord events (interactions, reactions, joins) and Twitch EventSub events.
 7. The bot blocks indefinitely with `Task.Delay(Timeout.Infinite)`.
 
@@ -135,6 +137,7 @@ The bot will:
 | `/reactionrole` | Open the reaction role wizard: Add or Remove reaction roles on any message |
 | `/user` | Open the user management menu: warn, ban, kick, manage roles, or assign live guest role (testing) |
 | `/collab` | Start a collaboration request: pick date, fill modal, invite collaborators, confirm and send DMs (requires "Proxy Hosts" role) |
+| `/postlink` | Post the account linking embed with a "Link Twitch" button to the current channel |
 
 ### AETHER-OS Terminal
 
@@ -190,6 +193,9 @@ Auto-logs audit events to a Discord channel. Message logs include before/after c
 ### Token Management (`Services/TokenManager.cs`)
 Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On startup, if a refresh token exists but the access token is expired, it silently refreshes without user interaction. On first run (no tokens at all), starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
 
+### Twitch-Discord Account Linking (`Modules/Linking/` + `Services/TwitchChatService.cs` + `Services/LinkedAccountsData.cs`)
+A persistent embed posted via `/postlink` with a "Link Twitch" button. Clicking the button (ephemeral) generates a 5-character code valid for 20 seconds. The user types the code in Twitch chat, the bot matches it, deletes the Twitch message, looks up the user in the GlosselDB (`../../TwitchBot/data/glossels_db.json`), and writes their Discord user ID into the entry. Sends a DM on success, updates the ephemeral message and DM on expiry. Requires a configured Twitch bot account for IRC connection. `LinkedAccountsData` resolves the GlosselDB path relative to `AppContext.BaseDirectory`.
+
 ---
 
 ## Project Structure
@@ -220,6 +226,8 @@ DiscordBot/
 │   │   ├── FavouritesLiveNoti.cs   # Favourite streamer go-live alerts
 │   │   ├── TwitchRedeemHandler.cs  # Channel point redemption router
 │   │   └── SuggestionModule.cs     # "Mark Complete" button handler
+│   ├── Linking/
+│   │   └── LinkModule.cs           # /postlink and Link Twitch button handler
 │   ├── SevenTvIntegration/
 │   │   ├── SevenTvModule.cs        # /7tv command group
 │   │   ├── SevenTvApi.cs           # 7TV GraphQL API client
@@ -237,11 +245,14 @@ DiscordBot/
 ├── Services/
 │   ├── Logger.cs                   # Static logger (console + bot-log.txt + optional DM)
 │   ├── TokenManager.cs             # Twitch OAuth2 token management with auto-refresh
-│   ├── TwitchClient.cs             # TwitchAPI wrapper with token pre-flight
+│   ├── TwitchApiService.cs         # TwitchAPI wrapper with token pre-flight
+│   ├── TwitchChatService.cs        # TwitchLib.Client IRC connection for account linking
 │   ├── TwitchScheduleService.cs    # Twitch schedule segment CRUD
 │   ├── EventSubReconnectService.cs # EventSub websocket reconnect with backoff
 │   ├── CollabService.cs            # DM delivery and status updates for collabs
 │   ├── CollabRequestCache.cs       # In-memory pending collab request cache
+│   ├── LinkedAccountsData.cs       # GlosselDB read/write for account linking
+│   ├── LiveGuestService.cs         # Auto-remove live guest role on voice leave
 │   ├── ArgTerminalService.cs       # Terminal embed builder and renderer
 │   └── CoherenceWatcher.cs         # Filesystem watcher for external ARG state changes
 ├── Redeems/
