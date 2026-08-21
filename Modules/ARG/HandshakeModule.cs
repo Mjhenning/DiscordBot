@@ -103,7 +103,7 @@ public class HandshakeModule : InteractionModuleBase<SocketInteractionContext>
         _data.HandshakeContent = handshakeContent;
         _data.Save();
 
-        await _terminal.RefreshEmbeds(ARGEmbed_Type.Handshake, ARGEmbed_Type.Logs);
+        await _terminal.RefreshEmbeds(ARGEmbed_Type.Handshake, ARGEmbed_Type.Logs, ARGEmbed_Type.Terminal);
     }
 }
 
