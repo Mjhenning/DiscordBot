@@ -6,7 +6,8 @@ public enum ARGEmbed_Type
 {
     Logs,
     Terminal,
-    ReadOutput
+    ReadOutput,
+    Handshake
 }
 
 public enum TerminalInteractionMode
@@ -33,6 +34,9 @@ public class ArgTerminalData
     public ulong PublishedTMessageId  { get;  set; } = 0;
     public ulong PublishedRMessageId  { get; set; } = 0;
     public ulong PublishedLMessageId  { get; set; } = 0;
+    public ulong PublishedHMessageId  { get; set; } = 0;
+    
+    public string HandshakeContent { get; set; } = "";
 
     public string Cwd { get; set; } = "/";
     public string ReadMessageFile{ get; set; } = "";
@@ -67,11 +71,13 @@ public class ArgTerminalData
             PublishedTMessageId = store.TerminalMessageId;
             PublishedChannelId = store.ChannelId;
             PublishedRMessageId = store.ReadMessageId;
+            PublishedHMessageId = store.HandshakeMessageId;
             
             Cwd = store.Cwd;
             ReadMessageFile = store.ReadMessageFile;
             ReadMessageContent = store.ReadMessage;
-
+            HandshakeContent = store.HandshakeContent;
+            
             ActionHistory = store.ActionHistory ?? new();
         }
     }
@@ -91,6 +97,9 @@ public class ArgTerminalData
             case ARGEmbed_Type.Logs:
                 PublishedLMessageId = messageId;
                 break;
+            case ARGEmbed_Type.Handshake:
+                PublishedHMessageId = messageId;
+                break;
         }
         Save();
     }
@@ -103,10 +112,12 @@ public class ArgTerminalData
             TerminalMessageId = PublishedTMessageId,
             ChannelId = PublishedChannelId,
             ReadMessageId = PublishedRMessageId,
+            HandshakeMessageId = PublishedHMessageId,
             
             Cwd = Cwd,
             ReadMessageFile = ReadMessageFile,
             ReadMessage = ReadMessageContent,
+            HandshakeContent = HandshakeContent,
             
             ActionHistory = ActionHistory
         };
@@ -198,10 +209,12 @@ public class ArgTerminalData
             PublishedTMessageId = store.TerminalMessageId;
             PublishedChannelId  = store.ChannelId;
             PublishedRMessageId = store.ReadMessageId;
+            PublishedHMessageId = store.HandshakeMessageId;
 
             Cwd = store.Cwd ?? "/";
             ReadMessageFile = store.ReadMessageFile ?? "";
             ReadMessageContent = store.ReadMessage ?? "";
+            HandshakeContent = store.HandshakeContent ?? "";
 
             ActionHistory = store.ActionHistory ?? new Queue<string>();
 
@@ -221,10 +234,12 @@ public class TerminalStore
     public ulong TerminalMessageId { get; set; } = 0;
     public ulong ReadMessageId { get; set; } = 0;
     public ulong LogsMessageId { get; set; } = 0;
+    public ulong HandshakeMessageId { get; set; } = 0;
 
     public string Cwd { get; set; } = "/";
     public string ReadMessageFile { get; set; } = "";
     public string ReadMessage { get; set; } = "";
+    public string HandshakeContent { get; set; } = "";
     
     public Queue<string> ActionHistory { get; set; }
 }

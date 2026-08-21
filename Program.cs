@@ -97,6 +97,9 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<TwitchChatService>()
     .AddSingleton<LinkedAccountsData>()
     
+    //Handshake gambling
+    .AddSingleton<HandshakeService>()
+    
     //LOGGER
     .AddLogging()
     

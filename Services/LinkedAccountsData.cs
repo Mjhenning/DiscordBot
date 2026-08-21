@@ -106,6 +106,20 @@ public class LinkedAccountsData
         }
     }
 
+    public bool AddAmountByDiscordId(ulong discordUserId, int delta)
+    {
+        lock (_lock)
+        {
+            var entry = _entries.FirstOrDefault(e => e.DiscordUserId == discordUserId.ToString());
+            if (entry == null) return false;
+
+            entry.Amount += delta;
+            if (entry.Amount < 0) entry.Amount = 0;
+            Save();
+            return true;
+        }
+    }
+
     public bool TransferAmount(string fromTwitchId, string toTwitchId, int amount)
     {
         lock (_lock)

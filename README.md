@@ -29,7 +29,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
 - **Collaboration Requests** - Create multi-person stream/event proposals with DM invitations, accept/decline flow, decline reasons, and live status tracking. Hosts and participants receive persistent DM updates.
 - **Moderation Logging** - Comprehensive audit logging: message edits/deletes (with before/after, attachment tracking, and moderator attribution), member joins/leaves/kicks/bans, nickname/role changes, and voice session summaries with duration tracking.
 - **7TV Emote Integration** - Search and send 7TV emotes directly in Discord with autocomplete. Per-user preferences for channel, emote set, and image size (1x–4x). Supports animated and static formats.
-- **AETHER-OS Terminal** - An in-character ARG terminal interface with a virtual filesystem, file reading, directory navigation, and a "coherence" mechanic. Corrupted files become readable as coherence increases. All users share a single terminal session.
+- **AETHER-OS Terminal** - An in-character ARG terminal interface with a virtual filesystem, file reading, directory navigation, and a "coherence" mechanic. Corrupted files become readable as coherence increases. All users share a single terminal session. Includes a **Network Handshake** gambling system where users send Glossels into unknown network nodes for a chance to win multiplied rewards, drain the shared network cache, or lose packets to hostile nodes.
 - **Twitch-Discord Account Linking** - A persistent embed with a "Link Twitch" button lets users link their accounts. Clicking generates a code, the user types it in Twitch chat within 20 seconds, and the bot matches and writes the link to the shared user data file.
 
 ---
@@ -143,7 +143,7 @@ The bot will:
 
 | Command | Description |
 |---|---|
-| `/system login` | Log in to the AETHER-OS terminal. Posts three persistent embeds: logs, terminal, and file viewer |
+| `/system login` | Log in to the AETHER-OS terminal. Posts four persistent embeds: logs, terminal, file viewer, and network handshake |
 | `/system logout` | End your terminal session |
 
 ### 7TV Emotes
@@ -182,7 +182,10 @@ Routes fulfilled channel point redemptions by reward ID: suggestions post an emb
 Per-user emote preferences stored in `Data/sevenTvPreferences.json`. Emote search uses 7TV's GraphQL v4 API with autocomplete caching (5 min TTL, 1000 entry cap). Supports animated (avif) and static (png) formats. Default channel/set auto-resolves from the configured Twitch channel.
 
 ### AETHER-OS Terminal (`Modules/ARG/` + `Services/ArgTerminalService.cs` + `Services/CoherenceWatcher.cs`)
-In-character terminal with three persistent embeds: action log, terminal view (directory listing + buttons for Navigate, Read, Ping), and file viewer. A virtual filesystem with a coherence percentage (0–100) gates file access - corrupted files show garbled content below 60% coherence. The Ping button increases coherence by 2%. All users share a single session. A `CoherenceWatcher` monitors the state file on disk for external changes (e.g. from an overlay or external tool).
+In-character terminal with four persistent embeds: action log, terminal view (directory listing + buttons for Navigate, Read, Ping, Handshake), file viewer, and network handshake results. A virtual filesystem with a coherence percentage (0–100) gates file access - corrupted files show garbled content below 60% coherence. The Ping button increases coherence by 2%. The Handshake button initiates a weighted gambling system (ported from the TwitchBot) where users send Glossels into unknown network nodes. All users share a single session. A `CoherenceWatcher` monitors the state file on disk for external changes (e.g. from an overlay or external tool).
+
+### Network Handshake (`Modules/ARG/HandshakeModule.cs` + `Services/HandshakeService.cs`)
+Gambling system shared with the TwitchBot via `../../TwitchBot/data/user_data.json` and `network_cache.json`. The Handshake button on the terminal embed opens an ephemeral choice screen with "Unknown Network". Clicking it presents a modal where the user enters an amount of Glossels to gamble. Six weighted outcomes: accepted (35%, 2x return), unstable (30%, no change), rejected (25%, loss to cache), amplified (8%, 3x return), captured (2%, half lost to cache), drained (1%, drains entire network cache). Results update the persistent Handshake embed and log to the action history. Requires a linked Twitch-Discord account with a positive Glossel balance.
 
 ### Moderation Logging (`Modules/Moderation/ModerationLogs.cs`)
 Auto-logs audit events to a Discord channel. Message logs include before/after content, attachment changes, and reply context. Member logs track joins (with account age), leaves, kicks (via audit log), bans/unbans, nickname/role changes. Voice logs track sessions: when a channel empties, posts a summary with total duration and all participants. Each category independently toggleable via `Config` flags.
@@ -236,7 +239,8 @@ DiscordBot/
 │   │   ├── SevenTvTypes.cs         # API response types
 │   │   └── SevenTvDefaults.cs      # Default channel/set resolution
 │   ├── ARG/
-│   │   └── ARG.cs                  # /system login/logout and terminal UI
+│   │   ├── ARG.cs                  # /system login/logout and terminal UI
+│   │   └── HandshakeModule.cs      # Handshake button, Unknown Network choice, gamble modal
 │   ├── Data/
 │   │   ├── ReactionsData.cs        # Reaction role data model and persistence
 │   │   ├── ScheduleData.cs         # Schedule data model with weekly reset timer
@@ -254,6 +258,7 @@ DiscordBot/
 │   ├── LinkedAccountsData.cs       # User data read/write for account linking
 │   ├── LiveGuestService.cs         # Auto-remove live guest role on voice leave
 │   ├── ArgTerminalService.cs       # Terminal embed builder and renderer
+│   ├── HandshakeService.cs         # Network handshake gambling logic and cache
 │   └── CoherenceWatcher.cs         # Filesystem watcher for external ARG state changes
 ├── Redeems/
 │   ├── RedemptionContext.cs        # Context record for redemption handlers

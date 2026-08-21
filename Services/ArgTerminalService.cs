@@ -12,12 +12,14 @@ public class ArgTerminalService
     readonly DiscordSocketClient _client;
     readonly ArgTerminalData _data;
     readonly ArgFilesystem _fs;
+    readonly HandshakeService _handshake;
 
-    public ArgTerminalService(DiscordSocketClient client, ArgTerminalData data, ArgFilesystem fs)
+    public ArgTerminalService(DiscordSocketClient client, ArgTerminalData data, ArgFilesystem fs, HandshakeService handshake)
     {
         _client = client;
         _data = data;
         _fs = fs;
+        _handshake = handshake;
     }
 
     // ─── HELPERS ────────────────────────────────────────────────────
@@ -52,6 +54,7 @@ public class ArgTerminalService
         Embed logEmbed = BuildLogHistoryEmbed();
         Embed terminalEmbed = BuildTerminalEmbed();
         Embed readEmbed     = BuildReadEmbed();
+        Embed handshakeEmbed = BuildHandshakeEmbed();
 
 
         if (_data.PublishedLMessageId != 0)
@@ -76,6 +79,14 @@ public class ArgTerminalService
                 channel,
                 readEmbed,
                 _data.PublishedRMessageId);
+        }
+        
+        if (_data.PublishedHMessageId != 0)
+        {
+            await UpdateExistingEmbed(
+                channel,
+                handshakeEmbed,
+                _data.PublishedHMessageId);
         }
     }
     string RenderDirectory(FsNode node, int coherence)
@@ -143,6 +154,7 @@ public class ArgTerminalService
                 $"\n🔌 Active connections: {_data.activeUsers}" +
                 $"\n⚡ Last action: {lastAction}" +
                 $"\n💾 Coherence: {coherence}%" +
+                $"\n🌐 Network Cache: {_handshake.GetCacheBalance()} Glossels" +
                 $"\n**------------------------------------------**")
             .WithColor(new Color(0xffffff))
             .WithFooter("System Active • 4/30/03, 3:00 AM")
@@ -188,6 +200,25 @@ public class ArgTerminalService
             .WithColor(new Color(0xffffff))
             .WithFooter("System Active • 4/30/03, 3:00 AM")
             .Build(); 
+    }
+    
+    public Embed BuildHandshakeEmbed()
+    {
+        string content = string.IsNullOrEmpty(_data.HandshakeContent)
+            ? "*no data*"
+            : _data.HandshakeContent;
+
+        return new EmbedBuilder()
+            .WithAuthor(
+                "AETHER-OS // NETWORK HANDSHAKE",
+                "https://images.icon-icons.com/183/PNG/256/Windows_Messenger_22559.png")
+            .WithTitle("---------------------------------------")
+            .WithDescription(
+                content +
+                $"\n\n**------------------------------------------**")
+            .WithColor(new Color(0xffffff))
+            .WithFooter("System Active • 4/30/03, 3:00 AM")
+            .Build();
     }
     
     public async Task RefreshEmbeds(params ARGEmbed_Type[] embedTypes)
@@ -237,7 +268,8 @@ public class ArgTerminalService
                         {
                             {"Navigate", "terminal_btn_nav"},
                             {"Read", "terminal_btn_read"},
-                            {"Ping", "terminal_btn_ping"}
+                            {"Ping", "terminal_btn_ping"},
+                            {"Handshake", "terminal_btn_handshake"}
                         });
                 }
                 
@@ -268,6 +300,19 @@ public class ArgTerminalService
                             BuildReadEmbed(),
                             _data.PublishedRMessageId);
                     }
+                }
+                
+                break;
+            
+            case ARGEmbed_Type.Handshake:
+                // ─── HANDSHAKE ──────────────────────────
+
+                if (_data.PublishedHMessageId != 0)
+                {
+                    await UpdateExistingEmbed(
+                        channel,
+                        BuildHandshakeEmbed(),
+                        _data.PublishedHMessageId);
                 }
                 
                 break;

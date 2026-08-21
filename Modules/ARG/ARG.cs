@@ -82,7 +82,8 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             {
                 {"Navigate", "terminal_btn_nav"},
                 {"Read", "terminal_btn_read"},
-                {"Ping", "terminal_btn_ping"}
+                {"Ping", "terminal_btn_ping"},
+                {"Handshake", "terminal_btn_handshake"}
             });
             Logger.Log($"[Debug] Terminal embed posted with ID: {postedTerminal.Id}");
             _data.SetPublished(postedTerminal.Id, channel.Id, ARGEmbed_Type.Terminal);
@@ -101,10 +102,24 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             _data.SetPublished(postedRead.Id, channel.Id, ARGEmbed_Type.ReadOutput);
         }
         
+        // ── Handshake embed ─────────────────────────────────────
+        if (_data.PublishedHMessageId == 0)
+        {
+            IUserMessage postedHandshake;
+            
+            Embed handshakeEmbed = _terminal.BuildHandshakeEmbed();
+            
+            Logger.Log($"[Debug] No existing handshake embed — posting new");
+            postedHandshake = await _terminal.SendNewEmbed(channel, handshakeEmbed);
+            Logger.Log($"[Debug] Handshake embed posted with ID: {postedHandshake.Id}");
+            _data.SetPublished(postedHandshake.Id, channel.Id, ARGEmbed_Type.Handshake);
+        }
+        
         await _terminal.RefreshEmbeds(
             ARGEmbed_Type.Logs,
             ARGEmbed_Type.Terminal,
-            ARGEmbed_Type.ReadOutput);
+            ARGEmbed_Type.ReadOutput,
+            ARGEmbed_Type.Handshake);
 
         Logger.Log($"[Info] /login complete for {Context.User.Username} — terminal session active");
         await ModifyOriginalResponseAsync(msg =>
@@ -155,8 +170,6 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     
     [ComponentInteraction("terminal_btn_ping", ignoreGroupNames: true)]
     public Task OnBtnPing() => Ping();
-    
-    
     
     // ─── BUTTON LOGIC ────────────────────────────────────────────────────
     
