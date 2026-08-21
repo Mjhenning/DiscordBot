@@ -54,27 +54,17 @@ public class HandshakeModule : InteractionModuleBase<SocketInteractionContext>
 
         int balance = _handshake.GetBalance(Context.User.Id);
 
-        var modal = new ModalBuilder()
-            .WithTitle("Network Handshake")
-            .AddTextInput(
-                "Glossels to send",
-                "handshake_amount_input",
-                TextInputStyle.Short,
-                placeholder: $"Balance: {balance} - enter amount",
-                minLength: 1,
-                maxLength: 10,
-                required: true)
-            .Build();
-
-        await RespondWithModalAsync(modal);
+        await RespondWithModalAsync<HandshakeAmountModal>(
+            "handshake_amount",
+            modifyModal: m => m.WithTitle($"Network Handshake — Balance: {balance} Glossels"));
     }
 
     [ModalInteraction("handshake_amount", ignoreGroupNames: true)]
-    public async Task OnHandshakeAmount(string handshake_amount_input)
+    public async Task OnHandshakeAmount(HandshakeAmountModal modal)
     {
         await DeferAsync(ephemeral: true);
 
-        if (!int.TryParse(handshake_amount_input, out int amount) || amount <= 0)
+        if (!int.TryParse(modal.AmountInput, out int amount) || amount <= 0)
         {
             await ModifyOriginalResponseAsync(msg =>
             {
@@ -115,4 +105,14 @@ public class HandshakeModule : InteractionModuleBase<SocketInteractionContext>
 
         await _terminal.RefreshEmbeds(ARGEmbed_Type.Handshake, ARGEmbed_Type.Logs);
     }
+}
+
+public class HandshakeAmountModal : IModal
+{
+    public string Title => "Network Handshake";
+
+    [InputLabel("Glossels to send")]
+    [ModalTextInput("handshake_amount_input", TextInputStyle.Short,
+        placeholder: "Enter amount...", minLength: 1, maxLength: 10)]
+    public string AmountInput { get; set; } = "";
 }
