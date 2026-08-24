@@ -622,14 +622,17 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
 
             string userList = string.Join("\n", users.Select(id => $"\u2022 <@{id}>"));
 
-            var embed = new EmbedBuilder()
+            var builder = new EmbedBuilder()
                 .WithTitle($"{action} (via /user)")
                 .WithColor(color)
                 .WithCurrentTimestamp()
                 .AddField("Target(s)", userList)
-                .AddField("Moderator", Context.User.Mention, true)
-                .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason, true)
-                .Build();
+                .AddField("Moderator", Context.User.Mention, true);
+
+            if (!string.IsNullOrWhiteSpace(reason))
+                builder.AddField("Reason", reason, true);
+
+            var embed = builder.Build();
 
             await channel.SendMessageAsync(embed: embed);
         }
