@@ -208,6 +208,16 @@ public class ModerationLogs
 
     static string FormatUser(IUser user) => $"@{user.Username} ({user.Mention})";
 
+    // For low-signal events (role changes, message deletes) an empty Reason
+    // is just noise, so the field is omitted entirely unless a reason exists.
+    // Kick/ban/unban keep a "*No reason provided*" placeholder instead,
+    // because there a missing reason is worth flagging.
+    static void AddReasonIfPresent(EmbedBuilder embed, string? reason)
+    {
+        if (!string.IsNullOrWhiteSpace(reason))
+            embed.AddField("Reason", reason);
+    }
+
     // =====================================================
     // AUDIT LOG HELPER
     // =====================================================
@@ -475,8 +485,7 @@ public class ModerationLogs
             {
                 embed.AddField("Deleted by", FormatUser(moderator), true);
 
-                if (!string.IsNullOrWhiteSpace(reason))
-                    embed.AddField("Reason", reason, true);
+                AddReasonIfPresent(embed, reason);
             }
         }
         
@@ -663,8 +672,9 @@ public class ModerationLogs
                 var embed = CreateEmbed("Role added", Color.Green)
                     .AddField("User", FormatUser(after), true)
                     .AddField("Role", role.Mention, true)
-                    .AddField("Changed By", moderator != null ? FormatUser(moderator) : "*Unknown*", true)
-                    .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason);
+                    .AddField("Changed By", moderator != null ? FormatUser(moderator) : "*Unknown*", true);
+
+                AddReasonIfPresent(embed, reason);
 
                 await LogAsync(embed.Build());
             }
@@ -677,8 +687,9 @@ public class ModerationLogs
                 var embed = CreateEmbed("Role removed", Color.Red)
                     .AddField("User", FormatUser(after), true)
                     .AddField("Role", role.Mention, true)
-                    .AddField("Changed By", moderator != null ? FormatUser(moderator) : "*Unknown*", true)
-                    .AddField("Reason", string.IsNullOrWhiteSpace(reason) ? "*No reason provided*" : reason);
+                    .AddField("Changed By", moderator != null ? FormatUser(moderator) : "*Unknown*", true);
+
+                AddReasonIfPresent(embed, reason);
 
                 await LogAsync(embed.Build());
             }
