@@ -140,6 +140,51 @@ public class HandshakeService
         return _linked.FindByDiscordId(discordUserId)?.Amount ?? 0;
     }
 
+    public class TransferOutcome
+    {
+        public bool Success { get; init; }
+        public string Message { get; init; } = "";
+        public int FromBalance { get; init; }
+        public int ToBalance { get; init; }
+        public string ToName { get; init; } = "";
+    }
+
+    // Transfers Glossels between two linked Discord users. Atomic: the
+    // recipient is credited and the sender debited together, so both
+    // sides can never drift out of sync.
+    public TransferOutcome Transfer(ulong fromDiscordId, ulong toDiscordId, string toUsername, int amount)
+    {
+        if (amount <= 0)
+            return new TransferOutcome { Message = "Invalid amount." };
+
+        var from = _linked.FindByDiscordId(fromDiscordId);
+        if (from == null)
+            return new TransferOutcome { Message = "No linked account found." };
+
+        if (from.Amount < amount)
+            return new TransferOutcome
+            {
+                Message = $"Insufficient Glossels. Balance: {from.Amount}"
+            };
+
+        if (_linked.TransferAmountByDiscordId(fromDiscordId, toDiscordId, amount))
+            return new TransferOutcome
+            {
+                Success = true,
+                FromBalance = _linked.FindByDiscordId(fromDiscordId)?.Amount ?? 0,
+                ToBalance = _linked.FindByDiscordId(toDiscordId)?.Amount ?? amount,
+                ToName = toUsername,
+                Message = ""
+            };
+
+        return new TransferOutcome { Message = "Recipient has no linked account." };
+    }
+
+    public bool IsLinked(ulong discordUserId)
+    {
+        return _linked.FindByDiscordId(discordUserId) != null;
+    }
+
     public int GetCacheBalance() => ReadCache();
 
     OutcomeDef RollOutcome()

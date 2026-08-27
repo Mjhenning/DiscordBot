@@ -135,4 +135,22 @@ public class LinkedAccountsData
             return true;
         }
     }
+
+    // Discord-ID based variant so the caller doesn't have to know the
+    // recipient's Twitch user ID to move Glossels between linked accounts.
+    public bool TransferAmountByDiscordId(ulong fromDiscordId, ulong toDiscordId, int amount)
+    {
+        lock (_lock)
+        {
+            var from = _entries.FirstOrDefault(e => e.DiscordUserId == fromDiscordId.ToString());
+            var to = _entries.FirstOrDefault(e => e.DiscordUserId == toDiscordId.ToString());
+            if (from == null || to == null) return false;
+            if (from.Amount < amount) return false;
+
+            from.Amount -= amount;
+            to.Amount += amount;
+            Save();
+            return true;
+        }
+    }
 }
