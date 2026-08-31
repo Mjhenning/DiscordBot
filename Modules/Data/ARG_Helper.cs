@@ -4,6 +4,7 @@ namespace DiscordBot.Data;
 
 public class ArgFilesystem
 {
+    // mirrors the ARG filesystem that lives in the separate TwitchBot project
     static readonly string FsRoot =
         Path.GetFullPath(
             Path.Combine(
@@ -161,7 +162,7 @@ public class ArgFilesystem
         foreach (string part in parts)
         {
             if (!current.Children.TryGetValue(part, out FsNode? next))
-                return current; // or return current if you prefer partial fallback
+                return current; // return current on a partial match
 
             current = next;
         }
@@ -183,6 +184,7 @@ public class ArgFilesystem
     {
         FsNode node = GetCurrentNode(cwd);
 
+        // a file stays hidden until both its coherence and event gates open
         return node.Children.Values
             .Where(c =>
                 !c.IsDirectory &&
@@ -192,7 +194,7 @@ public class ArgFilesystem
             .ToList();
     }
     
-    //PORTS
+    // ports
     
     static readonly string PortsPath =
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
@@ -221,6 +223,7 @@ public class ArgFilesystem
 
         try
         {
+            // an event is unlocked once its port has been probed on the network
             string portsJson = File.ReadAllText(PortsPath);
             Dictionary<string, PortDef>? ports =
                 JsonConvert.DeserializeObject<Dictionary<string, PortDef>>(portsJson);

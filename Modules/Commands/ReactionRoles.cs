@@ -38,7 +38,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
     [ComponentInteraction("rr_btn_remove", ignoreGroupNames: true)]
     public Task OnBtnRemove() => DeleteStart();
     
-    // ─── STEP 1 ───────────────────────────────────────────────────────────────
+    //-----STEP 1-----
 
     public async Task SetupStart()
     {
@@ -60,7 +60,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─── STEP 2 ───────────────────────────────────────────────────────────────
+    //-----STEP 2-----
 
     [ComponentInteraction("rr_channel", ignoreGroupNames: true)]
     public async Task OnChannelSelected(string[] selectedValues)
@@ -113,7 +113,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─── STEP 3 ───────────────────────────────────────────────────────────────
+    //-----STEP 3-----
 
     [ComponentInteraction("rr_message", ignoreGroupNames: true)]
     public async Task OnMessageSelected(string[] selectedValues)
@@ -135,7 +135,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─── STEP 4 ───────────────────────────────────────────────────────────────
+    //-----STEP 4-----
 
     [ModalInteraction("rr_emoji_modal")]
     public async Task OnEmojiSubmitted(ReactionEmojiModal modal)
@@ -182,7 +182,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─── ROLE SELECTION ───────────────────────────────────────────────────────
+    //-----ROLE SELECTION-----
 
     [ComponentInteraction("rr_roles_add", ignoreGroupNames: true)]
     public async Task OnRolesAddSelected(string[] selectedValues)
@@ -208,7 +208,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         await DeferAsync(ephemeral: true);
     }
 
-    // ─── STEP 5 — CONFIRM ─────────────────────────────────────────────────────
+    //-----STEP 5 CONFIRM-----
 
     [ComponentInteraction("rr_confirm", ignoreGroupNames: true)]
     public async Task OnConfirm()
@@ -280,7 +280,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         }
     }
     
-    // ─── DELETE START ─────────────────────────────────────────────────────────
+    //-----DELETE START-----
     
     public async Task DeleteStart()
     {
@@ -326,7 +326,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─── DELETE SELECT ────────────────────────────────────────────────────────
+    //-----DELETE SELECT-----
 
     [ComponentInteraction("rr_delete_select", ignoreGroupNames: true)]
     public async Task OnDeleteSelected(string[] selectedValues)
@@ -367,7 +367,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         );
     }
 
-    // ─── DELETE CONFIRM ───────────────────────────────────────────────────────
+    //-----DELETE CONFIRM-----
 
     [ComponentInteraction("rr_delete_confirm_multi", ignoreGroupNames: true)]
     public async Task OnDeleteConfirmedMulti()
@@ -429,7 +429,7 @@ public class ReactionRolesModule : InteractionModuleBase<SocketInteractionContex
         }
     }
 
-    // ─── DELETE CANCEL ────────────────────────────────────────────────────────
+    //-----DELETE CANCEL-----
 
     [ComponentInteraction("rr_delete_cancel", ignoreGroupNames: true)]
     public async Task OnDeleteCancelled()

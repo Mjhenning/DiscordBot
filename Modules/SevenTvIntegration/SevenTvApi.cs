@@ -3,17 +3,13 @@ using System.Text.Json;
 
 namespace DiscordBot.Modules.SevenTv;
 
-/// <summary>
-/// Talks to 7TV's GraphQL v4 API. Ported from the original 7emotes project's
-/// service.ts files — same queries, same autocomplete caching behavior, same
-/// image-format selection logic.
-/// </summary>
+// talks to 7TV's GraphQL v4 API.
 public static class SevenTvApi
 {
      const string GraphQlEndpoint = "https://7tv.io/v4/gql";
      static readonly HttpClient Http = new();
 
-    // ---------- GraphQL queries (unchanged from the original project) ----------
+    //-------------GRAPHQL QUERIES--------------
 
      const string EmoteInSetQuery = @"
       query getEmoteInEmoteSet($setId:Id!, $emoteName:String){
@@ -86,7 +82,7 @@ public static class SevenTvApi
         }
     }
 
-    // ---------- Channels ----------
+    //---------------------CHANNELS---------------------
 
     public static async Task<List<SevenTvUser>> SearchChannelsAsync(string channelName)
     {
@@ -125,7 +121,7 @@ public static class SevenTvApi
         }
     }
 
-    // ---------- Emote sets ----------
+    //--------------------EMOTE SETS--------------------
 
     public static async Task<List<SevenTvEmoteSet>> GetUserEmoteSetsAsync(string sevenTvUserId)
     {
@@ -160,7 +156,7 @@ public static class SevenTvApi
         }
     }
 
-    // ---------- Emotes ----------
+    //----------------------EMOTES----------------------
 
      static SevenTvEmote ParseEmote(JsonElement el)
     {
@@ -218,11 +214,9 @@ public static class SevenTvApi
         return results;
     }
 
-    /// <summary>
-    /// Resolve a single emote by exact name. Checks the user's last autocomplete
-    /// results first (so picking a suggestion doesn't trigger a second lookup),
-    /// then falls back to a fresh GraphQL search.
-    /// </summary>
+    // resolve a single emote by exact name.
+    // checks the user's last autocomplete results first,
+    // then falls back to a fresh GraphQL search.
     public static async Task<SevenTvEmote?> SearchEmoteAsync(string emoteName, string? setId, string userId)
     {
         var lastResults = GetLastAutocompleteResults(userId, setId);
@@ -251,11 +245,9 @@ public static class SevenTvApi
         }
     }
 
-    /// <summary>
-    /// Search for emotes matching a partial name, for autocomplete. Sorted by
-    /// popularity (topAllTime), cached for 5 minutes per user+query+set — mirrors
-    /// the original project's caching so repeated keystrokes don't hammer 7TV.
-    /// </summary>
+    // search for emotes matching a partial name, for autocomplete.
+    // sorted by popularity (topAllTime), cached 5 min per user+query+set,
+    // so repeated keystrokes don't hammer 7TV.
     public static async Task<List<SevenTvEmote>> SearchEmotesForAutocompleteAsync(string partialName, string? setId, string userId)
     {
         var cached = GetCachedAutocompleteSearch(userId, partialName, setId);
@@ -293,10 +285,8 @@ public static class SevenTvApi
         }
     }
 
-    /// <summary>
-    /// Pick the right image URL/format for an emote at the given size —
-    /// prefers animated (avif) over static (png), same priority as the original.
-    /// </summary>
+    // pick the right image URL/format for an emote at the given size.
+    // prefers animated (avif) over static (png).
     public static SevenTvEmoteInfo GetEmoteUrl(SevenTvEmote emote, string size = "2x")
     {
         var filtered = emote.Images
@@ -320,10 +310,11 @@ public static class SevenTvApi
         };
     }
 
-    // ---------- Caches ----------
-    // Two caches, same shape as the original: one for raw autocomplete search
-    // results (keyed by user+query+set, 5 min TTL), and one tracking each user's
-    // *last* autocomplete results so /emote can resolve an exact pick instantly.
+    //----------------------CACHES----------------------
+    // two caches, one for raw autocomplete search results,
+    // keyed by user+query+set, 5 min TTL.
+    // one tracking each user's last autocomplete results,
+    // so /emote can resolve an exact pick instantly.
 
      static readonly Dictionary<string, (List<SevenTvEmote> Emotes, DateTime Timestamp)> AutocompleteCache = new();
      static readonly Dictionary<string, (List<SevenTvEmote> Emotes, string Query, DateTime Timestamp)> LastAutocompleteCache = new();

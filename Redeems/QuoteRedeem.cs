@@ -40,9 +40,11 @@ public static class QuoteRedeem
     {
         input = input.Replace("\"", "");
         
+        // no separator, treat the whole thing as the quote
         if (!input.Contains('-'))
             return new QuoteEntry(input.Trim(), "", "", submitter);
 
+        // split on the first dash: "quote - source" or "source - quote"
         int dash     = input.IndexOf('-');
         string left  = input[..dash].Trim();
         string right = input[(dash + 1)..].Trim();
@@ -50,6 +52,7 @@ public static class QuoteRedeem
         string quotePart;
         string metaPart;
 
+        // metadata carries the comma, so it sits on the left: "source - quote"
         if (left.Contains(',') && !right.Contains(','))
         {
             metaPart  = left;
@@ -57,6 +60,7 @@ public static class QuoteRedeem
         }
         else
         {
+            // otherwise the quote is on the left: "quote - source, year"
             quotePart = left;
             metaPart  = right;
         }
@@ -64,6 +68,7 @@ public static class QuoteRedeem
         string source = "";
         string year   = "";
 
+        // metadata splits into source and year on the last comma
         if (metaPart.Contains(','))
         {
             int comma = metaPart.LastIndexOf(',');

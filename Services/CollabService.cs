@@ -197,7 +197,7 @@ public class CollabService
         {
             props.Embed = builder.Build();
 
-            // Removes the Accept / Decline buttons
+            // removes the accept/decline buttons
             props.Components = new ComponentBuilder().Build();
         });
     }

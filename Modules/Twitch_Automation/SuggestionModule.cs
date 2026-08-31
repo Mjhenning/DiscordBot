@@ -4,7 +4,7 @@ using Discord.Interactions;
 
 public class SuggestionModule : InteractionModuleBase<SocketInteractionContext>
 {
-    // This replaces the manual OnInteractionCreated hook in TwitchRedeemHandler
+    // handles the suggestion_complete button click
     [ComponentInteraction("suggestion_complete", ignoreGroupNames: true)]
     public async Task OnMarkComplete()
     {
@@ -16,7 +16,7 @@ public class SuggestionModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        // Context.Interaction is the button click — the message it's on is the suggestion embed
+        // the button click is the message the suggestion embed is on
         if (Context.Interaction is SocketMessageComponent component)
         {
             await component.Message.DeleteAsync();

@@ -56,7 +56,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("schedule_btn_publish", ignoreGroupNames: true)]
     public Task OnBtnPublish() => PublishStart();
 
-    // ─── ADD ──────────────────────────────────────────────────────────────────
+    //-----ADD-----
     
     public async Task AddStart()
     {
@@ -130,7 +130,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        // Build the entry – we’ll add the game name and category ID next
+        // build the entry, game name and category ID resolved below
         ScheduleEntry entry = new()
         {
             Id          = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
@@ -139,13 +139,13 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
             GameName    = string.IsNullOrWhiteSpace(modal.Game) ? null : modal.Game.Trim()
         };
 
-        // If a game name was supplied, look up its Twitch category ID
+        // if a game name was supplied, look up its Twitch category ID
         if (!string.IsNullOrWhiteSpace(entry.GameName))
         {
             string? catId = await _twitchSchedule.GetCategoryIdAsync(entry.GameName);
             if (catId != null)
             {
-                entry.CategoryId = catId;   // <-- store the ID for the segment
+                entry.CategoryId = catId;   // store the ID for the segment
             }
             else
             {
@@ -165,7 +165,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         );
     }
 
-    // ─── REMOVE ───────────────────────────────────────────────────────────────
+    //-----REMOVE-----
     
     public async Task RemoveStart()
     {
@@ -232,7 +232,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    // ─── VIEW ─────────────────────────────────────────────────────────────────
+    //-----VIEW-----
     
     public async Task View()
     {
@@ -246,7 +246,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         await RespondAsync(embed: embed, ephemeral: true);
     }
 
-// ─── PUBLISH ──────────────────────────────────────────────────────────────
+//-----PUBLISH-----
     
     public async Task PublishStart()
     {
@@ -319,7 +319,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    // ─── LIVE EDIT HELPER ─────────────────────────────────────────────────────
+    //-----LIVE EDIT HELPER-----
 
     async Task<bool> TryUpdatePublishedEmbed()
     {
@@ -353,7 +353,7 @@ public class ScheduleModule : InteractionModuleBase<SocketInteractionContext>
         }
     }
 
-    // ─── EMBED BUILDER ────────────────────────────────────────────────────────
+    //-----EMBED BUILDER-----
 
     Embed BuildScheduleEmbed()
     {

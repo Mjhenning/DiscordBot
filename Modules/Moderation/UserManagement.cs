@@ -26,9 +26,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         }
     }
 
-    // ==========================================================
-    // Slash Command
-    // ==========================================================
+    //-------------------------------------SLASH COMMAND-------------------------------------
 
     [SlashCommand("user", "Warn, ban, kick, or add roles to one or more users")]
     [RequireRole("\U0001f527 Processes")]
@@ -53,9 +51,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         );
     }
 
-    // ==========================================================
-    // Navigation from main menu
-    // ==========================================================
+    //-------------------------------------NAVIGATION FROM MAIN MENU-------------------------------------
 
     [ComponentInteraction("um:warn")]
     public async Task Warn()
@@ -108,9 +104,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         await Refresh();
     }
 
-    // ==========================================================
-    // Confirm Actions
-    // ==========================================================
+    //-------------------------------------CONFIRM ACTIONS-------------------------------------
 
     [ComponentInteraction("um:confirm_warn")]
     public async Task ConfirmWarn()
@@ -261,9 +255,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         Session.Reset();
     }
 
-    // ==========================================================
-    // Reason Modal
-    // ==========================================================
+    //-------------------------------------REASON MODAL-------------------------------------
 
     [ComponentInteraction("um:reason_warn", ignoreGroupNames: true)]
     public async Task OpenReasonModalWarn() => await OpenReasonModal();
@@ -287,9 +279,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         await Refresh();
     }
 
-    // ==========================================================
-    // Role Management - Add Roles display
-    // ==========================================================
+    //-------------------------------------ADD ROLES DISPLAY-------------------------------------
 
      async Task ShowAddRoles()
     {
@@ -328,9 +318,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         });
     }
 
-    // ==========================================================
-    // Role Management - Remove Roles display
-    // ==========================================================
+    //-------------------------------------REMOVE ROLES DISPLAY-------------------------------------
 
      async Task ShowRemoveRoles()
     {
@@ -382,9 +370,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         });
     }
 
-    // ==========================================================
-    // Role Management - apply
-    // ==========================================================
+    //-------------------------------------ROLE MANAGEMENT: APPLY-------------------------------------
 
     [ComponentInteraction("um:pick_add_roles")]
     public async Task PickAddRoles(string[] roleIds)
@@ -466,9 +452,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         Session.Reset();
     }
 
-    // ==========================================================
-    // Rendering
-    // ==========================================================
+    //-------------------------------------RENDERING-------------------------------------
 
      async Task Refresh()
     {
@@ -567,9 +551,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         return builder.Build();
     }
 
-    // ==========================================================
-    // Helpers
-    // ==========================================================
+    //-------------------------------------HELPERS-------------------------------------
 
      static HashSet<ulong> ParseUserIds(string input)
     {
@@ -604,8 +586,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         Logger.Log($"[UserMgmt] {action} by {Context.User.Username}: {userList} | Reason: {reason ?? "none"}");
     }
 
-    // Audit-log reason for kick/ban - omits the ": reason" suffix when
-    // none was set so the mod-log doesn't end in a dangling colon
+    // audit log reason for kick/ban, omits the ": reason" suffix when
+    // none was set so the mod log doesn't end in a dangling colon
      string AuditReason(string action)
     {
         return string.IsNullOrWhiteSpace(Session.Reason)
@@ -642,9 +624,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         }
     }
 
-    // ==========================================================
-    // Models
-    // ==========================================================
+    //-------------------------------------MODELS-------------------------------------
 
      enum UmPage
     {

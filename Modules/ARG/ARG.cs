@@ -70,7 +70,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
         }
         
 
-        // ── Terminal embed ────────────────────────────────────────
+        //-----TERMINAL EMBED-----
         if (_data.PublishedTMessageId == 0)
         {
             IUserMessage postedTerminal;
@@ -89,7 +89,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             _data.SetPublished(postedTerminal.Id, channel.Id, ARGEmbed_Type.Terminal);
         }
 
-        // ── Read embed ───────────────────────────────────────────
+        //-----READ EMBED-----
         if (_data.PublishedRMessageId == 0)
         {
             IUserMessage postedRead;
@@ -102,7 +102,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
             _data.SetPublished(postedRead.Id, channel.Id, ARGEmbed_Type.ReadOutput);
         }
         
-        // ── Handshake embed ─────────────────────────────────────
+        //-----HANDSHAKE EMBED-----
         if (_data.PublishedHMessageId == 0)
         {
             IUserMessage postedHandshake;
@@ -161,7 +161,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     
     
     
-    // ─── BUTTONS ────────────────────────────────────────────────────
+    //-----BUTTONS-----
     [ComponentInteraction("terminal_btn_nav",     ignoreGroupNames: true)]
     public Task OnBtnNavigate()     => NavigateToFolder();
     
@@ -171,7 +171,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("terminal_btn_ping", ignoreGroupNames: true)]
     public Task OnBtnPing() => Ping();
     
-    // ─── BUTTON LOGIC ────────────────────────────────────────────────────
+    //-----BUTTON LOGIC-----
     
 
     public async Task NavigateToFolder()
@@ -187,7 +187,7 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         _data.InteractionMode = TerminalInteractionMode.Navigating; //so select menu is for folder navigation
 
-        //Buuilds directory list
+        // builds directory list
         List<FsNode> directories =
             _fs.GetDirectories(_data.Cwd);
         

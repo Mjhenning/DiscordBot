@@ -15,10 +15,9 @@ DotNetEnv.Env.Load();
 bool _ready = false;
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// c# version 9+ does not use main class void structure, allows writing top level
-// statements - essentially code that runs directly without a class wrapper
-// ─────────────────────────────────────────────────────────────────────────────
+//------------------------------TOP-LEVEL STATEMENTS------------------------------
+// c# version 9+ does not use main class void structure.
+// top level statements run directly without a class wrapper.
 
 DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
 {
@@ -37,24 +36,23 @@ DiscordSocketClient client = new DiscordSocketClient(new DiscordSocketConfig
 
     Logger.Init(client);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Service provider — registers singletons for DI injection into modules
-// ─────────────────────────────────────────────────────────────────────────────
+//----------------------------SERVICE PROVIDER----------------------------
+// service provider: registers singletons for DI injection into modules.
 
 ServiceProvider services = new ServiceCollection()
     
-    //BASE DISCORD STUFF
+    //-----base discord-----
     .AddSingleton(client)
     .AddSingleton(x => new InteractionService(
         x.GetRequiredService<DiscordSocketClient>()
     ))
     
-    //DATA RELATED
+    //-----data related-----
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
     .AddSingleton<CollabData>()
     
-    //TWITCH RELATED
+    //-----twitch related-----
     .AddSingleton<TwitchAPI>()
     .AddTwitchLibEventSubWebsockets()
     .AddSingleton<TokenManager>(sp => new TokenManager(
@@ -69,10 +67,10 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<CollabRequestCache>()
     .AddSingleton<CollabService>()
     
-    //TWITCH RECONNECT HANDLER
+    //-----twitch reconnect handler-----
     .AddSingleton<EventSubReconnectService>()
     
-    //ARG RELATED
+    //-----arg related-----
     .AddSingleton<ArgFilesystem>()
     .AddSingleton<ArgTerminalData>()
     .AddSingleton<ArgTerminalService>()
@@ -87,23 +85,23 @@ ServiceProvider services = new ServiceCollection()
         );
     })
     
-    //Mod Logging
+    //-----mod logging-----
     .AddSingleton<ModerationLogs>()
 
-    //Live Guest auto-remove
+    //-----live guest auto-remove-----
     .AddSingleton<LiveGuestService>()
 
-    //Linking
+    //-----linking-----
     .AddSingleton<TwitchChatService>()
     .AddSingleton<LinkedAccountsData>()
     
-    //Handshake gambling
+    //-----handshake gambling-----
     .AddSingleton<HandshakeService>()
     
-    //LOGGER
+    //-----logger-----
     .AddLogging()
     
-    //CONSTRUCTS SERVICE PROVIDER
+    //-----builds service provider-----
     .BuildServiceProvider();
 
 ModerationLogs modLogs = services.GetRequiredService<ModerationLogs>();
@@ -112,9 +110,8 @@ ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
 CoherenceWatcher watcher = services.GetRequiredService<CoherenceWatcher>();
 TokenManager tokenManager = services.GetRequiredService<TokenManager>();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Twitch token auth - refresh if expired, full OAuth if no refresh token
-// ─────────────────────────────────────────────────────────────────────────────
+//--------------------------------TWITCH TOKEN AUTH--------------------------------
+// refresh if expired, full OAuth if no refresh token.
 
 if (!tokenManager.HasValidTokens(TwitchProfile.Broadcaster))
 {
@@ -144,10 +141,9 @@ if (!tokenManager.HasValidTokens(TwitchProfile.Bot))
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Logging — routes both client and interaction service logs to the console
-// => {} is a lambda meaning an anonymous function
-// ─────────────────────────────────────────────────────────────────────────────
+//------------------------------------LOGGING------------------------------------
+// routes both client and interaction service logs to the console.
+// => {} is a lambda meaning an anonymous function.
 
 client.Log += log =>
 {
@@ -163,18 +159,17 @@ interactions.Log += log =>
     return Task.CompletedTask;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Ready — registers slash commands and logs startup info
-// ─────────────────────────────────────────────────────────────────────────────
+//------------------------------------READY------------------------------------
+// registers slash commands and logs startup info.
 
 client.Ready += async () =>
 {
-    // //UNCOMMENT TO CLEAR OUT COMMANDS
+    //TODO: uncomment to clear out commands
     //
-    // // Add this ONCE, run the bot, then remove it
+    // add this once, run the bot, then remove it
     //      await client.Rest.DeleteAllGlobalCommandsAsync();
     //
-    //  // Also clear guild-specific commands
+    //  // also clear guild-specific commands
     //      foreach (var guild in client.Guilds)
     //      {
     //          await guild.DeleteApplicationCommandsAsync();
@@ -184,10 +179,10 @@ client.Ready += async () =>
     if (_ready) return; // prevent re-running on reconnect
     _ready = true;
     
-    await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services); //adds Schedule and ReactionROle because both derive from IInteractionModuleBase
+    await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services); // adds schedule and reaction roles because both derive from IInteractionModuleBase
     
-    // // Use RegisterCommandsToGuildAsync(guildId) during development for instant updates
-    // // Switch to RegisterCommandsGloballyAsync() for production (up to 1hr propagation)
+    // // use RegisterCommandsToGuildAsync(guildId) during development for instant updates
+    // // switch to RegisterCommandsGloballyAsync() for production, up to 1hr propagation
     await interactions.RegisterCommandsToGuildAsync(Config.GuildId, deleteMissing: true);
     
     Logger.Log($"[Info] Bot is ready — logged in as {client.CurrentUser.Username}#{client.CurrentUser.Discriminator}");
@@ -231,26 +226,24 @@ client.Ready += async () =>
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Interaction routing — forwards all interactions to the interaction service
-// ─────────────────────────────────────────────────────────────────────────────
+//------------------------------INTERACTION ROUTING------------------------------
+// forwards all interactions to the interaction service.
 
 client.InteractionCreated += async interaction =>
 {
     SocketInteractionContext ctx = new SocketInteractionContext(client, interaction);
     
-    // Log what's coming in to confirm routing
+    // log what's coming in to confirm routing
     Logger.Log($"[Debug] Interaction received: {interaction.Type} — {(interaction is SocketMessageComponent c ? c.Data.CustomId : "N/A")}");
     
-    var result = await interactions.ExecuteCommandAsync(ctx, services); //routes to correct module based on called slash command
+    var result = await interactions.ExecuteCommandAsync(ctx, services); // routes to correct module based on called slash command
 
     if (!result.IsSuccess)
         Logger.Log($"[Warning] Interaction failed: {result.Error} — {result.ErrorReason}");
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Welcome + auto role — fires when a new member joins the guild
-// ─────────────────────────────────────────────────────────────────────────────
+//------------------------WELCOME AND AUTO ROLE------------------------
+// fires when a new member joins the guild.
 
 client.UserJoined += async member =>
 {
@@ -281,24 +274,20 @@ client.UserJoined += async member =>
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ReactionAdded Event Handler
+//------------------------------REACTION ADDED------------------------------
 //
-// Handles TWO systems:
-// 1. Setup Wizard Flow (Step 3 → Step 4 emoji capture)
-// 2. Live Reaction Role System (normal users triggering roles)
+// handles two systems.
+// 1. setup wizard flow, step 3 to step 4 emoji capture
+// 2. live reaction role system, normal users triggering roles
 //
-// IMPORTANT: Order matters — setup flow MUST run before normal role logic
-// ─────────────────────────────────────────────────────────────────────────────
+// order matters: setup flow must run before normal role logic.
 
 client.ReactionAdded += async (msgRef, channelRef, reaction) =>
 {
-    // Ignore bot's own reactions (prevents infinite loops / self-triggers)
+    // ignore bot's own reactions, prevents infinite loops
     if (reaction.UserId == client.CurrentUser.Id) return;
 
-    // ─────────────────────────────────────────────────────────────
-    // Resolve channel + message context
-    // ─────────────────────────────────────────────────────────────
+    //---------------resolve channel and message context---------------
 
     IMessageChannel? resolvedChannel = await channelRef.GetOrDownloadAsync();
     if (resolvedChannel is not IGuildChannel guildChannel)
@@ -312,25 +301,21 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     var guild = (guildChannel as SocketGuildChannel)?.Guild;
     if (guild == null) return;
 
-    // ─────────────────────────────────────────────────────────────
-    // SETUP FLOW BRIDGE (STEP 3 → STEP 4)
-    //
-    // If user is currently configuring a reaction role:
-    // - capture emoji directly from real Discord reaction
-    // - exit early (do NOT run normal role logic)
-    // ─────────────────────────────────────────────────────────────
+    //-----------------setup flow bridge, step 3 to step 4-----------------
+    // capture emoji directly from real discord reaction.
+    // exit early, do not run normal role logic.
 
     if (ReactionRolesModule.Sessions.TryGetValue(reaction.UserId, out var session))
     {
         if (session.WaitingForEmoji && session.MessageId == msg.Id)
         {
-            // Capture exact emoji (unicode or custom)
+            // capture exact emoji, unicode or custom
             session.Emoji = reaction.Emote?.ToString();
             session.WaitingForEmoji = false;
 
             Logger.Log($"[Setup] Captured emoji: {session.Emoji} for user {reaction.UserId}");
 
-            // Clean up user's setup reaction for cleaner UX
+            // clean up user's setup reaction for cleaner ux
             try
             {
                 var guildUser = guild.GetUser(reaction.UserId);
@@ -342,9 +327,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
                 Logger.Log($"[Warning] Failed to remove setup reaction: {ex.Message}");
             }
 
-            // ─────────────────────────────────────────────────────────────
-            // CONTINUE WIZARD → STEP 4 (ROLE SELECTION UI)
-            // ─────────────────────────────────────────────────────────────
+            //-------------continue wizard to step 4, role selection ui-------------
 
             var roles = guild.Roles
                 .Where(r => r.Id != guild.Id && !r.IsManaged)
@@ -376,13 +359,11 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
                 components: components
             );
 
-            return; // IMPORTANT: stop here so normal role logic does not run
+            return; // stop here so normal role logic does not run
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // NORMAL REACTION ROLE LOGIC (production users)
-    // ─────────────────────────────────────────────────────────────
+    //---------------normal reaction role logic, production users---------------
 
     string? emoji = reaction.Emote?.ToString();
     if (string.IsNullOrWhiteSpace(emoji))
@@ -400,11 +381,9 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
 
     Logger.Log($"[Info] Reaction role triggered by {member.Username} on message {msg.Id} with {reaction.Emote}");
 
-    // ─────────────────────────────────────────────────────────────
-    // ROLE HANDLING — toggle behavior
-    // If member already has ALL roles-to-add, remove them (toggle off)
-    // Otherwise add them (toggle on)
-    // ─────────────────────────────────────────────────────────────
+    //----------role handling, toggle behavior----------
+    // if member has all roles-to-add, remove them, toggle off
+    // otherwise add them, toggle on.
 
     if (entry.RolesToAdd.Count > 0)
     {
@@ -428,10 +407,8 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
         Logger.Log($"[Info] Removed {entry.RolesToRemove.Count} role(s) from {member.Username}");
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // UX CLEANUP: remove user's reaction after processing
-    // (keeps only bot reaction visible → button-like behavior)
-    // ─────────────────────────────────────────────────────────────
+    //----------ux cleanup: remove user's reaction after processing----------
+    // keeps only bot reaction visible, button-like behavior.
 
     try
     {
@@ -443,9 +420,8 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Login and run — verifies token and blocks forever
-// ─────────────────────────────────────────────────────────────────────────────
+//--------------------------------LOGIN AND RUN--------------------------------
+// verifies token and blocks forever.
 
 Logger.Log("[Info] Logging in...");
 await client.LoginAsync(TokenType.Bot, Config.BotToken);

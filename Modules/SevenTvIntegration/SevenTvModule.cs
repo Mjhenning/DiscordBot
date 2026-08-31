@@ -3,13 +3,10 @@ using Discord.Interactions;
 
 namespace DiscordBot.Modules.SevenTv;
 
-/// <summary>
-/// /emote, /channel, /image-size, /emote-set, /reset — ported from atmahana/7emotes.
-/// Written as a proper Discord.Interactions module so it's auto-discovered by
-/// the existing `interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services)`
-/// call in Program.cs. No manual wiring needed — just needs to live in the
-/// same project/assembly.
-/// </summary>
+// /emote, /channel, /image-size, /emote-set, /reset, the 7TV commands.
+// written as a proper discord.interactions module so it's auto-discovered by
+// the existing interactions.addmodulesasync call in program.cs.
+// no manual wiring needed, just needs to live in the same project or assembly.
 [Group("7tv", "7TV emote commands")]
 public class SevenTvModule : InteractionModuleBase<SocketInteractionContext>
 {
@@ -48,7 +45,7 @@ public class SevenTvModule : InteractionModuleBase<SocketInteractionContext>
             using var stream = new MemoryStream(imageBytes);
             await ModifyOriginalResponseAsync(m =>
             {
-                m.Content = "\u200B"; // zero-width space — satisfies Discord.Net's "Content can't be empty" check, renders as nothing visible
+                m.Content = "\u200B"; // zero width space, satisfies discord.net's content can't be empty check, renders as nothing visible
                 m.Attachments = new[] { new FileAttachment(stream, $"{emoteInfo.Name}.{emoteInfo.Format}") };
             });
         }

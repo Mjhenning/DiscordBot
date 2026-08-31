@@ -22,7 +22,7 @@ public class ArgTerminalService
         _handshake = handshake;
     }
 
-    // ─── HELPERS ────────────────────────────────────────────────────
+    //------------HELPERS------------
     public async Task ResetSession()
     {
         _data.LoggedInUsers.Clear();
@@ -93,7 +93,7 @@ public class ArgTerminalService
     {
         StringBuilder sb = new();
 
-        // Directories
+        // directories
         foreach (FsNode dir in node.Children.Values
                      .Where(c => c.IsDirectory)
                      .OrderBy(c => c.Name))
@@ -101,7 +101,7 @@ public class ArgTerminalService
             sb.AppendLine($"├📁 /{dir.Name}/");
         }
 
-        // Files (already filtered)
+        // files (already filtered)
         string cwd = node == _fs.Root
             ? "/"
             : node.FullPath
@@ -130,7 +130,7 @@ public class ArgTerminalService
         return sb.Length > 0 ? sb.ToString() : "*No Logs Found*";
     }
 
-    // ─── EMBEDS ────────────────────────────────────────────────────
+    //------------EMBEDS------------
     public Embed BuildTerminalEmbed()
     {
         int coherence    = _data.GetCoherence();
@@ -244,7 +244,7 @@ public class ArgTerminalService
         switch (embedType)
         {
             case ARGEmbed_Type.Logs:
-                // ─── LOGS ───────────────────────────────
+                //-----LOGS-----
 
                 if (_data.PublishedLMessageId != 0)
                 {
@@ -256,7 +256,7 @@ public class ArgTerminalService
                 
                 break;
             case ARGEmbed_Type.Terminal:
-                // ─── TERMINAL ───────────────────────────
+                //-----TERMINAL-----
 
                 if (_data.PublishedTMessageId != 0)
                 {
@@ -275,7 +275,7 @@ public class ArgTerminalService
                 
                 break;
             case ARGEmbed_Type.ReadOutput:
-                // ─── READ ───────────────────────────────
+                //-----READ-----
 
                 if (_data.PublishedRMessageId != 0)
                 {
@@ -305,7 +305,7 @@ public class ArgTerminalService
                 break;
             
             case ARGEmbed_Type.Handshake:
-                // ─── HANDSHAKE ──────────────────────────
+                //-----HANDSHAKE-----
 
                 if (_data.PublishedHMessageId != 0)
                 {

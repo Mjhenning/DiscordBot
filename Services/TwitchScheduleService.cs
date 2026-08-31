@@ -10,10 +10,9 @@ public class TwitchScheduleService
     readonly TwitchAPI _api;
     readonly TokenManager _tokens;
 
-    // ── Tweak these ─────────────────────────────────────────────
+    // tweak these to change the default segment length and timezone
     const int    DefaultDurationMinutes = 240; // 4 hours
     const string Timezone               = "Africa/Johannesburg"; // IANA tz name
-    // ───────────────────────────────────────────────────────────
 
     public TwitchScheduleService(TwitchAPI api, TokenManager tokens)
     {

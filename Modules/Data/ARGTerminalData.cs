@@ -126,7 +126,7 @@ public class ArgTerminalData
         File.WriteAllText(FilePath, json);
     }
     
-    // ─── HELPERS ────────────────────────────────────────────────────
+    //-----HELPERS-----
 
     public int GetCoherence()
     {
@@ -149,11 +149,11 @@ public class ArgTerminalData
         string json   = File.ReadAllText(StateFilePath);
         dynamic state = JsonConvert.DeserializeObject<dynamic>(json)!;
         int current   = (int)(state.coherence ?? 0);
-        int updated   = Math.Min(100, current + amount);
+        int updated   = Math.Min(100, current + amount); // coherence caps at 100
         state.coherence = updated;
     
         string written = JsonConvert.SerializeObject(state, Formatting.Indented);
-        Logger.Log($"[ARG] Writing coherence: {written}"); // temp debug
+        Logger.Log($"[ARG] Writing coherence: {written}");
         File.WriteAllText(StateFilePath, written);
         return updated;
     }
@@ -218,7 +218,7 @@ public class ArgTerminalData
 
             ActionHistory = store.ActionHistory ?? new Queue<string>();
 
-            // keep runtime-only state intact unless you want resets:
+            // recompute runtime-only state after reload
             activeUsers = LoggedInUsers.Count;
         }
         catch (Exception ex)

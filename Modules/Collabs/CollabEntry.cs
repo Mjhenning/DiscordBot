@@ -16,7 +16,7 @@ public class CollabEntry
 
     public List<CollabParticipant> Participants { get; set; } = new();
 
-    // Owner DM so we can keep updating it.
+    // owner dm so we can keep updating it.
     public ulong OwnerDmChannelId { get; set; }
 
     public ulong OwnerDmMessageId { get; set; }

@@ -19,6 +19,7 @@ public class HandshakeService
 
     static readonly Random _rng = new();
 
+    // one row per possible handshake result, weight drives how often it rolls
     readonly record struct OutcomeDef(string Type, int Weight, int Multiplier, string[] Messages);
 
     static readonly OutcomeDef[] Outcomes =
@@ -85,8 +86,10 @@ public class HandshakeService
         var outcome = RollOutcome();
         string msgTemplate = outcome.Messages[_rng.Next(outcome.Messages.Length)];
         int displayAmount;
+        // the shared network cache is where lost packets get buffered
         int cacheBalance = ReadCache();
 
+        // drained: sweep the whole cache into the user's balance
         if (outcome.Type == "drained")
         {
             int cacheDrained = cacheBalance;
@@ -94,6 +97,7 @@ public class HandshakeService
             WriteCache(0);
             displayAmount = amount + cacheDrained;
         }
+        // captured: half the stake is lost and fed to the cache
         else if (outcome.Type == "captured")
         {
             int lost = Math.Max(1, (int)Math.Ceiling(amount * 0.5));
@@ -101,6 +105,7 @@ public class HandshakeService
             WriteCache(cacheBalance + lost);
             displayAmount = lost;
         }
+        // win: pay the stake, then return the multiplied winnings
         else if (outcome.Multiplier > 1)
         {
             int returnAmount = (int)Math.Floor(amount * (double)outcome.Multiplier);
@@ -108,12 +113,14 @@ public class HandshakeService
             _linked.AddAmountByDiscordId(discordUserId, returnAmount);
             displayAmount = returnAmount - amount;
         }
+        // loss: stake is lost and buffered in the cache
         else if (outcome.Multiplier == 0)
         {
             _linked.AddAmountByDiscordId(discordUserId, -amount);
             WriteCache(cacheBalance + amount);
             displayAmount = amount;
         }
+        // even: no change
         else
         {
             displayAmount = 0;
@@ -149,9 +156,9 @@ public class HandshakeService
         public string ToName { get; init; } = "";
     }
 
-    // Transfers Glossels between two linked Discord users. Atomic: the
-    // recipient is credited and the sender debited together, so both
-    // sides can never drift out of sync.
+    // transfers Glossels between two linked Discord users, atomic
+    // the recipient is credited and the sender debited together, so both
+    // sides can never drift out of sync
     public TransferOutcome Transfer(ulong fromDiscordId, ulong toDiscordId, string toUsername, int amount)
     {
         if (amount <= 0)

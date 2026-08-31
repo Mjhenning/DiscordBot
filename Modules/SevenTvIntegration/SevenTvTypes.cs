@@ -42,11 +42,9 @@ public class SevenTvEmoteSet
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-/// <summary>
-/// The resolved, ready-to-download image for an emote at a given size —
-/// mirrors the original project's format detection (animated emotes come
-/// through as avif, static ones as png).
-/// </summary>
+// the resolved, ready-to-download image for an emote at a given size,
+// matches the format detection (animated emotes come
+// through as avif, static ones as png)
 public class SevenTvEmoteInfo
 {
     public string Url { get; set; } = "";

@@ -6,13 +6,13 @@ using Discord.WebSocket;
 
 namespace DiscordBot
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // Logger — static utility for writing timestamped messages to console
-    // and a persistent log file. Call Logger.Log() from anywhere.
+    //-----------------------------------------------------------------------
+    // logger, static utility for writing timestamped messages to console
+    // and a persistent log file. call Logger.Log() from anywhere.
     //
-    // Pass dm: true to also DM the bot owner — use it for events you
+    // pass dm: true to also DM the bot owner, use it for events you
     // actually want to be notified about, not routine debug spam.
-    // ─────────────────────────────────────────────────────────────────────────
+    //-----------------------------------------------------------------------
     public static class Logger
     {
          static readonly StreamWriter _logFile =
@@ -21,7 +21,7 @@ namespace DiscordBot
          static DiscordSocketClient? _client;
          static IDMChannel? _ownerDm;
 
-        // Call once, right after constructing the client (before client.LoginAsync)
+        // call once, right after constructing the client, before client.LoginAsync
         public static void Init(DiscordSocketClient client)
         {
             _client = client;
@@ -35,14 +35,14 @@ namespace DiscordBot
             Console.WriteLine(line);
 
             if (dm)
-                _ = SendDmAsync(msg); // fire-and-forget so callers stay sync
+                _ = SendDmAsync(msg); // fire and forget so callers stay sync
         }
 
          static async Task SendDmAsync(string msg)
         {
             if (_client == null)
             {
-                // Note: don't call Log(..., dm:true) here — avoids infinite recursion
+                // note: don't call Log(..., dm:true) here, avoids infinite recursion
                 Log("[Warning] Logger.Log(dm:true) called before Logger.Init — DM not sent");
                 return;
             }

@@ -381,7 +381,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             ephemeral: true);
     }
     
-    // ─── REQUESTS ──────────────────────────────────────────────────────────────────
+    //-----REQUESTS-----
     public async Task RequestStart()
     {
         List<SelectMenuOptionBuilder> options = new();
@@ -410,7 +410,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             ephemeral: true);
     }
     
-    // ─── VIEW ──────────────────────────────────────────────────────────────────
+    //-----VIEW-----
     
     public async Task View()
     {

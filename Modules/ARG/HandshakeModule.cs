@@ -123,8 +123,8 @@ public class HandshakeModule : InteractionModuleBase<SocketInteractionContext>
 
         var target = Context.Guild.GetUser(targetId);
 
-        // Confirm the chosen user is actually reachable on the network.
-        // If they're not linked to Twitch yet, they can't hold Glossels.
+        // confirm the chosen user is actually reachable on the network
+        // if they're not linked to Twitch yet, they can't hold Glossels.
         if (!_handshake.IsLinked(targetId))
         {
             await RespondAsync(

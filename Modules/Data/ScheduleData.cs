@@ -1,6 +1,6 @@
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------
 // ScheduleData.cs
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------
 
 namespace DiscordBot.Data;
 using Newtonsoft.Json;
@@ -10,22 +10,22 @@ public class ScheduleData
 {
     const string FilePath = "Data/schedule.json";
     
-    // ── Tweak these to change when the week resets ────────────────────────
+    // tweak these to change when the week resets
     const DayOfWeek ResetDay    = DayOfWeek.Sunday;
     const int       ResetHour   = 23;   // 24-hour local time
     const int       ResetMinute = 30;
-    // ─────────────────────────────────────────────────────────────────────
+    // -----------------------------------------
 
     readonly TwitchScheduleService _twitchSchedule;
     Timer _resetTimer;
 
     public List<ScheduleEntry> ScheduleEntries { get;  set; } = new();
 
-    // Persistent published message reference
+    // persistent published message reference
     public ulong PublishedMessageId  { get;  set; } = 0;
     public ulong PublishedChannelId  { get;  set; } = 0;
-    public string WeekStart          { get;  set; } = ""; // ISO 8601 UTC — Monday of published week
-    public string EntriesWeekStart   { get;  set; } = ""; // ISO 8601 UTC — Monday of the week current entries belong to
+    public string WeekStart          { get;  set; } = ""; // ISO 8601 UTC: Monday of published week
+    public string EntriesWeekStart   { get;  set; } = ""; // ISO 8601 UTC: Monday of the week current entries belong to
 
     public ScheduleData(TwitchScheduleService twitchSchedule)
     {
@@ -55,8 +55,8 @@ public class ScheduleData
             EntriesWeekStart   = store.EntriesWeekStart  ?? "";
         }
 
-        // Back-compat: older saves won't have EntriesWeekStart set.
-        // Fall back to WeekStart if we have it, otherwise assume "now".
+        // back-compat: older saves won't have EntriesWeekStart set.
+        // fall back to WeekStart if we have it, otherwise assume "now".
         if (string.IsNullOrWhiteSpace(EntriesWeekStart))
         {
             EntriesWeekStart = !string.IsNullOrWhiteSpace(WeekStart)
@@ -90,7 +90,7 @@ public class ScheduleData
 
     public async Task AddEntryAsync(ScheduleEntry entry)
     {
-        // Stamp the entries-week if it's somehow unset (e.g. list was empty going in)
+        // stamp the entries-week if it's somehow unset (e.g. list was empty going in)
         if (string.IsNullOrWhiteSpace(EntriesWeekStart))
             EntriesWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
 
@@ -141,7 +141,7 @@ public class ScheduleData
     
     public async Task ClearPublishedAsync(bool auto = false)
     {
-        // Snapshot before clearing so we still have segment IDs to delete
+        // snapshot before clearing so we still have segment IDs to delete
         List<ScheduleEntry> toClean = ScheduleEntries
             .Where(e => !string.IsNullOrWhiteSpace(e.TwitchSegmentId))
             .ToList();
@@ -169,7 +169,7 @@ public class ScheduleData
         Logger.Log($"📅 The stream schedule has been {reason}. Don't forget to add your streams!", true);
     }
 
-    // Returns true if a message is published for the current week
+    // returns true if a message is published for the current week
     public bool IsPublishedThisWeek()
     {
         
@@ -180,7 +180,7 @@ public class ScheduleData
         return WeekStart == currentWeekStart;
     }
 
-    // Monday of the current UTC week
+    // monday of the current UTC week
     public static DateTimeOffset GetCurrentWeekStart()
     {
         DateTime now = DateTime.Now;
@@ -222,7 +222,7 @@ public class ScheduleData
             .AddHours(ResetHour)
             .AddMinutes(ResetMinute);
 
-        // If that time has already passed this week, jump to next week
+        // if that time has already passed this week, jump to next week
         if (candidate <= from)
             candidate = candidate.AddDays(7);
 
@@ -233,7 +233,7 @@ public class ScheduleData
     {
         string currentWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
 
-        // No entries-week tracked yet — stamp it and bail, nothing to clear
+        // no entries-week tracked yet, stamp it and bail, nothing to clear
         if (string.IsNullOrWhiteSpace(EntriesWeekStart))
         {
             EntriesWeekStart = currentWeekStart;
@@ -241,21 +241,21 @@ public class ScheduleData
             return;
         }
 
-        // Entries belong to the current week → nothing to do
+        // entries belong to the current week so nothing to do
         if (EntriesWeekStart == currentWeekStart)
             return;
 
         Logger.Log("[Info] Week rollover detected — clearing previous schedule");
 
-        // Fire-and-forget: this runs from the sync Initialize() path at startup,
-        // so we can't await here. The Twitch segment deletes happen best-effort
-        // in the background; the local/Discord state clear still completes
+        // fire-and-forget: runs from the sync Initialize() path at startup,
+        // so we can't await here. the Twitch segment deletes happen best-effort
+        // in the background. the local/Discord state clear still completes
         // synchronously inside ClearPublishedAsync before the delete loop finishes.
         _ = ClearPublishedAsync(auto: true);
     }
 }
 
-// Wrapper so we can store entries + metadata in one JSON object
+// wrapper so we can store entries + metadata in one JSON object
 public class ScheduleStore
 {
     public List<ScheduleEntry> Entries          { get; set; } = new();

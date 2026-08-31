@@ -2,12 +2,10 @@ using System.Text.Json;
 
 namespace DiscordBot.Modules.SevenTv;
 
-/// <summary>
-/// Same public API as the SQLite version, backed by a single JSON file instead —
-/// no NuGet package needed, just System.Text.Json. All user preferences live in
-/// memory once loaded and get rewritten to disk (atomically, via a temp file +
-/// move) on every change, so reads never touch disk after the first load.
-/// </summary>
+// backed by a single json file, no external db dependency.
+// just system.text.json. all user preferences live in memory once loaded
+// and get rewritten to disk (atomically, via a temp file + move) on every
+// change, so reads never touch disk after the first load.
 public static class SevenTvPreferencesStore
 {
      static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "data", "sevenTvPreferences.json");
@@ -57,8 +55,8 @@ public static class SevenTvPreferencesStore
     {
         var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
 
-        // Write to a temp file then move over the real one, so a crash mid-write
-        // can't leave you with a corrupted/truncated preferences file.
+        // write to a temp file then move over the real one,
+        // so a crash mid-write can't leave you with a corrupted or truncated preferences file.
         var tempPath = FilePath + ".tmp";
         await File.WriteAllTextAsync(tempPath, json);
         File.Move(tempPath, FilePath, overwrite: true);
@@ -85,10 +83,8 @@ public static class SevenTvPreferencesStore
         }
     }
 
-    /// <summary>
-    /// Loads the current preferences, applies `mutate`, and saves the result —
-    /// so callers only need to set the one or two fields they care about.
-    /// </summary>
+    // loads the current preferences, applies mutate, and saves the result.
+    // callers only need to set the one or two fields they care about.
     public static async Task<bool> SetPreferencesAsync(ulong userId, Action<SevenTvUserPreferences> mutate)
     {
         var data = await LoadAsync();

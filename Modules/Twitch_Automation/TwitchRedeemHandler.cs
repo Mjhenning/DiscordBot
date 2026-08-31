@@ -37,16 +37,17 @@ public class TwitchRedeemHandler
 
         _eventSubClient.WebsocketConnected                        += OnWebsocketConnected;
         _eventSubClient.ChannelPointsCustomRewardRedemptionUpdate += OnRedemptionUpdated;
-        // OnInteractionCreated hook REMOVED — suggestion_complete is now a proper [ComponentInteraction]
+        // suggestion_complete handled as a proper [ComponentInteraction]
+        // in SuggestionModule, not through a manual hook here
     }
 
-    // ── Subscriptions ──────────────────────────────────────────────────────
+    //-----SUBSCRIPTIONS-----
 
     async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
         if (e.IsRequestedReconnect) return;
 
-        // Ensure token is valid before subscribing
+        // ensure token is valid before subscribing
         await _tokenManager.GetValidAccessTokenAsync(TwitchProfile.Broadcaster);
 
         foreach (string rewardId in _handlers.Keys)
@@ -80,7 +81,7 @@ public class TwitchRedeemHandler
     }
     
 
-    // ── Redemption updated → route to handler ─────────────────────────────
+    //-----REDEMPTION UPDATED ROUTES TO HANDLER-----
 
     async Task OnRedemptionUpdated(object? sender, ChannelPointsCustomRewardRedemptionArgs args)
     {

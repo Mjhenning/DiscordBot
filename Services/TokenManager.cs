@@ -51,9 +51,7 @@ public class TokenManager
         LoadFromFile();
     }
 
-    // ─────────────────────────────
-    // CORE PUBLIC API (THIS IS ALL YOU USE NOW)
-    // ─────────────────────────────
+    //---------------------------------CORE PUBLIC API---------------------------------
 
     public async Task<string> GetAccessTokenAsync(TwitchProfile profile)
     {
@@ -62,9 +60,7 @@ public class TokenManager
         return _tokens[Key(profile)].AccessToken;
     }
 
-    // ─────────────────────────────
-    // VALIDATION CORE
-    // ─────────────────────────────
+    //---------------------------------------VALIDATION CORE---------------------------------------
 
      async Task EnsureValid(TwitchProfile profile)
     {
@@ -91,9 +87,7 @@ public class TokenManager
         return DateTimeOffset.UtcNow.ToUnixTimeSeconds() > token.ExpiresAt - 300;
     }
 
-    // ─────────────────────────────
-    // REFRESH (ONLY WHEN NEEDED)
-    // ─────────────────────────────
+    //------------------------------REFRESH (ONLY WHEN NEEDED)------------------------------
 
     internal async Task Refresh(TwitchProfile profile)
     {
@@ -145,9 +139,7 @@ public class TokenManager
         }
     }
 
-    // ─────────────────────────────
-    // AUTO-RECOVERY WRAPPER (IMPORTANT)
-    // ─────────────────────────────
+    //-------------------------------AUTO-RECOVERY WRAPPER (IMPORTANT)-------------------------------
 
     public async Task<T> WithTokenRetryAsync<T>(
         TwitchProfile profile,
@@ -177,9 +169,7 @@ public class TokenManager
                ex.Message.Contains("Unauthorized");
     }
 
-    // ─────────────────────────────
-    // FILE IO
-    // ─────────────────────────────
+    //------------------------------------------FILE IO------------------------------------------
 
      static string Key(TwitchProfile profile) => profile.ToString();
 
@@ -205,9 +195,7 @@ public class TokenManager
         );
     }
     
-    // ─────────────────────────────
-    // HELPERS
-    // ─────────────────────────────
+    //------------------------------------------HELPERS------------------------------------------
     
     public async Task<string> GetValidAccessTokenAsync(TwitchProfile profile)
     {
@@ -220,9 +208,7 @@ public class TokenManager
         await Refresh(profile);
     }
 
-    // ─────────────────────────────
-    // INITIAL OAUTH AUTHORIZATION
-    // ─────────────────────────────
+    //---------------------------------INITIAL OAUTH AUTHORIZATION---------------------------------
 
      const int AuthPort = 17563;
      const string RedirectUri = "http://localhost:17563/callback";

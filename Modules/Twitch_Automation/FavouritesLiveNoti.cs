@@ -10,14 +10,14 @@ namespace DiscordBot.Modules;
 
 public class FavouritesLiveNoti
 {
-    // ─────────────────────────────────────────────────────────────────────────
-    // CONFIGURATION — edit these to add/remove streamers
+    //-------------------------------------CONFIGURATION-------------------------------------
+    // edit these to add or remove streamers
     //
     // Key:   Twitch username (lowercase)
     // Value: Message to post when they go live.
-    //        Use {user} for their name and {game} for their current game.
-    //        A link to their stream is always appended automatically.
-    // ─────────────────────────────────────────────────────────────────────────
+    //        use {user} for their name and {game} for their current game.
+    //        a link to their stream is always appended automatically.
+    //-------------------------------------CONFIGURATION-------------------------------------
     
     static readonly Dictionary<string, string> WatchList = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -32,10 +32,10 @@ public class FavouritesLiveNoti
         {"Silbers_", "Scug?! The only one I know is Sticky! Go check out this amazing scug and her community (maybe drop a wawa in chat) whether it's {game} or something else!🩶"}
     };
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Channel to post notifications in — add this to Config.cs:
+    //----------------------------------CHANNEL ID----------------------------------
+    // add this to Config.cs:
     //     public const ulong FavouritesNotifyChannelId = YOUR_CHANNEL_ID;
-    // ─────────────────────────────────────────────────────────────────────────
+    //----------------------------------CHANNEL ID----------------------------------
 
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
@@ -50,7 +50,7 @@ public class FavouritesLiveNoti
         _discordSocket  = discordSocket;
         _twitchClient   = twitchClient;
 
-        // Hook into the shared EventSub websocket — same connection Twitch_Notifier uses
+        // hook into the shared EventSub websocket, same connection Twitch_Notifier uses
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
         _eventSubClient.StreamOnline        += OnStreamOnline;
 
@@ -58,14 +58,14 @@ public class FavouritesLiveNoti
     }
 
 
-    // ─── WEBSOCKET CONNECTED ─────────────────────────────────────────────────
-    // Subscribe to stream.online for every streamer in the watchlist.
-    // Fires on initial connect only — reconnects reuse existing subscriptions.
+    //-----WEBSOCKET CONNECTED-----
+    // subscribe to stream.online for every streamer in the watchlist.
+    // fires on initial connect only, reconnects reuse existing subscriptions.
     async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
         if (e.IsRequestedReconnect) return;
 
-        // Clean up any leftover subscriptions from the previous session
+        // clean up any leftover subscriptions from the previous session
         // before creating new ones, otherwise we'll hit the 10-sub limit
         try
         {
@@ -78,8 +78,8 @@ public class FavouritesLiveNoti
 
             foreach (var sub in existing.Subscriptions)
             {
-                // Only delete stream.online subs that belong to FavNoti
-                // (identified by broadcaster_user_id NOT being your own channel)
+                // only delete stream.online subs that belong to FavNoti
+                // identified by broadcaster_user_id not being your own channel
                 if (sub.Type == "stream.online" && 
                     sub.Condition.TryGetValue("broadcaster_user_id", out string? uid) &&
                     uid != Config.TwitchUserId)
@@ -97,12 +97,12 @@ public class FavouritesLiveNoti
             Logger.Log($"[FavNoti] Failed to clean up old subscriptions: {ex.Message}");
         }
         
-        // Fetch broadcaster user IDs for each name in the watchlist
+        // fetch broadcaster user ids for each name in the watchlist
         foreach (string username in WatchList.Keys)
         {
             try
             {
-                // Look up the Twitch user ID for this username
+                // look up the Twitch user id for this username
                 var userResult = await _twitchClient.ExecuteAsync(
                     TwitchProfile.Broadcaster,
                     api => api.Helix.Users.GetUsersAsync(
@@ -142,15 +142,15 @@ public class FavouritesLiveNoti
     }
 
 
-    // ─── STREAM ONLINE ───────────────────────────────────────────────────────
-    // Fires when any subscribed channel goes live.
-    // We match the broadcaster login name against our watchlist and post
+    //-----STREAM ONLINE-----
+    // fires when any subscribed channel goes live.
+    // we match the broadcaster login name against the watchlist and post
     // the configured message if found.
     async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
     {
         string broadcasterLogin = args.Payload.Event.BroadcasterUserLogin;
 
-        // Check if this broadcaster is in our watchlist
+        // check if this broadcaster is in the watchlist
         if (!WatchList.TryGetValue(broadcasterLogin, out string? messageTemplate))
             return;
 
@@ -167,7 +167,7 @@ public class FavouritesLiveNoti
             
            
             
-            // Fetch stream info so we can fill in game, thumbail, username
+            // fetch stream info so we can fill in game, thumbnail, username
             GetStreamsResponse? streamResult = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
                 api => api.Helix.Streams.GetStreamsAsync(
@@ -199,10 +199,10 @@ public class FavouritesLiveNoti
                 pfp = usersResponse.Users[0].ProfileImageUrl;
             }
             
-            // Build the message — replace placeholders
+            // build the message and replace placeholders
             string message = messageTemplate.Replace("{game}", gameName, StringComparison.OrdinalIgnoreCase);
 
-            // Resolve the notification channel
+            // resolve the notification channel
             ITextChannel? channel = _discordSocket.GetChannel(Config.FavouritesNotifyChannelId) as ITextChannel;
 
             if (channel == null)
@@ -223,8 +223,8 @@ public class FavouritesLiveNoti
     }
     
     
-        // ── EMBED BUILDER ────────────────────────────────────────────────────────
-    // Builds either a live embed or an offline embed depending on stream state.
+    //-----EMBED BUILDER-----
+    // builds either a live embed or an offline embed depending on stream state.
     Embed BuildLiveEmbed(
         string userName,
         string pfp,

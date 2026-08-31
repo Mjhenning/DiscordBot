@@ -11,27 +11,27 @@ public class ReactionsData
         Initialize();
     }
     
-    void Initialize() // on ReactionsData create
+    void Initialize() // runs on construction
     {
-        if (!File.Exists(FilePath)) //check if file doesn't exist and create file + save data
+        if (!File.Exists(FilePath)) // first run, no stored entries
         {
             ReactionMessages = new();
             Save();
             return;
         }
         
-        string json = File.ReadAllText(FilePath); //else json = readalltext in file
+        string json = File.ReadAllText(FilePath); // load existing entries
 
-        ReactionMessages = JsonConvert.DeserializeObject<List<ReactionEntry>>(json) ?? new List<ReactionEntry>(); //list of reactentry gets populated by deserialized json
+        ReactionMessages = JsonConvert.DeserializeObject<List<ReactionEntry>>(json) ?? new List<ReactionEntry>(); // deserialize stored entries
     }
 
-    public void Save() //on save searlize json string and write to file
+    public void Save() // serialize entries and write to file
     {
         string json = JsonConvert.SerializeObject(ReactionMessages, Formatting.Indented);
         File.WriteAllText(FilePath, json);
     }
 
-    public ReactionEntry? GetEntry(ulong messageId, string emoji) //used to retrieve an entry based on message connected to and emoji
+    public ReactionEntry? GetEntry(ulong messageId, string emoji) // find an entry by message id and emoji
     {
         
         return ReactionMessages.FirstOrDefault(x =>
@@ -40,13 +40,13 @@ public class ReactionsData
         );
     }
 
-    public void AddEntry(ReactionEntry entry) //adds an entry and saves json
+    public void AddEntry(ReactionEntry entry) // add an entry and save
     {
         ReactionMessages.Add(entry);
         Save();
     }
     
-    public void RemoveEntry(ulong messageId, string emoji) //removes an entry and saves json
+    public void RemoveEntry(ulong messageId, string emoji) // remove an entry and save
     {
         ReactionMessages.RemoveAll(x => 
         x.Message == messageId &&

@@ -1,21 +1,17 @@
 namespace DiscordBot.Modules.SevenTv;
 
-/// <summary>
-/// Fallback 7TV channel + emote set used when a user hasn't run /channel and
-/// /emote-set themselves. Resolved once (channel name -> 7TV IDs) and cached
-/// for the lifetime of the process.
-/// </summary>
+// fallback 7tv channel + emote set used when a user hasn't run /channel or
+// /emote-set themselves. resolved once (channel name to 7tv ids) and cached
+// for the lifetime of the process.
 public static class SevenTvDefaults
 {
      static (string ChannelId, string SetId, string SetName)? _resolved;
      static readonly SemaphoreSlim Lock = new(1, 1);
 
-    /// <summary>
-    /// Returns the default channel ID + emote set ID, resolving and caching
-    /// them on first call. Returns null if the channel can't be found on 7TV
-    /// or has no emote sets — callers should treat that the same as "no default
-    /// configured" and fall back to a global search.
-    /// </summary>
+    // returns the default channel id + emote set id, resolving and caching
+    // them on first call. returns null if the channel can't be found on 7tv
+    // or has no emote sets. callers should treat that the same as "no default
+    // configured" and fall back to a global search.
     public static async Task<(string ChannelId, string SetId, string SetName)?> ResolveAsync()
     {
         if (_resolved != null) return _resolved;
@@ -27,11 +23,11 @@ public static class SevenTvDefaults
 
             var channels = await SevenTvApi.SearchChannelsAsync(Config.TwitchChannelName);
 
-            // Case-insensitive match, since 7TV's stored username casing doesn't
-            // necessarily match how the channel name is cased in config (e.g.
-            // Twitch handles are case-insensitive everywhere else too). Falls
-            // back to the top search result if nothing matches exactly — we're
-            // specifically searching for this name, so the first hit should
+            // case insensitive match, since 7tv's stored username casing doesn't
+            // necessarily match how the channel name is cased in config. twitch
+            // handles are case insensitive everywhere else too. falls back to
+            // the top search result if nothing matches exactly, since we're
+            // specifically searching for this name and the first hit should
             // almost always be the right channel.
             var channel = channels.FirstOrDefault(c =>
                     string.Equals(c.MainConnection?.PlatformUsername, Config.TwitchChannelName, StringComparison.OrdinalIgnoreCase))

@@ -20,19 +20,19 @@ public class Twitch_Notifier
     static StreamSession TwitchSession = new();
     static TwitchVOD TwitchVOD = new();
 
-    // int instead of bool so Interlocked can atomically check-and-set it,
-    // preventing two updater loops from starting simultaneously
+    // int so Interlocked can atomically check and set it
+    // prevents two updater loops from starting simultaneously
      int _liveUpdaterRunning = 0;
 
-    // Ensures only one thread reads or writes TwitchSession/TwitchVOD at a time
+    // ensures only one thread reads or writes TwitchSession/TwitchVOD at a time
      readonly SemaphoreSlim _sessionLock = new(1, 1);
 
     static readonly HttpClient HttpClient = new();
 
 
-    // ── CONSTRUCTOR ──────────────────────────────────────────────────────────
-    // Inject TokenManager + TwitchApiService instead of raw TwitchAPI.
-    // DI resolves these automatically because they're registered in Program.cs.
+    //---------------------CONSTRUCTOR---------------------
+    // takes TokenManager + TwitchApiService for token handling
+    // DI resolves these automatically because they're registered in Program.cs
     public Twitch_Notifier(
         EventSubWebsocketClient eventSubClient,
         DiscordSocketClient discordSocket,
@@ -47,7 +47,7 @@ public class Twitch_Notifier
         Logger.Log("[Info] Twitch_Notifier constructor called");
         Logger.Log($"[Info] Notifier EventSubClient hash: {_eventSubClient.GetHashCode()}");
 
-        // ── Wire up EventSub lifecycle events ─────────────────────────────
+        //-------- wire up eventsub lifecycle events --------
         _eventSubClient.WebsocketConnected    += OnWebsocketConnected;
         _eventSubClient.WebsocketDisconnected += (s, e) =>
         {
@@ -63,7 +63,7 @@ public class Twitch_Notifier
             return Task.CompletedTask;
         };
 
-        // ── Wire up stream event handlers ─────────────────────────────────
+        //-------- wire up stream event handlers --------
         _eventSubClient.StreamOnline  += OnStreamOnline;
         _eventSubClient.StreamOffline += OnStreamOffline;
         _eventSubClient.ChannelUpdate += OnChannelUpdate;
@@ -72,16 +72,15 @@ public class Twitch_Notifier
     }
 
 
-    // ── START ────────────────────────────────────────────────────────────────
-    // Simplified: we just ask TokenManager for a valid token (it fetches +
-    // stores it automatically), then connect the EventSub websocket.
-    // The old GetUserToken() and manual token assignment are gone.
+    //--------------------------START--------------------------
+    // ask TokenManager for a valid token, it fetches and stores one
+    // automatically, then connect the EventSub websocket
     public async Task StartAsync()
     {
         Logger.Log("[Info] Notifier StartAsync called");
 
-        // Trigger initial token fetch/validation. TokenManager saves the token
-        // to disk and updates it automatically before it expires from now on.
+        // trigger initial token fetch/validation
+        // TokenManager saves the token to disk and updates it automatically before expiry
         var token = await _tokenManager.GetValidAccessTokenAsync(TwitchProfile.Broadcaster);
 
         Logger.Log($"[Info] Token ready ({(token.Length > 10 ? token[..10] : token)}...)");
@@ -91,18 +90,18 @@ public class Twitch_Notifier
     }
 
 
-    // ── WEBSOCKET CONNECTED ──────────────────────────────────────────────────
-    // Fires when the EventSub websocket connects (or reconnects).
-    // We use TwitchApiService.ExecuteAsync here so if the token happens to be
-    // expired at subscription time, it's refreshed and retried automatically.
+    //---------------------WEBSOCKET CONNECTED---------------------
+    // fires when the EventSub websocket connects or reconnects
+    // we use TwitchApiService.ExecuteAsync here so if the token is
+    // expired at subscription time, it's refreshed and retried automatically
     async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
     {
         Logger.Log($"[Info] Notifier OnWebsocketConnected fired — IsReconnect: {e.IsRequestedReconnect}, SessionId: {_eventSubClient.SessionId}");
 
-        // On reconnect, Twitch re-uses existing subscriptions — no need to re-register
+        // on reconnect, Twitch reuses existing subscriptions, no need to re-register
         if (!e.IsRequestedReconnect)
         {
-            // ── stream.online ──────────────────────────────────────────────
+            //-------- stream.online --------
             try
             {
                 Logger.Log("[Info] Creating stream.online subscription...");
@@ -122,7 +121,7 @@ public class Twitch_Notifier
             }
             catch (Exception ex) { Logger.Log($"[Error] stream.online subscription failed: {ex.Message}"); }
 
-            // ── stream.offline ─────────────────────────────────────────────
+            //-------- stream.offline --------
             try
             {
                 Logger.Log("[Info] Creating stream.offline subscription...");
@@ -144,7 +143,7 @@ public class Twitch_Notifier
             }
             catch (Exception ex) { Logger.Log($"[Error] stream.offline subscription failed: {ex.Message}"); }
 
-            // ── channel.update ─────────────────────────────────────────────
+            //-------- channel.update --------
             try
             {
                 Logger.Log("[Info] Creating channel.update subscription...");
@@ -175,17 +174,16 @@ public class Twitch_Notifier
     }
 
 
-    // ── STREAM ONLINE ────────────────────────────────────────────────────────
-    // Fires when Twitch detects the channel goes live.
-    // TwitchApiService.ExecuteAsync replaces the old try/catch Unauthorized blocks —
-    // if the token is stale it refreshes once and retries transparently.
+    //---------------------STREAM ONLINE---------------------
+    // fires when Twitch detects the channel goes live
+    // if the token is stale it refreshes once and retries transparently
     async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
     {
         Logger.Log("[Info] OnStreamOnline fired");
 
         try
         {
-            // Fetch current stream info (title, game, viewer count, thumbnail)
+            // fetch current stream info (title, game, viewer count, thumbnail)
             GetStreamsResponse? result = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
                 api => api.Helix.Streams.GetStreamsAsync(
@@ -202,7 +200,7 @@ public class Twitch_Notifier
                 return;
             }
 
-            // Fetch user info (avatar URL)
+            // fetch user info (avatar URL)
             GetUsersResponse? userResult = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
                 api => api.Helix.Users.GetUsersAsync(
@@ -219,7 +217,7 @@ public class Twitch_Notifier
                 return;
             }
 
-            // Lock session and populate it with fresh stream data
+            // lock session and populate it with fresh stream data
             await _sessionLock.WaitAsync();
             try
             {
@@ -255,8 +253,8 @@ public class Twitch_Notifier
     }
 
 
-    // ── STREAM RECEIVED ──────────────────────────────────────────────────────
-    // Posts the go-live embed to Discord and starts the live updater loop.
+    //---------------------STREAM RECEIVED---------------------
+    // posts the go-live embed to Discord and starts the live updater loop
     async Task OnStreamReceived()
     {
         Logger.Log("[Info] OnStreamReceived called");
@@ -296,8 +294,8 @@ public class Twitch_Notifier
 
         Logger.Log($"[Info] Notification published to #{channel.Name} (msg: {posted.Id})");
 
-        // Atomically start the live updater loop — Interlocked prevents a
-        // second stream.online event from spawning a duplicate loop
+        // atomically start the live updater loop
+        // Interlocked prevents a second stream.online event from spawning a duplicate loop
         if (Interlocked.CompareExchange(ref _liveUpdaterRunning, 1, 0) == 0)
         {
             _ = Task.Run(async () =>
@@ -309,7 +307,7 @@ public class Twitch_Notifier
     }
 
 
-    // ── STREAM OFFLINE ───────────────────────────────────────────────────────
+    //---------------------STREAM OFFLINE---------------------
     async Task OnStreamOffline(object? sender, StreamOfflineArgs args)
     {
         Logger.Log("[Info] OnStreamOffline fired");
@@ -331,7 +329,7 @@ public class Twitch_Notifier
         Logger.Log("[Info] Updating embed to offline state...");
         await UpdateEmbed();
 
-        // Wait for the live updater loop to fully exit before checking for VOD
+        // wait for the live updater loop to fully exit before checking for VOD
         _ = Task.Run(async () =>
         {
             while (Interlocked.CompareExchange(ref _liveUpdaterRunning, 0, 0) == 1)
@@ -356,8 +354,9 @@ public class Twitch_Notifier
     }
 
 
-    // ── VOD CHECK ────────────────────────────────────────────────────────────
-    // Called after stream goes offline. Tries to find the VOD and update the embed.
+    //---------------------VOD CHECK---------------------
+    // called after stream goes offline
+    // tries to find the VOD and update the embed
     async Task CheckIfVodUp()
     {
         string userId;
@@ -384,14 +383,14 @@ public class Twitch_Notifier
 
             Logger.Log($"[Info] VOD found: {result.Videos[0].Url}");
 
-            // Update the embed so viewers can see the VOD link
+            // update the embed so viewers can see the VOD link
             await UpdateEmbed();
         }
     }
 
 
-    // ── CHANNEL UPDATE ───────────────────────────────────────────────────────
-    // Fires when the broadcaster changes their title or game mid-stream.
+    //---------------------CHANNEL UPDATE---------------------
+    // fires when the broadcaster changes their title or game mid-stream
     async Task OnChannelUpdate(object? sender, ChannelUpdateArgs args)
     {
         Logger.Log($"[Info] OnChannelUpdate fired — Title: {args.Payload.Event.Title}, Game: {args.Payload.Event.CategoryName}");
@@ -404,14 +403,14 @@ public class Twitch_Notifier
         }
         finally { _sessionLock.Release(); }
 
-        // Reflect the title/game change in the Discord embed immediately
+        // reflect the title/game change in the Discord embed immediately
         await UpdateEmbed();
     }
 
 
-    // ── LIVE UPDATER LOOP ────────────────────────────────────────────────────
-    // Polls every minute while the stream is live to update viewer count +
-    // thumbnail. Also detects if the stream has gone offline unexpectedly.
+    //---------------------LIVE UPDATER LOOP---------------------
+    // polls every minute while the stream is live to update viewer count + thumbnail
+    // also detects if the stream has gone offline unexpectedly
     async Task StartLiveUpdates()
     {
         Logger.Log("[Info] StartLiveUpdates loop started");
@@ -420,7 +419,7 @@ public class Twitch_Notifier
 
         while (true)
         {
-            // Check if stream is still marked live before each poll
+            // check if stream is still marked live before each poll
             bool live;
             await _sessionLock.WaitAsync();
             try   { live = TwitchSession.CurrentlyLive; }
@@ -432,7 +431,7 @@ public class Twitch_Notifier
 
             try
             {
-                // TwitchApiService handles 401 retry automatically — no manual catch needed
+                // TwitchApiService handles 401 retry automatically, no manual catch needed
                 GetStreamsResponse? result = await _twitchClient.ExecuteAsync(
                     TwitchProfile.Broadcaster,
                     api => api.Helix.Streams.GetStreamsAsync(
@@ -443,7 +442,7 @@ public class Twitch_Notifier
 
                 if (result?.Streams == null || result.Streams.Length == 0)
                 {
-                    // Stream may have just ended — give it 3 missed checks before forcing offline
+                    // stream may have just ended, give it 3 missed checks before forcing offline
                     missedStreamChecks++;
                     Logger.Log($"[Warning] StartLiveUpdates: GetStreams returned no results ({missedStreamChecks}/3)");
 
@@ -467,7 +466,7 @@ public class Twitch_Notifier
                 }
                 else
                 {
-                    // Stream still live — update viewer count + thumbnail
+                    // stream still live, update viewer count + thumbnail
                     missedStreamChecks = 0;
 
                     await _sessionLock.WaitAsync();
@@ -488,7 +487,7 @@ public class Twitch_Notifier
                 Logger.Log($"[Error] StartLiveUpdates failed: {ex}");
             }
 
-            // Pace the loop to ~1 update per minute, accounting for elapsed time
+            // pace the loop to ~1 update per minute, accounting for elapsed time
             TimeSpan elapsed = DateTimeOffset.UtcNow - startTime;
             TimeSpan delay   = TimeSpan.FromMinutes(1) - elapsed;
 
@@ -508,8 +507,8 @@ public class Twitch_Notifier
     }
 
 
-    // ── EMBED BUILDER ────────────────────────────────────────────────────────
-    // Builds either a live embed or an offline embed depending on stream state.
+    //---------------------EMBED BUILDER---------------------
+    // builds either a live embed or an offline embed depending on stream state
     Embed BuildTwitchEmbed(
         string userName,
         bool live,
@@ -538,13 +537,13 @@ public class Twitch_Notifier
                     "https://images.icon-icons.com/4401/PNG/256/269414_twitch-icon.png"
                 );
 
-            // Add cache-busted thumbnail so Discord doesn't show a stale image
+            // add cache-busted thumbnail so Discord doesn't show a stale image
             if (!string.IsNullOrWhiteSpace(thumbnailUrl))
                 builder.WithImageUrl($"{thumbnailUrl}?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
         }
         else
         {
-            // Show VOD link once it's available, or "Processing VOD..." while waiting
+            // show VOD link once it's available, or "Processing VOD..." while waiting
             string vodText = "> Processing VOD...";
             if (vod != null && !string.IsNullOrWhiteSpace(vod.Url))
                 vodText = $"> [{vod.Duration}]({vod.Url})";
@@ -569,12 +568,12 @@ public class Twitch_Notifier
     }
 
 
-    // ── UPDATE EMBED ─────────────────────────────────────────────────────────
-    // Edits the already-posted Discord message with the latest stream state.
-    // Called by the live updater loop, channel update handler, and offline handler.
+    //---------------------UPDATE EMBED---------------------
+    // edits the already-posted Discord message with the latest stream state
+    // called by the live updater loop, channel update handler, and offline handler
     async Task UpdateEmbed()
     {
-        // Don't attempt to update if no message has been published yet
+        // don't attempt to update if no message has been published yet
         if (TwitchSession.PublishedChannelId == 0 || TwitchSession.PublishedMessageId == 0)
         {
             Logger.Log("[Debug] UpdateEmbed skipped — no published message");
@@ -583,7 +582,7 @@ public class Twitch_Notifier
         
         try
         {
-            // Snapshot all session state under the lock to avoid race conditions
+            // snapshot all session state under the lock to avoid race conditions
             ulong channelId;
             ulong messageId;
             bool currentlyLive;
@@ -606,7 +605,7 @@ public class Twitch_Notifier
                 startedAt     = TwitchSession.StartedAt;
                 offlineAt     = TwitchSession.OfflineAt;
 
-                // Clone the VOD object to avoid modifying shared state outside the lock
+                // clone the VOD object to avoid modifying shared state outside the lock
                 vod = new TwitchVOD
                 {
                     Url      = TwitchVOD.Url,
@@ -616,7 +615,7 @@ public class Twitch_Notifier
             }
             finally { _sessionLock.Release(); }
 
-            // Build a human-readable stream duration string
+            // build a human-readable stream duration string
             TimeSpan duration = (currentlyLive ? DateTimeOffset.UtcNow : offlineAt) - startedAt;
             string onlineDuration = "Just started.";
 
@@ -635,7 +634,7 @@ public class Twitch_Notifier
                     : "Just started.";
             }
 
-            // Resolve the Discord channel and message to edit
+            // resolve the Discord channel and message to edit
             ITextChannel? channel =
                 _discordSocket.GetChannel(channelId) as ITextChannel
                 ?? await _discordSocket.GetChannelAsync(channelId) as ITextChannel;
@@ -670,12 +669,10 @@ public class Twitch_Notifier
         }
     }
 
-    // NOTE: GetUserToken() and RefreshAccessToken() have been removed.
-    // TokenManager + TwitchApiService handle all of that transparently now.
 }
 
 
-// ── DATA MODELS ──────────────────────────────────────────────────────────────
+//---------------------DATA MODELS---------------------
 
 public class TwitchVOD
 {

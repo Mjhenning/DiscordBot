@@ -25,7 +25,7 @@ public class ModerationLogs
 
     readonly DiscordSocketClient _client;
 
-    // Tracks in-progress voice channel sessions: channelId -> session info
+    // tracks in-progress voice channel sessions: channelId -> session info
     readonly ConcurrentDictionary<ulong, VoiceSessionInfo> _voiceSessions = new();
 
     class VoiceSessionInfo
@@ -196,36 +196,35 @@ public class ModerationLogs
         }
     }
 
-    // =====================================================
-    // USER FORMATTING
-    // =====================================================
-    // Plain username first (always readable), with a real mention afterward
-    // so it's actually clickable to open the user's profile — a code-formatted
-    // ID is copyable but not a link, only a true mention opens a profile card.
-    // Note: on a client that hasn't cached this user yet, the mention may
-    // display as a raw "<@id>" instead of resolving to their name — that's
-    // cosmetic only, it's still clickable and opens the right profile either way.
+    //---------------------USER FORMATTING---------------------
+    // plain username first, always readable, with a real mention afterward
+    // so it's actually clickable to open the user's profile
+    // a code-formatted id is copyable but not a link
+    // only a true mention opens a profile card
+    // on a client that hasn't cached this user yet, the mention may
+    // display as a raw "<@id>" instead of resolving to their name
+    // that's cosmetic only, it's still clickable and opens the right profile either way
 
     static string FormatUser(IUser user) => $"@{user.Username} ({user.Mention})";
 
-    // Every Reason field across all mod-log embeds goes through here,
-    // so an empty audit-log reason means no Reason field at all.
+    // every reason field across all mod-log embeds goes through here
+    // an empty audit-log reason means no reason field at all
     static void AddReasonIfPresent(EmbedBuilder embed, string? reason)
     {
         if (!string.IsNullOrWhiteSpace(reason))
             embed.AddField("Reason", reason);
     }
 
-    // =====================================================
-    // AUDIT LOG HELPER
-    // =====================================================
-    // Every "who did this" lookup below shares this one method.
-    // Discord doesn't push audit log entries to us directly, so
-    // whenever we see an event that could've been caused by a mod
-    // action (kick, ban, role change, message delete) we pull the
+    //---------------------AUDIT LOG HELPER---------------------
+    // every "who did this" lookup below shares this one method
+    // discord doesn't push audit log entries to us directly
+    // whenever we see an event that could've been caused by a mod action
+    // (kick, ban, role change, message delete) we pull the
     // most recent matching audit log entry and check it happened
-    // just now (within `maxAge`) so we don't misattribute an old
-    // unrelated action to a fresh event.
+    // just now, within maxAge, so we don't misattribute an old
+    // unrelated action to a fresh event
+    // maxAge: the maximum allowed time between the audit log entry
+    // creation and the current moment, entries older than this are skipped
 
     async Task<(IUser? Moderator, string? Reason)> TryGetAuditLogModeratorAsync(
         SocketGuild guild,
@@ -337,13 +336,11 @@ public class ModerationLogs
             string.Join("\n", stickers.Select(s => $"• {s.Name}")));
     }
 
-    // =====================================================
-    // MESSAGE LOGS
-    // =====================================================
-    // Styled to match the reference layout: sentence-case title, no emoji,
-    // channel as a mention, message ID linked to its jump URL, author shown
-    // via FormatUser (see note above on why not .Mention), and a relative
-    // "created" timestamp.
+    //---------------------MESSAGE LOGS---------------------
+    // styled to match the reference layout: sentence-case title, no emoji
+    // channel as a mention, message id linked to its jump url
+    // author shown via formatuser, see note above on why not .mention
+    // and a relative "created" timestamp
 
     async Task OnMessageUpdated(
         Cacheable<IMessage, ulong> beforeCache,
@@ -519,9 +516,7 @@ public class ModerationLogs
         await LogAsync(embed.Build());
     }
 
-    // =====================================================
-    // MEMBER LOGS
-    // =====================================================
+    //---------------------MEMBER LOGS---------------------
 
     async Task OnUserJoined(SocketGuildUser user)
     {
@@ -539,9 +534,9 @@ public class ModerationLogs
 
     async Task OnUserLeft(SocketGuild guild, SocketUser user)
     {
-        // A kick looks identical to a normal leave from Discord's gateway perspective —
+        // a kick looks identical to a normal leave from discord's gateway perspective
         // the only way to tell them apart is checking the audit log for a very recent
-        // Kick entry targeting this user.
+        // kick entry targeting this user
 
         if (!IsEnabled(LogCategory.Member))
             return;
@@ -574,9 +569,7 @@ public class ModerationLogs
         await LogAsync(embed.Build());
     }
 
-    // =====================================================
-    // BAN / UNBAN
-    // =====================================================
+    //--------------------BAN / UNBAN--------------------
 
     async Task OnUserBanned(SocketUser user, SocketGuild guild)
     {
@@ -624,9 +617,7 @@ public class ModerationLogs
         await LogAsync(embed.Build());
     }
 
-    // =====================================================
-    // MEMBER / ROLE CHANGES
-    // =====================================================
+    //---------------MEMBER / ROLE CHANGES----------------
 
     async Task OnGuildMemberUpdated(
         Cacheable<SocketGuildUser, ulong> beforeCache,
@@ -640,7 +631,7 @@ public class ModerationLogs
         if (before == null)
             return;
 
-        // Nickname changed
+        // nickname changed
         if (before.Nickname != after.Nickname)
         {
             Logger.Log($"[ModLogs] {after.Username} changed nickname from '{before.Nickname ?? "None"}' to '{after.Nickname ?? "None"}'");
@@ -653,7 +644,7 @@ public class ModerationLogs
             await LogAsync(embed.Build());
         }
 
-        // Roles Added / Removed — look up who made the change once, reuse for both.
+        // roles added or removed, look up who made the change once, reuse for both
         var rolesAdded = after.Roles.Except(before.Roles).ToList();
         var rolesRemoved = before.Roles.Except(after.Roles).ToList();
 
@@ -697,16 +688,14 @@ public class ModerationLogs
         }
     }
 
-    // =====================================================
-    // USER PROFILE CHANGES
-    // =====================================================
+    //------------------USER PROFILE CHANGES------------------
 
     async Task OnUserUpdated(SocketUser before, SocketUser after)
     {
         if (!IsEnabled(LogCategory.Member))
             return;
 
-        // Username changed
+        // username changed
         if (before.Username != after.Username)
         {
             Logger.Log($"[ModLogs] Username changed from '{before.Username}' to '{after.Username}'");
@@ -719,7 +708,7 @@ public class ModerationLogs
             await LogAsync(embed.Build());
         }
 
-        // Avatar changed
+        // avatar changed
         if (before.GetAvatarUrl() != after.GetAvatarUrl())
         {
             Logger.Log($"[ModLogs] {after.Username} changed their avatar.");
@@ -733,13 +722,11 @@ public class ModerationLogs
         }
     }
 
-    // =====================================================
-    // VOICE CHANNEL ACTIVITY
-    // =====================================================
-    // Tracks who's been in a voice channel since it first became non-empty.
-    // When the last person leaves, posts a summary: how long the channel
+    //------------------VOICE CHANNEL ACTIVITY------------------
+    // tracks who's been in a voice channel since it first became non-empty
+    // when the last person leaves, posts a summary: how long the channel
     // was active, who left last, and everyone who passed through it during
-    // that session (not just who happened to be there at the end).
+    // that session, not just who happened to be there at the end
 
     async Task OnUserVoiceStateUpdated(SocketUser user, SocketVoiceState before, SocketVoiceState after)
     {
@@ -750,7 +737,7 @@ public class ModerationLogs
         var joinedChannel = after.VoiceChannel;
 
         if (leftChannel?.Id == joinedChannel?.Id)
-            return; // mute/deafen/etc. toggle, no channel change
+            return; // mute/deafen/etc toggle, no channel change
 
         if (joinedChannel != null)
         {
@@ -769,7 +756,7 @@ public class ModerationLogs
         {
             Logger.Log($"[ModLogs] {user.Username} left voice channel '{leftChannel.Name}'");
 
-            // Only fire the summary once the channel is actually empty.
+            // only fire the summary once the channel is actually empty
             if (leftChannel.ConnectedUsers.Count == 0 && _voiceSessions.TryRemove(leftChannel.Id, out var session))
             {
                 var duration = DateTimeOffset.UtcNow - session.StartTime;
