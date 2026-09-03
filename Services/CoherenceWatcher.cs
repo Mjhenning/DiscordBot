@@ -8,6 +8,7 @@ public class CoherenceWatcher : IDisposable
     readonly ArgTerminalService _terminal;
     readonly ArgTerminalData _data;
     readonly FileSystemWatcher _watcher;
+    readonly FileSystemWatcher? _cacheWatcher;
     
     DateTime _lastFileEvent = DateTime.MinValue;
     DateTime _lastEmbedRefresh = DateTime.MinValue;
@@ -28,6 +29,27 @@ public class CoherenceWatcher : IDisposable
 
         _watcher.Changed += OnChanged;
         _watcher.Created += OnChanged;
+
+        // the Twitch bot writes network_cache.json directly (no atomic rename)
+        // so watching the file itself is safe. the Terminal embed reads it fresh,
+        // so a change only needs an embed refresh, no state reload
+        string cachePath = Path.GetFullPath(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+                "TwitchBot", "data", "network_cache.json"));
+
+        string? cacheDir = Path.GetDirectoryName(cachePath);
+        if (cacheDir != null && Directory.Exists(cacheDir))
+        {
+            _cacheWatcher = new FileSystemWatcher(cacheDir)
+            {
+                Filter = Path.GetFileName(cachePath),
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+                EnableRaisingEvents = true
+            };
+
+            _cacheWatcher.Changed += OnChanged;
+            _cacheWatcher.Created += OnChanged;
+        }
     }
 
     void OnChanged(object sender, FileSystemEventArgs e)
@@ -66,5 +88,6 @@ public class CoherenceWatcher : IDisposable
     public void Dispose()
     {
         _watcher.Dispose();
+        _cacheWatcher?.Dispose();
     }
 }
