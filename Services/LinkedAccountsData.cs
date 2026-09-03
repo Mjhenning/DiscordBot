@@ -36,25 +36,39 @@ public class LinkedAccountsData : IDisposable
                 "TwitchBot", "data", "user_data.json"));
         Load();
 
+        string target = Path.GetFileName(_filePath);
+
+        // watch the directory, not the file. the Twitch bot writes the summit
+        // via a temp file + atomic rename, which swaps the inode. a watcher on
+        // the file path misses that, so we watch the whole dir and filter below
         string? dir = Path.GetDirectoryName(_filePath);
         if (dir != null && Directory.Exists(dir))
         {
             _watcher = new FileSystemWatcher(dir)
             {
-                Filter = Path.GetFileName(_filePath),
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                 EnableRaisingEvents = true
             };
 
-            _watcher.Changed += OnChanged;
-            _watcher.Created += OnChanged;
+            _watcher.Changed += (_, e) => OnEvent(e.Name, e.FullPath);
+            _watcher.Created += (_, e) => OnEvent(e.Name, e.FullPath);
+            _watcher.Renamed += (_, e) =>
+            {
+                // the rename of the tmp file onto the target is what actually
+                // replaces the file, so check both the old and new name
+                if (e.Name == target || e.OldName == target)
+                    OnEvent(target, Path.Combine(dir, target));
+            };
         }
     }
 
     // external writes to user_data.json are picked up here, so the in-memory
     // copy never goes stale and local saves don't clobber fresh TwitchBot data
-    void OnChanged(object sender, FileSystemEventArgs e)
+    void OnEvent(string? name, string fullPath)
     {
+        string target = Path.GetFileName(_filePath);
+        if (name != target) return;
+
         _ = ReloadAfterChangeAsync();
     }
 
@@ -126,6 +140,7 @@ public class LinkedAccountsData : IDisposable
     {
         lock (_lock)
         {
+            ReloadFromDisk();
             return _entries.FirstOrDefault(e => e.UsrId == twitchUserId);
         }
     }
@@ -134,6 +149,7 @@ public class LinkedAccountsData : IDisposable
     {
         lock (_lock)
         {
+            ReloadFromDisk();
             return _entries.FirstOrDefault(e => e.DiscordUserId == discordUserId.ToString());
         }
     }
@@ -142,6 +158,7 @@ public class LinkedAccountsData : IDisposable
     {
         lock (_lock)
         {
+            ReloadFromDisk();
             var entry = _entries.FirstOrDefault(e => e.UsrId == twitchUserId);
             if (entry == null) return false;
 
@@ -156,6 +173,7 @@ public class LinkedAccountsData : IDisposable
     {
         lock (_lock)
         {
+            ReloadFromDisk();
             var entry = _entries.FirstOrDefault(e => e.UsrId == twitchUserId);
             if (entry == null) return false;
 
@@ -169,6 +187,7 @@ public class LinkedAccountsData : IDisposable
     {
         lock (_lock)
         {
+            ReloadFromDisk();
             var entry = _entries.FirstOrDefault(e => e.DiscordUserId == discordUserId.ToString());
             if (entry == null) return false;
 
@@ -183,6 +202,7 @@ public class LinkedAccountsData : IDisposable
     {
         lock (_lock)
         {
+            ReloadFromDisk();
             var from = _entries.FirstOrDefault(e => e.UsrId == fromTwitchId);
             var to = _entries.FirstOrDefault(e => e.UsrId == toTwitchId);
             if (from == null || to == null) return false;
@@ -201,6 +221,7 @@ public class LinkedAccountsData : IDisposable
     {
         lock (_lock)
         {
+            ReloadFromDisk();
             var from = _entries.FirstOrDefault(e => e.DiscordUserId == fromDiscordId.ToString());
             var to = _entries.FirstOrDefault(e => e.DiscordUserId == toDiscordId.ToString());
             if (from == null || to == null) return false;
