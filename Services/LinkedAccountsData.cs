@@ -20,11 +20,14 @@ public class UserDataEntry
     public string? DiscordUserId { get; set; }
 }
 
-public class LinkedAccountsData
+public class LinkedAccountsData : IDisposable
 {
     readonly string _filePath;
     List<UserDataEntry> _entries = new();
     readonly object _lock = new();
+
+    FileSystemWatcher? _watcher;
+    DateTime _lastFileEvent = DateTime.MinValue;
 
     public LinkedAccountsData()
     {
@@ -32,6 +35,56 @@ public class LinkedAccountsData
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
                 "TwitchBot", "data", "user_data.json"));
         Load();
+
+        string? dir = Path.GetDirectoryName(_filePath);
+        if (dir != null && Directory.Exists(dir))
+        {
+            _watcher = new FileSystemWatcher(dir)
+            {
+                Filter = Path.GetFileName(_filePath),
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+                EnableRaisingEvents = true
+            };
+
+            _watcher.Changed += OnChanged;
+            _watcher.Created += OnChanged;
+        }
+    }
+
+    // external writes to user_data.json are picked up here, so the in-memory
+    // copy never goes stale and local saves don't clobber fresh TwitchBot data
+    void OnChanged(object sender, FileSystemEventArgs e)
+    {
+        _ = ReloadAfterChangeAsync();
+    }
+
+    async Task ReloadAfterChangeAsync()
+    {
+        // debounce the burst of file events a single write triggers
+        if (DateTime.UtcNow - _lastFileEvent < TimeSpan.FromMilliseconds(300))
+            return;
+
+        _lastFileEvent = DateTime.UtcNow;
+
+        await Task.Delay(50); // let the write finish
+
+        try
+        {
+            ReloadFromDisk();
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[LinkedAccounts] Reload failed: {ex.Message}");
+        }
+    }
+
+    // re-reads the shared file so balances track external changes
+    public void ReloadFromDisk()
+    {
+        lock (_lock)
+        {
+            Load();
+        }
     }
 
     void Load()
@@ -55,6 +108,12 @@ public class LinkedAccountsData
             Logger.Log($"[LinkedAccounts] Failed to load user data: {ex.Message}");
             _entries = new();
         }
+    }
+
+    public void Dispose()
+    {
+        _watcher?.Dispose();
+        _watcher = null;
     }
 
     public void Save()
