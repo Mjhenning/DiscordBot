@@ -2,6 +2,8 @@
 
 A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [Discord.Net](https://discordnet.dev/) and [TwitchLib](https://github.com/TwitchLib), this bot manages community interaction, Twitch live notifications, stream scheduling, moderation logging, collaboration requests, and an in-character alternate reality game - all themed around the "AETHER-OS" lore.
 
+> ⚠️ **Work In Progress.** This project is actively developed and reworked, and it **will have bugs**. I've worked with C# a lot before, but never on a project compiled from scratch with dotnet, so this is my first time doing that. Any and all feedback on coding style or ways of working is very welcome. Constructive criticism is appreciated.
+
 ---
 
 ## Table of Contents
@@ -249,7 +251,7 @@ DiscordBot/
 ├── Services/
 │   ├── Logger.cs                   # Static logger (console + bot-log.txt + optional DM)
 │   ├── TokenManager.cs             # Twitch OAuth2 token management with auto-refresh
-│   ├── TwitchApiService.cs         # TwitchAPI wrapper with token pre-flight
+│   ├── TwitchClient.cs             # TwitchAPI wrapper with token pre-flight
 │   ├── TwitchChatService.cs        # TwitchLib.Client IRC connection for account linking
 │   ├── TwitchScheduleService.cs    # Twitch schedule segment CRUD
 │   ├── EventSubReconnectService.cs # EventSub websocket reconnect with backoff

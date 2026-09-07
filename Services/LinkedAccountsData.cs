@@ -38,7 +38,7 @@ public class LinkedAccountsData : IDisposable
 
         string target = Path.GetFileName(_filePath);
 
-        // watch the directory, not the file. the Twitch bot writes the summit
+        // watch the directory, not the file. the Twitch bot writes the file
         // via a temp file + atomic rename, which swaps the inode. a watcher on
         // the file path misses that, so we watch the whole dir and filter below
         string? dir = Path.GetDirectoryName(_filePath);
