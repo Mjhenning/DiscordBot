@@ -365,12 +365,12 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("terminal_btn_close_file", ignoreGroupNames: true)]
     public async Task CloseFile()
     {
+        await DeferAsync(ephemeral: true);
+
         if (!IsLoggedIn())
         {
-            await RespondAsync(
-                "You're not currently logged in! Please call /system login first to interact with the AETHER-OS!🫧",
-                ephemeral: true);
-
+            await ModifyOriginalResponseAsync(msg =>
+                msg.Content = "You're not currently logged in! Please call /system login first to interact with the AETHER-OS!🫧");
             return;
         }
         
@@ -383,19 +383,18 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         await _terminal.RefreshEmbeds(ARGEmbed_Type.ReadOutput, ARGEmbed_Type.Logs);
 
-        await RespondAsync(
-            "File closed successfully.🫧",
-            ephemeral: true);
+        await ModifyOriginalResponseAsync(msg =>
+            msg.Content = "File closed successfully.🫧");
     }
     
     public async Task Ping()
     {
+        await DeferAsync(ephemeral: true);
+
         if (!IsLoggedIn())
         {
-            await RespondAsync(
-                "You're not currently logged in! Please call /system login first to interact with the AETHER-OS!🫧",
-                ephemeral: true);
-
+            await ModifyOriginalResponseAsync(msg =>
+                msg.Content = "You're not currently logged in! Please call /system login first to interact with the AETHER-OS!🫧");
             return;
         }
         
@@ -412,9 +411,9 @@ public class ARG : InteractionModuleBase<SocketInteractionContext>
 
         int restored = coherenceAfter - coherenceBefore;
 
-        await RespondAsync(
-            $"🫧 Filesystem integrity restored by {restored}%\n" +
-            $"Current coherence: {coherenceAfter}%",
-            ephemeral: true);
+        await ModifyOriginalResponseAsync(msg =>
+            msg.Content =
+                $"🫧 Filesystem integrity restored by {restored}%\n" +
+                $"Current coherence: {coherenceAfter}%");
     }
 }

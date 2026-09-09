@@ -188,7 +188,7 @@ public class ArgFilesystem
         return node.Children.Values
             .Where(c =>
                 !c.IsDirectory &&
-                (!c.UnlockedAtCoherence.HasValue || coherence >= c.UnlockedAtCoherence.Value) &&
+                (c.UnlockedAtCoherence == null || coherence >= c.UnlockedAtCoherence.GetValueOrDefault()) &&
                 (string.IsNullOrEmpty(c.UnlockedByEvent) || IsEventUnlocked(c.UnlockedByEvent)))
             .OrderBy(c => c.Filename)
             .ToList();
