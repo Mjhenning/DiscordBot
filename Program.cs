@@ -110,6 +110,7 @@ InteractionService interactions = services.GetRequiredService<InteractionService
 ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
 CoherenceWatcher watcher = services.GetRequiredService<CoherenceWatcher>();
 TokenManager tokenManager = services.GetRequiredService<TokenManager>();
+CollabCleanupService cleanup = services.GetRequiredService<CollabCleanupService>();
 
 //--------------------------------TWITCH TOKEN AUTH--------------------------------
 // refresh if expired, full OAuth if no refresh token.

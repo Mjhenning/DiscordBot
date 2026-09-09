@@ -15,6 +15,7 @@ obj/
 Folder.DotSettings.user
 
 # Logs
+logs/
 *.log
 bot-log.txt
 

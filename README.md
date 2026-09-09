@@ -249,7 +249,7 @@ DiscordBot/
 │   │   ├── ARGTerminalData.cs      # ARG state persistence
 │   │   └── ARG_Helper.cs           # Virtual filesystem tree
 ├── Services/
-│   ├── Logger.cs                   # Static logger (console + bot-log.txt + optional DM)
+│   ├── Logger.cs                   # Static logger (console + logs/ + optional DM)
 │   ├── TokenManager.cs             # Twitch OAuth2 token management with auto-refresh
 │   ├── TwitchClient.cs             # TwitchAPI wrapper with token pre-flight
 │   ├── TwitchChatService.cs        # TwitchLib.Client IRC connection for account linking
@@ -288,7 +288,7 @@ The `Data/` directory holds all runtime state and is fully gitignored. On first 
 | `Data/twitch_tokens.json` | Twitch OAuth access/refresh tokens (auto-refreshed at runtime) |
 | `Data/sevenTvPreferences.json` | Per-user 7TV channel, emote set, and image size preferences |
 | `Data/argData.json` | AETHER-OS terminal state (cwd, coherence, action history) |
-| `bot-log.txt` | Timestamped log output (append mode) |
+| `logs/` | Timestamped log files, one per bot start (`bot-log-YYYY-MM-DD-N.txt`) |
 
 ### External File
 

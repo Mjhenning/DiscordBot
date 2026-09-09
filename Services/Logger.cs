@@ -10,28 +10,47 @@ namespace DiscordBot
     // logger, static utility for writing timestamped messages to console
     // and a persistent log file. call Logger.Log() from anywhere.
     //
+    // logs are written to logs/bot-log-YYYY-MM-DD-N.txt where N is the
+    // iteration count for that day. a new file is created each time the
+    // bot starts.
+    //
     // pass dm: true to also DM the bot owner, use it for events you
     // actually want to be notified about, not routine debug spam.
     //-----------------------------------------------------------------------
     public static class Logger
     {
-         static readonly StreamWriter _logFile =
-            new StreamWriter("bot-log.txt", append: true) { AutoFlush = true };
+        static readonly string LogDir =
+            Path.Combine(Environment.CurrentDirectory, "logs");
 
-         static DiscordSocketClient? _client;
-         static IDMChannel? _ownerDm;
+        static StreamWriter? _logFile;
+        static DiscordSocketClient? _client;
+        static IDMChannel? _ownerDm;
 
         // call once, right after constructing the client, before client.LoginAsync
         public static void Init(DiscordSocketClient client)
         {
             _client = client;
+
+            Directory.CreateDirectory(LogDir);
+
+            string today = DateTime.Now.ToString("yyyy-MM-dd");
+
+            string[] existing = Directory.GetFiles(
+                LogDir, $"bot-log-{today}-*.txt");
+
+            int iteration = existing.Length + 1;
+
+            string path = Path.Combine(
+                LogDir, $"bot-log-{today}-{iteration}.txt");
+
+            _logFile = new StreamWriter(path, append: true) { AutoFlush = true };
         }
 
         public static void Log(string msg, bool dm = false)
         {
             string line = $"[{DateTime.Now:HH:mm:ss}] {msg}";
-            _logFile.WriteLine(line);
-            _logFile.Flush();
+            _logFile?.WriteLine(line);
+            _logFile?.Flush();
             Console.WriteLine(line);
 
             if (dm)
@@ -43,7 +62,7 @@ namespace DiscordBot
             if (_client == null)
             {
                 // note: don't call Log(..., dm:true) here, avoids infinite recursion
-                Log("[Warning] Logger.Log(dm:true) called before Logger.Init — DM not sent");
+                Log("[Warning] Logger.Log(dm:true) called before Logger.Init, DM not sent");
                 return;
             }
 
