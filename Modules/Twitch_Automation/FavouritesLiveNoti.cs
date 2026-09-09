@@ -5,56 +5,37 @@ using TwitchLib.Api.Helix.Models.Users.GetUsers;
 using TwitchLib.EventSub.Websockets;
 using TwitchLib.EventSub.Websockets.Core.EventArgs;
 using TwitchLib.EventSub.Core.EventArgs.Stream;
+using DiscordBot.Data;
 
 namespace DiscordBot.Modules;
 
 public class FavouritesLiveNoti
 {
-    //-------------------------------------CONFIGURATION-------------------------------------
-    // edit these to add or remove streamers
-    //
-    // Key:   Twitch username (lowercase)
-    // Value: Message to post when they go live.
-    //        use {user} for their name and {game} for their current game.
-    //        a link to their stream is always appended automatically.
-    //-------------------------------------CONFIGURATION-------------------------------------
-    
-    static readonly Dictionary<string, string> WatchList = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "Siigynn",   "Fox's favourite matcha obsessed herbalist is live!! Whether it's {game} or karaoke, she's always a blast to have around! 💚" },
-        { "its_livinabox", "Go catch our favourite australian goober Livy, whether it's {game} or anything else, there's always a giggle to be shared! 🩷" },
-        { "InnocentOfSin", "Definitely not a cult, but brother can this owl yap! 🧡 Go checkout the amazing sin and his sussy but lovely community!"},
-        { "BaxxyCH", "Go catch our lovely family from next door, the baxxidents!!! 💜 Make sure to keep up with their chaotic energy on {game}!"},
-        { "LaeliaTheCat", "Fox's favourite chef star kitty is live with {game}!!! 🌟 Make sure to go pop in and say hi!!"},
-        { "Juliuskat", "Our Finnish Feline from next door is live with {game}! Go show the katpack some love! 🤍"},
-        { "violenciakurayami", "Fox's favourite sharkie is busy with {game}, go say hi to our bubbly family, the fishies! 🫧"},
-        { "pathetic_softpaw", "You love art right?! Go check out fox's favourite vibe artist, paw paw! Maybe she's up to {game} and not art this time? 🩷"},
-        {"Silbers_", "Scug?! The only one I know is Sticky! Go check out this amazing scug and her community (maybe drop a wawa in chat) whether it's {game} or something else!🩶"}
-    };
-
-    //----------------------------------CHANNEL ID----------------------------------
-    // add this to Config.cs:
-    //     public const ulong FavouritesNotifyChannelId = YOUR_CHANNEL_ID;
-    //----------------------------------CHANNEL ID----------------------------------
+    // the watchlist itself lives in Data/favourites.json (seeded on first run),
+    // edited there to add or remove streamers. the Twitch bot reads the same
+    // file to auto-shoutout favourited streamers when they first type in chat.
 
     readonly EventSubWebsocketClient _eventSubClient;
     readonly DiscordSocketClient _discordSocket;
     readonly TwitchApiService _twitchClient;
+    readonly FavouritesData _data;
 
     public FavouritesLiveNoti(
         EventSubWebsocketClient eventSubClient,
         DiscordSocketClient discordSocket,
-        TwitchApiService twitchClient)
+        TwitchApiService twitchClient,
+        FavouritesData data)
     {
         _eventSubClient = eventSubClient;
         _discordSocket  = discordSocket;
         _twitchClient   = twitchClient;
+        _data           = data;
 
         // hook into the shared EventSub websocket, same connection Twitch_Notifier uses
         _eventSubClient.WebsocketConnected += OnWebsocketConnected;
         _eventSubClient.StreamOnline        += OnStreamOnline;
 
-        Logger.Log("[FavNoti] Constructed — watching for: " + string.Join(", ", WatchList.Keys));
+        Logger.Log("[FavNoti] Constructed — watching for: " + string.Join(", ", _data.Entries.Keys));
     }
 
 
@@ -98,7 +79,7 @@ public class FavouritesLiveNoti
         }
         
         // fetch broadcaster user ids for each name in the watchlist
-        foreach (string username in WatchList.Keys)
+        foreach (string username in _data.Entries.Keys)
         {
             try
             {
@@ -151,7 +132,7 @@ public class FavouritesLiveNoti
         string broadcasterLogin = args.Payload.Event.BroadcasterUserLogin;
 
         // check if this broadcaster is in the watchlist
-        if (!WatchList.TryGetValue(broadcasterLogin, out string? messageTemplate))
+        if (!_data.Entries.TryGetValue(broadcasterLogin, out string? messageTemplate))
             return;
 
         Logger.Log($"[FavNoti] {broadcasterLogin} went live — fetching stream info");

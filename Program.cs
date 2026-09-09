@@ -51,6 +51,7 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<ReactionsData>()
     .AddSingleton<ScheduleData>()
     .AddSingleton<CollabData>()
+    .AddSingleton<FavouritesData>()
     
     //-----twitch related-----
     .AddSingleton<TwitchAPI>()

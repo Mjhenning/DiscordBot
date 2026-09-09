@@ -174,8 +174,8 @@ Full collaboration request pipeline: date picker → modal (title, time, game, e
 ### Twitch Live Notifications (`Modules/Twitch_Automation/TwitchNotifier.cs`)
 EventSub websocket handler for `stream.online`, `stream.offline`, and `channel.update`. On live: fetches stream info and avatar, posts a rich embed with role ping, starts a 60s polling loop that updates viewer count and thumbnail. On offline: updates embed with duration and VOD link. Thread-safe via `SemaphoreSlim`.
 
-### Favourite Streamer Alerts (`Modules/Twitch_Automation/FavouritesLiveNoti.cs`)
-Watches 9 hardcoded streamers via EventSub `stream.online` subscriptions. Posts themed go-live embeds with custom notification messages to a dedicated channel.
+### Favourite Streamer Alerts (`Modules/Twitch_Automation/FavouritesLiveNoti.cs` + `Modules/Data/FavouritesData.cs`)
+Watches the curated favourites list via EventSub `stream.online` subscriptions and posts themed go-live embeds with custom notification messages to a dedicated channel. The list is data-driven: `FavouritesData` loads `Data/favourites.json` (seeded with defaults on first run, edit the file to add or remove streamers). The same JSON is read by the Twitch bot (`../DiscordBot/Data/favourites.json`), which auto-shouts out favourited streamers the first time they talk during a stream.
 
 ### Twitch Redemption Handler (`Modules/Twitch_Automation/TwitchRedeemHandler.cs` + `Redeems/`)
 Routes fulfilled channel point redemptions by reward ID: suggestions post an embed with a "Mark Complete" button, quotes parse input (`Quote text - Source, Year`) and append to a shared JSON file for OBS overlay integration.
