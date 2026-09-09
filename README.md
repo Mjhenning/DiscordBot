@@ -168,8 +168,8 @@ Multi-step interactive wizard. The add flow: select channel → select message (
 ### Stream Schedule (`Modules/Commands/Schedule.cs` + `Modules/Data/ScheduleData.cs` + `Services/TwitchScheduleService.cs`)
 Weekly schedule manager with four actions: Add (day picker → modal with title, time, optional game name that resolves a Twitch category ID), Remove (multi-select), View (ephemeral embed), and Publish (posts styled embed with role mention, or refreshes existing message). Auto-resets weekly via a timer (Sunday 23:30). Entries are synced to the Twitch channel schedule API.
 
-### Collaboration System (`Modules/Collabs/` + `Services/CollabService.cs` + `Services/CollabRequestCache.cs`)
-Full collaboration request pipeline: date picker → modal (title, time, game, external collaborators) → user-select menu → confirmation embed. On confirm, DMs are sent to all participants with Accept/Decline buttons. Responses update the DM embed in-place. Data persists to `Data/collabs.json`. An in-memory `CollabRequestCache` holds pending requests between modal submission and confirmation.
+### Collaboration System (`Modules/Collabs/` + `Services/CollabService.cs` + `Services/CollabRequestCache.cs` + `Services/CollabCleanupService.cs`)
+Full collaboration request pipeline: date picker → modal (title, time, game, external collaborators) → user-select menu → confirmation embed. On confirm, DMs are sent to all participants with Accept/Decline buttons. Responses update the DM embed in-place. `/collab view` shows a fox-filtered, paginated schedule-style embed with Next/Previous buttons (hidden on the first/last page). A `CollabCleanupService` sweeps hourly and removes collabs whose date has passed, deleting their DMs. Data persists to `Data/collabs.json`. An in-memory `CollabRequestCache` holds pending requests between modal submission and confirmation.
 
 ### Twitch Live Notifications (`Modules/Twitch_Automation/TwitchNotifier.cs`)
 EventSub websocket handler for `stream.online`, `stream.offline`, and `channel.update`. On live: fetches stream info and avatar, posts a rich embed with role ping, starts a 60s polling loop that updates viewer count and thumbnail. On offline: updates embed with duration and VOD link. Thread-safe via `SemaphoreSlim`.
@@ -257,6 +257,7 @@ DiscordBot/
 │   ├── EventSubReconnectService.cs # EventSub websocket reconnect with backoff
 │   ├── CollabService.cs            # DM delivery and status updates for collabs
 │   ├── CollabRequestCache.cs       # In-memory pending collab request cache
+│   ├── CollabCleanupService.cs     # Sweeps expired collabs and deletes their DMs
 │   ├── LinkedAccountsData.cs       # User data read/write for account linking
 │   ├── LiveGuestService.cs         # Auto-remove live guest role on voice leave
 │   ├── ArgTerminalService.cs       # Terminal embed builder and renderer

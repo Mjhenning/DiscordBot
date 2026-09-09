@@ -201,7 +201,56 @@ public class CollabService
             props.Components = new ComponentBuilder().Build();
         });
     }
-    
+
+    public async Task DeleteDmMessagesAsync(
+        IEnumerable<CollabEntry> collabs,
+        DiscordSocketClient client)
+    {
+        foreach (CollabEntry collab in collabs)
+        {
+            await DeleteDmMessageAsync(
+                collab.OwnerDmChannelId,
+                collab.OwnerDmMessageId,
+                client);
+
+            foreach (CollabDmReference reference in collab.ParticipantDmMessages.Values)
+            {
+                await DeleteDmMessageAsync(
+                    reference.ChannelId,
+                    reference.MessageId,
+                    client);
+            }
+        }
+    }
+
+    async Task DeleteDmMessageAsync(
+        ulong channelId,
+        ulong messageId,
+        DiscordSocketClient client)
+    {
+        if (channelId == 0 || messageId == 0)
+            return;
+
+        try
+        {
+            IDMChannel? dm =
+                await client.Rest.GetChannelAsync(channelId)
+                    as IDMChannel;
+
+            if (dm == null)
+                return;
+
+            IMessage message =
+                await dm.GetMessageAsync(messageId);
+
+            await message.DeleteAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[Warning] Couldn't delete collab DM ({channelId}/{messageId}): {ex.Message}");
+        }
+    }
+
     Embed BuildOwnerEmbed(CollabEntry request)
     {
         EmbedBuilder builder = new();

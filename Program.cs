@@ -66,6 +66,7 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<TwitchScheduleService>()
     .AddSingleton<CollabRequestCache>()
     .AddSingleton<CollabService>()
+    .AddSingleton<CollabCleanupService>()
     
     //-----twitch reconnect handler-----
     .AddSingleton<EventSubReconnectService>()

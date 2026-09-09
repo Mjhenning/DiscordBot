@@ -1,5 +1,6 @@
 using Discord;
 using Discord.Interactions;
+using Discord.WebSocket;
 using DiscordBot.Data;
 using DiscordBot.Models;
 using DiscordBot.Services;
@@ -114,6 +115,8 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
     [ComponentInteraction("collab_accept:*", ignoreGroupNames: true)]
     public async Task Accept(string idString)
     {
+        await DeferAsync(ephemeral: true);
+
         if (!ulong.TryParse(idString, out ulong id))
             return;
 
@@ -121,7 +124,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
         if (request == null)
         {
-            await RespondAsync(
+            await FollowupAsync(
                 "This collaboration request no longer exists.",
                 ephemeral: true);
 
@@ -134,7 +137,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
         if (participant == null)
         {
-            await RespondAsync(
+            await FollowupAsync(
                 "You are not part of this collaboration.",
                 ephemeral: true);
 
@@ -152,7 +155,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             request,
             Context.Client);
 
-        await RespondAsync(
+        await FollowupAsync(
             "✅ You've accepted the collaboration!",
             ephemeral: true);
     }
@@ -162,6 +165,8 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
         string idString,
         DeclineModal modal)
     {
+        await DeferAsync(ephemeral: true);
+
         if (!ulong.TryParse(idString, out ulong id))
             return;
 
@@ -169,7 +174,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
 
         if (request == null)
         {
-            await RespondAsync(
+            await FollowupAsync(
                 "Request no longer exists.",
                 ephemeral: true);
 
@@ -198,7 +203,7 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             request,
             Context.Client);
 
-        await RespondAsync(
+        await FollowupAsync(
             "You've declined the collaboration.",
             ephemeral: true);
     }
@@ -411,10 +416,38 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
     }
     
     //-----VIEW-----
-    
+
+    const int PageSize = 3;
+
+    List<CollabEntry> FoxCollabs()
+    {
+        return _data.GetFoxCollabs(Config.FoxId)
+            .OrderBy(x => x.ScheduledAtParsed)
+            .ToList();
+    }
+
     public async Task View()
     {
-        var collabs = _data.GetFoxCollabs(Config.FoxId).ToList();
+        await ShowPage(0);
+    }
+
+    [ComponentInteraction("collab_page_prev:*", ignoreGroupNames: true)]
+    public async Task OnPagePrev(string pageString)
+    {
+        if (int.TryParse(pageString, out int page) && page > 0)
+            await ShowPage(page - 1);
+    }
+
+    [ComponentInteraction("collab_page_next:*", ignoreGroupNames: true)]
+    public async Task OnPageNext(string pageString)
+    {
+        if (int.TryParse(pageString, out int page))
+            await ShowPage(page + 1);
+    }
+
+    async Task ShowPage(int page)
+    {
+        List<CollabEntry> collabs = FoxCollabs();
 
         if (collabs.Count == 0)
         {
@@ -425,47 +458,127 @@ public class CollabModule : InteractionModuleBase<SocketInteractionContext>
             return;
         }
 
-        EmbedBuilder builder = new EmbedBuilder()
-            .WithTitle("Accessing Collaboration Schedule...")
-            .WithDescription("Confirmed collaborations")
-            .WithColor(new Color(0x5865F2));
+        int pageCount = (collabs.Count + PageSize - 1) / PageSize;
 
-        foreach (var collab in collabs)
+        if (page < 0)
+            page = 0;
+
+        if (page > pageCount - 1)
+            page = pageCount - 1;
+
+        Embed embed = BuildCollabEmbed(
+            collabs.Skip(page * PageSize).Take(PageSize).ToList(),
+            page,
+            pageCount);
+
+        MessageComponent nav = BuildNavButtons(page, pageCount);
+
+        // page nav buttons edit the collab list message in place;
+        // the /collab menu button posts a fresh ephemeral message.
+        bool isNav = Context.Interaction is SocketMessageComponent c
+            && c.Data.CustomId.StartsWith("collab_page");
+
+        if (isNav)
         {
-            string collaborators =
-                collab.Participants.Any()
-                    ? string.Join(
-                        "\n",
-                        collab.Participants.Select(p => $"<@{p.UserId}>"))
-                    : "*None*";
-            
-            string external = "";
-
-            if (collab.ExternalCollaborators.Any())
+            await ((SocketMessageComponent)Context.Interaction).UpdateAsync(props =>
             {
-                external =
-                    "\n\n**External Collaborators**\n" +
-                    string.Join(
-                        "\n",
-                        collab.ExternalCollaborators.Select(x => $"• {x}"));
-            }
+                props.Embed = embed;
+                props.Components = nav;
+            });
 
-            builder.AddField(
-                $"🎮 {collab.Description}",
-                $"""
-                 <t:{collab.ScheduledAtParsed.ToUnixTimeSeconds()}:F>
-
-                 **Host**
-                 <@{collab.OwnerId}>
-
-                 **Collaborators**
-                 {collaborators}
-                 {external}
-                 """);
+            return;
         }
 
         await RespondAsync(
-            embed: builder.Build(),
+            embed: embed,
+            components: nav,
             ephemeral: true);
+    }
+
+    MessageComponent BuildNavButtons(int page, int pageCount)
+    {
+        ComponentBuilder builder = new();
+
+        if (pageCount <= 1)
+            return builder.Build();
+
+        if (page > 0)
+        {
+            builder.WithButton(
+                "◀ Previous",
+                $"collab_page_prev:{page}",
+                ButtonStyle.Secondary);
+        }
+
+        if (page < pageCount - 1)
+        {
+            builder.WithButton(
+                "Next ▶",
+                $"collab_page_next:{page}",
+                ButtonStyle.Secondary);
+        }
+
+        return builder.Build();
+    }
+
+    Embed BuildCollabEmbed(
+        List<CollabEntry> collabs,
+        int page,
+        int pageCount)
+    {
+        EmbedBuilder builder = new EmbedBuilder()
+            .WithTitle("Accessing Collaboration Schedule...")
+            .WithDescription("Status: active\nCollab queries detected...\n\n—")
+            .WithColor(new Color(0x5865F2))
+            .WithFooter($"System Active • Page {page + 1} of {pageCount}");
+
+        foreach (CollabEntry collab in collabs)
+        {
+            builder.AddField(
+                $"🌏 {collab.Description}",
+                BuildCollabField(collab),
+                false);
+        }
+
+        return builder.Build();
+    }
+
+    string BuildCollabField(CollabEntry collab)
+    {
+        long unixSeconds = collab.ScheduledAtParsed.ToUnixTimeSeconds();
+
+        string value = $"> <t:{unixSeconds}:F>\n";
+
+        value += $"> Host: <@{collab.OwnerId}>\n";
+
+        if (!string.IsNullOrWhiteSpace(collab.GameName))
+            value += $"> Game: {collab.GameName}\n";
+
+        if (collab.Participants.Any())
+        {
+            value += "> \n> Collaborators:\n";
+
+            foreach (CollabParticipant p in collab.Participants)
+            {
+                string icon = p.Status switch
+                {
+                    ParticipantStatus.Accepted => "🟢",
+                    ParticipantStatus.Pending => "🟡",
+                    ParticipantStatus.Declined => "🔴",
+                    _ => "⚪"
+                };
+
+                value += $"> {icon} <@{p.UserId}>\n";
+            }
+        }
+
+        if (collab.ExternalCollaborators.Any())
+        {
+            value += "> \n> External: ";
+
+            value += string.Join(", ", collab.ExternalCollaborators);
+        }
+
+        return value.TrimEnd();
     }
 }

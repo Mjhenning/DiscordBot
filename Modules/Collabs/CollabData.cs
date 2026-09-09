@@ -64,6 +64,24 @@ public class CollabData
         Save();
     }
 
+    public List<CollabEntry> RemoveExpired()
+    {
+        DateTimeOffset now = DateTimeOffset.Now;
+
+        List<CollabEntry> removed =
+            Collabs.Where(x => x.ScheduledAtParsed < now).ToList();
+
+        if (removed.Count == 0)
+            return removed;
+
+        foreach (CollabEntry entry in removed)
+            Collabs.Remove(entry);
+
+        Save();
+
+        return removed;
+    }
+
     public CollabEntry? Get(ulong id)
     {
         return Collabs.FirstOrDefault(x => x.Id == id);
