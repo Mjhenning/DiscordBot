@@ -116,11 +116,17 @@ public class FavouritesLiveNoti
                     nowLive.Add(stream.UserLogin);
             }
 
-            // first poll just records who is already live, no notifications
+            // first poll records who is already live and notifies for them,
+            // otherwise a reboot silently swallows everyone mid-stream
             if (!_seeded)
             {
-                _live = nowLive;
+                _live = new HashSet<string>(nowLive, StringComparer.OrdinalIgnoreCase);
                 _seeded = true;
+                Logger.Log($"[FavNoti] Seeded with {_live.Count} favourite(s) already live");
+
+                foreach (string login in nowLive)
+                    await PostLiveNotificationAsync(login);
+
                 return;
             }
 
