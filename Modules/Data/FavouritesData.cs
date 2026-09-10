@@ -41,8 +41,9 @@ public class FavouritesData
         }
 
         string json = File.ReadAllText(FilePath);
-        Entries = JsonConvert.DeserializeObject<Dictionary<string, string>>(json)
-                  ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var loaded = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+        // re-wrap so lookups stay case-insensitive, Twitch logins are lowercase
+        Entries = new Dictionary<string, string>(loaded ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
     }
 
     public void Save() // serialize entries and write to file
