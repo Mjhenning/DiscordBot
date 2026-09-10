@@ -1,67 +1,78 @@
 using Discord;
 using Discord.WebSocket;
+using System.Timers;
 using TwitchLib.Api.Helix.Models.Streams.GetStreams;
 using TwitchLib.Api.Helix.Models.Users.GetUsers;
-using TwitchLib.EventSub.Websockets;
-using TwitchLib.EventSub.Websockets.Core.EventArgs;
-using TwitchLib.EventSub.Core.EventArgs.Stream;
 using DiscordBot.Data;
+using Timer = System.Timers.Timer;
 
 namespace DiscordBot.Modules;
 
 public class FavouritesLiveNoti
 {
-    // the watchlist itself lives in Data/favourites.json (seeded on first run),
-    // edited there to add or remove streamers. the Twitch bot reads the same
-    // file to auto-shoutout favourited streamers when they first type in chat.
+    // polls the api instead of eventsub subscriptions. each stream.online
+    // subscription costs one point of the websocket's 10-point budget, and
+    // the watchlist has outgrown it. one GetStreams call covers the whole
+    // list at once, so the list can keep growing for free.
 
-    readonly EventSubWebsocketClient _eventSubClient;
+    const double PollIntervalMs = 60_000;
+
     readonly DiscordSocketClient _discordSocket;
     readonly TwitchApiService _twitchClient;
     readonly FavouritesData _data;
 
+    // logins known to be live right now, case-insensitive. seeded on the
+    // first poll so a streamer already live at boot doesn't instantly fire
+    // a notification.
+    HashSet<string> _live = new(StringComparer.OrdinalIgnoreCase);
+    bool _seeded;
+
+    readonly SemaphoreSlim _pollLock = new(1, 1);
+    Timer? _timer;
+
     public FavouritesLiveNoti(
-        EventSubWebsocketClient eventSubClient,
         DiscordSocketClient discordSocket,
         TwitchApiService twitchClient,
         FavouritesData data)
     {
-        _eventSubClient = eventSubClient;
-        _discordSocket  = discordSocket;
-        _twitchClient   = twitchClient;
-        _data           = data;
+        _discordSocket = discordSocket;
+        _twitchClient  = twitchClient;
+        _data          = data;
 
-        // hook into the shared EventSub websocket, same connection Twitch_Notifier uses
-        _eventSubClient.WebsocketConnected += OnWebsocketConnected;
-        _eventSubClient.StreamOnline        += OnStreamOnline;
+        Logger.Log("[FavNoti] Constructed. watching for: " + string.Join(", ", _data.Entries.Keys));
 
-        Logger.Log("[FavNoti] Constructed — watching for: " + string.Join(", ", _data.Entries.Keys));
+        // sweep stream.online subs left by the old watcher so the websocket
+        // budget stays clear for the main notifier
+        _ = CleanupStaleSubscriptionsAsync();
+
+        _timer = new Timer(PollIntervalMs)
+        {
+            AutoReset = true
+        };
+        _timer.Elapsed += async (_, _) => await PollAsync();
+        _timer.Start();
     }
 
 
-    //-----WEBSOCKET CONNECTED-----
-    // subscribe to stream.online for every streamer in the watchlist.
-    // fires on initial connect only, reconnects reuse existing subscriptions.
-    async Task OnWebsocketConnected(object? sender, WebsocketConnectedArgs e)
+    //-----STALE SUB CLEANUP-----
+    // deletes fav stream.online subscriptions created by the pre-polling
+    // era of this service. runs once on construction, best effort.
+    async Task CleanupStaleSubscriptionsAsync()
     {
-        if (e.IsRequestedReconnect) return;
-
-        // clean up any leftover subscriptions from the previous session
-        // before creating new ones, otherwise we'll hit the 10-sub limit
         try
         {
             var existing = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
                 api => api.Helix.EventSub.GetEventSubSubscriptionsAsync(
-                    type: "stream.online"  // only fetch the type we care about
+                    type: "stream.online"
                 )
             );
 
             foreach (var sub in existing.Subscriptions)
             {
-                // only delete stream.online subs that belong to FavNoti
-                // identified by broadcaster_user_id not being your own channel
-                if (sub.Type == "stream.online" && 
+                // only delete stream.online subs that aren't for your own
+                // channel, those belong to the old FavNoti watcher
+                if (sub.Type == "stream.online" &&
                     sub.Condition.TryGetValue("broadcaster_user_id", out string? uid) &&
                     uid != Config.TwitchUserId)
                 {
@@ -77,77 +88,82 @@ public class FavouritesLiveNoti
         {
             Logger.Log($"[FavNoti] Failed to clean up old subscriptions: {ex.Message}");
         }
-        
-        // fetch broadcaster user ids for each name in the watchlist
-        foreach (string username in _data.Entries.Keys)
+    }
+
+
+    //-----POLL-----
+    // one GetStreams call fetches live state for every favourite at once,
+    // then diffs against the last known state to detect new go-lives.
+    async Task PollAsync()
+    {
+        // skip if the previous poll is still running
+        if (!_pollLock.Wait(0)) return;
+
+        try
         {
-            try
+            GetStreamsResponse? streamResult = await _twitchClient.ExecuteAsync(
+                TwitchProfile.Broadcaster,
+                api => api.Helix.Streams.GetStreamsAsync(
+                    null, 100, null, null, null,
+                    _data.Entries.Keys.ToList()
+                )
+            );
+
+            HashSet<string> nowLive = new(StringComparer.OrdinalIgnoreCase);
+            if (streamResult?.Streams != null)
             {
-                // look up the Twitch user id for this username
-                var userResult = await _twitchClient.ExecuteAsync(
-                    TwitchProfile.Broadcaster,
-                    api => api.Helix.Users.GetUsersAsync(
-                        null,
-                        new List<string> { username }
-                    )
-                );
-
-                if (userResult?.Users == null || userResult.Users.Length == 0)
-                {
-                    Logger.Log($"[FavNoti] Could not find Twitch user: {username}");
-                    continue;
-                }
-
-                string userId = userResult.Users[0].Id;
-
-                var result = await _twitchClient.ExecuteAsync(
-                    TwitchProfile.Broadcaster,
-                    api => api.Helix.EventSub.CreateEventSubSubscriptionAsync(
-                        "stream.online",
-                        "1",
-                        new Dictionary<string, string> { { "broadcaster_user_id", userId } },
-                        TwitchLib.Api.Core.Enums.EventSubTransportMethod.Websocket,
-                        _eventSubClient.SessionId
-                    )
-                );
-
-                Logger.Log(
-                    $"[FavNoti] Subscription created: " +
-                    $"{result.Subscriptions[0].Id}");
+                foreach (var stream in streamResult.Streams)
+                    nowLive.Add(stream.UserLogin);
             }
-            catch (Exception ex)
+
+            // first poll just records who is already live, no notifications
+            if (!_seeded)
             {
-                Logger.Log($"[FavNoti] Failed to subscribe for {username}: {ex.Message}");
+                _live = nowLive;
+                _seeded = true;
+                return;
             }
+
+            // diff: anyone live now but not before just came online
+            foreach (string login in nowLive)
+            {
+                if (!_live.Contains(login))
+                    await PostLiveNotificationAsync(login);
+            }
+
+            // drop streamers that went offline since the last poll
+            _live.IntersectWith(nowLive);
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[FavNoti] Poll failed: {ex.Message}");
+        }
+        finally
+        {
+            _pollLock.Release();
         }
     }
 
 
-    //-----STREAM ONLINE-----
-    // fires when any subscribed channel goes live.
-    // we match the broadcaster login name against the watchlist and post
-    // the configured message if found.
-    async Task OnStreamOnline(object? sender, StreamOnlineArgs args)
+    //-----POST LIVE NOTIFICATION-----
+    // builds and sends the themed go-live embed for a broadcaster.
+    async Task PostLiveNotificationAsync(string broadcasterLogin)
     {
-        string broadcasterLogin = args.Payload.Event.BroadcasterUserLogin;
-
-        // check if this broadcaster is in the watchlist
         if (!_data.Entries.TryGetValue(broadcasterLogin, out string? messageTemplate))
             return;
 
-        Logger.Log($"[FavNoti] {broadcasterLogin} went live — fetching stream info");
-        
+        Logger.Log($"[FavNoti] {broadcasterLogin} went live. fetching stream info");
+
+        // give twitch a moment to finish registering the stream start
         await Task.Delay(3000);
-        
+
         try
         {
             string userName = "";
             string gameName = "";
             string thumbnail = "";
             string pfp = "";
-            
-           
-            
+
             // fetch stream info so we can fill in game, thumbnail, username
             GetStreamsResponse? streamResult = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
@@ -156,7 +172,7 @@ public class FavouritesLiveNoti
                     new List<string> { broadcasterLogin }
                 )
             );
-            
+
             if (streamResult?.Streams?.Length > 0)
             {
                 gameName = streamResult.Streams[0].GameName;
@@ -164,7 +180,7 @@ public class FavouritesLiveNoti
                                 .Replace("{width}", "1920")
                                 .Replace("{height}", "1080")
                             + $"?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
-                
+
             }
 
             GetUsersResponse? usersResponse = await _twitchClient.ExecuteAsync(
@@ -179,7 +195,7 @@ public class FavouritesLiveNoti
                 userName = usersResponse.Users[0].DisplayName;
                 pfp = usersResponse.Users[0].ProfileImageUrl;
             }
-            
+
             // build the message and replace placeholders
             string message = messageTemplate.Replace("{game}", gameName, StringComparison.OrdinalIgnoreCase);
 
@@ -202,10 +218,10 @@ public class FavouritesLiveNoti
             Logger.Log($"[FavNoti] Failed to post notification for {broadcasterLogin}: {ex.Message}");
         }
     }
-    
-    
+
+
     //-----EMBED BUILDER-----
-    // builds either a live embed or an offline embed depending on stream state.
+    // builds the themed go-live embed.
     Embed BuildLiveEmbed(
         string userName,
         string pfp,
@@ -215,14 +231,14 @@ public class FavouritesLiveNoti
     )
     {
         EmbedBuilder builder = new EmbedBuilder();
-        
+
             builder
                 .WithAuthor($"AETHER-OS // {userName}'s Proxy is Active", pfp, url)
                 .WithDescription("**---------------------------------------------------------------------** \n\n" +customMsg + "\n\n" + $"[Click here to go spread the love 🫧]({url})" + "\n\n**---------------------------------------------------------------------**")
                 .WithColor(new Color(0x5865F2))
                 .WithFooter("System Active • 4/30/03, 3:00 AM")
                 .WithThumbnailUrl(thumbnailUrl);
-        
+
 
         return builder.Build();
     }
