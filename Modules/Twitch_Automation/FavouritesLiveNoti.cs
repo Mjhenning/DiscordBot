@@ -137,8 +137,9 @@ public class FavouritesLiveNoti
                     await PostLiveNotificationAsync(login);
             }
 
-            // drop streamers that went offline since the last poll
-            _live.IntersectWith(nowLive);
+            // replace the tracked set with this poll's snapshot so the users
+            // who just posted are remembered and offline ones are dropped
+            _live = nowLive;
         }
         catch (Exception ex)
         {
