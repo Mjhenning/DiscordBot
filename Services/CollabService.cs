@@ -124,14 +124,14 @@ public class CollabService
         CollabEntry request,
         DiscordSocketClient client)
     {
-        SocketUser? owner =
-            client.GetUser(request.OwnerId);
+        // go through rest so the refresh works even before the socket
+        // user cache is populated at boot
+        IDMChannel? dm =
+            await client.Rest.GetChannelAsync(
+                request.OwnerDmChannelId) as IDMChannel;
 
-        if (owner == null)
+        if (dm == null)
             return;
-
-        IDMChannel dm =
-            await owner.CreateDMChannelAsync();
 
         IMessage message =
             await dm.GetMessageAsync(
