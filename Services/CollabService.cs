@@ -64,24 +64,13 @@ public class CollabService
 
         IDMChannel dm = await user.CreateDMChannelAsync();
 
-        MessageComponent buttons =
-            new ComponentBuilder()
-
-                .WithButton(
-                    "✅ Accept",
-                    $"collab_accept:{request.Id}",
-                    ButtonStyle.Success)
-
-                .WithButton(
-                    "❌ Decline",
-                    $"collab_decline:{request.Id}",
-                    ButtonStyle.Danger)
-
-                .Build();
+        MessageComponent buttons = BuildInviteButtons(request.Id);
 
         IUserMessage message =
             await dm.SendMessageAsync(
-                embed: BuildInviteEmbed(request),
+                embed: BuildInviteEmbed(
+                    request,
+                    participant.UserId),
                 components: buttons);
 
         request.ParticipantDmMessages[participant.UserId] =
@@ -110,6 +99,27 @@ public class CollabService
         }
     }
     
+    // rebuild every live collab dm once at boot so old embeds adopt the
+    // current format, skips collabs that never got their dms sent
+    public async Task RefreshAllDmsAsync(DiscordSocketClient client)
+    {
+        foreach (CollabEntry request in _data.Collabs)
+        {
+            if (request.OwnerDmChannelId == 0 &&
+                request.ParticipantDmMessages.Count == 0)
+                continue;
+
+            try
+            {
+                await UpdateMessagesAsync(request, client);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[Warning] Couldn't refresh collab DM {request.Id}: {ex.Message}");
+            }
+        }
+    }
+
     async Task UpdateOwnerMessage(
         CollabEntry request,
         DiscordSocketClient client)
@@ -160,45 +170,62 @@ public class CollabService
         if (message == null)
             return;
 
+        Embed embed;
+        MessageComponent components = new ComponentBuilder().Build();
+
         if (participant.Status == ParticipantStatus.Pending)
-            return;
-
-        EmbedBuilder builder = new();
-
-        if (participant.Status == ParticipantStatus.Accepted)
         {
-            builder
-                .WithColor(Color.Green)
-                .WithTitle("✅ Collaboration Accepted")
-                .WithDescription(
-                    $"You accepted **{request.Description}**.");
+            // still deciding, refresh invite so the live list stays current
+            embed = BuildInviteEmbed(request, participant.UserId);
+            components = BuildInviteButtons(request.Id);
         }
         else
         {
-            builder
-                .WithColor(Color.Red)
-                .WithTitle("❌ Collaboration Declined")
-                .WithDescription(
-                    $"You declined **{request.Description}**.");
+            EmbedBuilder builder = new();
 
-            if (!string.IsNullOrWhiteSpace(participant.DeclineReason))
+            if (participant.Status == ParticipantStatus.Accepted)
             {
-                builder.AddField(
-                    "Reason",
-                    participant.DeclineReason);
+                builder
+                    .WithColor(Color.Green)
+                    .WithTitle("✅ Collaboration Accepted")
+                    .WithDescription(
+                        $"You accepted **{request.Description}**.");
             }
-        }
+            else
+            {
+                builder
+                    .WithColor(Color.Red)
+                    .WithTitle("❌ Collaboration Declined")
+                    .WithDescription(
+                        $"You declined **{request.Description}**.");
 
-        builder.AddField(
-            "Time",
-            $"<t:{request.ScheduledAtParsed.ToUnixTimeSeconds()}:F>");
+                // echo only the participant's own reason
+                if (!string.IsNullOrWhiteSpace(participant.DeclineReason))
+                {
+                    builder.AddField(
+                        "Reason",
+                        participant.DeclineReason);
+                }
+            }
+
+            builder.AddField(
+                "Time",
+                $"<t:{request.ScheduledAtParsed.ToUnixTimeSeconds()}:F>");
+
+            builder.AddField(
+                "Collaborators",
+                BuildParticipantsValue(
+                    request,
+                    participant.UserId,
+                    includeDeclineReason: false));
+
+            embed = builder.Build();
+        }
 
         await message.ModifyAsync(props =>
         {
-            props.Embed = builder.Build();
-
-            // removes the accept/decline buttons
-            props.Components = new ComponentBuilder().Build();
+            props.Embed = embed;
+            props.Components = components;
         });
     }
 
@@ -275,26 +302,10 @@ public class CollabService
                 true);
         }
 
-        string participants = "";
-
-        foreach (CollabParticipant p in request.Participants)
-        {
-            string icon = p.Status switch
-            {
-                ParticipantStatus.Accepted => "🟢",
-                ParticipantStatus.Pending => "🟡",
-                ParticipantStatus.Declined => "🔴",
-                _ => "⚪"
-            };
-
-            participants +=
-                $"{icon} <@{p.UserId}>";
-
-            if (!string.IsNullOrWhiteSpace(p.DeclineReason))
-                participants += $" — {p.DeclineReason}";
-
-            participants += "\n";
-        }
+        string participants = BuildParticipantsValue(
+            request,
+            request.OwnerId,
+            includeDeclineReason: true);
 
         builder.AddField(
             "Participants",
@@ -308,7 +319,9 @@ public class CollabService
         return builder.Build();
     }
     
-    Embed BuildInviteEmbed(CollabEntry request)
+    Embed BuildInviteEmbed(
+        CollabEntry request,
+        ulong viewerId)
     {
         EmbedBuilder builder = new();
 
@@ -336,9 +349,74 @@ public class CollabService
                 true);
         }
 
+        builder.AddField(
+            "Collaborators",
+            BuildParticipantsValue(
+                request,
+                viewerId,
+                includeDeclineReason: false));
+
         builder.WithFooter(
             "Choose Accept or Decline below.");
 
         return builder.Build();
+    }
+
+    MessageComponent BuildInviteButtons(ulong requestId)
+    {
+        return new ComponentBuilder()
+
+            .WithButton(
+                "✅ Accept",
+                $"collab_accept:{requestId}",
+                ButtonStyle.Success)
+
+            .WithButton(
+                "❌ Decline",
+                $"collab_decline:{requestId}",
+                ButtonStyle.Danger)
+
+            .Build();
+    }
+
+    // status list shared by every collab dm, externals drop in when present
+    string BuildParticipantsValue(
+        CollabEntry request,
+        ulong viewerId,
+        bool includeDeclineReason)
+    {
+        string value = "";
+
+        foreach (CollabParticipant p in request.Participants)
+        {
+            string icon = p.Status switch
+            {
+                ParticipantStatus.Accepted => "🟢",
+                ParticipantStatus.Pending => "🟡",
+                ParticipantStatus.Declined => "🔴",
+                _ => "⚪"
+            };
+
+            value += $"{icon} <@{p.UserId}>";
+
+            if (p.UserId == viewerId)
+                value += " (you)";
+
+            // decline reasons are reserved for the host
+            if (includeDeclineReason && !string.IsNullOrWhiteSpace(p.DeclineReason))
+                value += $" — {p.DeclineReason}";
+
+            value += "\n";
+        }
+
+        if (request.ExternalCollaborators.Any())
+        {
+            value += "\n🌐 External Collaborators\n";
+
+            foreach (string name in request.ExternalCollaborators)
+                value += $"• {name}\n";
+        }
+
+        return value.TrimEnd();
     }
 }

@@ -202,8 +202,14 @@ client.Ready += async () =>
 
     await terminal.ResetSession();
     Logger.Log("[Info] Terminal session reset");
-    
-    
+
+    // rebuild any previously sent collab dms into the current format
+    CollabService collabService =
+        services.GetRequiredService<CollabService>();
+
+    await collabService.RefreshAllDmsAsync(client);
+    Logger.Log("[Collab] Live collab dms refreshed");
+
     try
     {
         Logger.Log("[Info] Initializing Twitch services...");
