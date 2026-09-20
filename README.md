@@ -121,6 +121,7 @@ The bot will:
 5. On the `Ready` event:
    - Register all slash command modules from the assembly.
    - Register commands to the configured guild (instant propagation). For production, switch to `RegisterCommandsGloballyAsync()` (up to 1 hour propagation).
+   - Rebuild all previously sent collaboration DMs so old embeds adopt the current format (live participant roster, external collaborators, host-only decline reasons).
    - Reset the AETHER-OS terminal session.
    - Initialize Twitch services: `TwitchRedeemHandler`, `FavouritesLiveNoti`, `EventSubReconnectService`, `TwitchChatService` (IRC connection for account linking), and start the `Twitch_Notifier` (connects EventSub websocket, subscribes to `stream.online`, `stream.offline`, and `channel.update`).
 6. Begin listening for Discord events (interactions, reactions, joins) and Twitch EventSub events.
@@ -138,7 +139,7 @@ The bot will:
 | `/resetschedule` | Force-clear the published schedule and all entries |
 | `/reactionrole` | Open the reaction role wizard: Add or Remove reaction roles on any message |
 | `/user` | Open the user management menu: warn, ban, kick, manage roles, or assign live guest role (testing) |
-| `/collab` | Start a collaboration request: pick date, fill modal, invite collaborators, confirm and send DMs (requires "Proxy Hosts" role) |
+| `/collab` | Start a collaboration request: pick date, fill modal, invite collaborators, confirm and send DMs (requires "Proxy Hosts" and "🔧 Processes" roles) |
 | `/postlink` | Post the account linking embed with a "Link Twitch" button to the current channel |
 
 ### AETHER-OS Terminal
@@ -285,6 +286,7 @@ The `Data/` directory holds all runtime state and is fully gitignored. On first 
 | `Data/reactions.json` | Reaction role configurations (message ID, channel, emoji, roles) |
 | `Data/schedule.json` | Stream schedule entries, published message state, week tracking |
 | `Data/collabs.json` | Collaboration requests with participant statuses |
+| `Data/favourites.json` | Favourite streamer list with custom go-live alert messages |
 | `Data/twitch_tokens.json` | Twitch OAuth access/refresh tokens (auto-refreshed at runtime) |
 | `Data/sevenTvPreferences.json` | Per-user 7TV channel, emote set, and image size preferences |
 | `Data/argData.json` | AETHER-OS terminal state (cwd, coherence, action history) |
