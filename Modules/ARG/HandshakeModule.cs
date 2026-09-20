@@ -238,6 +238,7 @@ public class HandshakeModule : InteractionModuleBase<SocketInteractionContext>
         }
 
         string response = $"**>> NETWORK HANDSHAKE - SENDING {amount} GLOSSELS**\n" +
+                           $"**>> MOTHER SEQUENCE: {result.MotherNumber:000}, NODE RESPONDING**\n" +
                            $"{result.Message}\n\n" +
                            $"{Context.User.Username} Balance: {result.NewBalance} Glossels.";
 
@@ -247,6 +248,7 @@ public class HandshakeModule : InteractionModuleBase<SocketInteractionContext>
         });
 
         string handshakeContent = $"**>> NETWORK HANDSHAKE - {amount} GLOSSELS**\n" +
+                                   $"**>> MOTHER SEQUENCE: {result.MotherNumber:000}, NODE RESPONDING**\n" +
                                    $"{result.Message}\n\n" +
                                    $"{Context.User.Username} Balance: {result.NewBalance} Glossels.";
 

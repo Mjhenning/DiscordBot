@@ -9,6 +9,7 @@ public class HandshakeOutcome
     public int DisplayAmount { get; init; }
     public int NewBalance { get; init; }
     public int CacheBalance { get; init; }
+    public int MotherNumber { get; init; }
 }
 
 public class HandshakeService
@@ -20,41 +21,42 @@ public class HandshakeService
     static readonly Random _rng = new();
 
     // one row per possible handshake result, weight drives how often it rolls
+    // weights sum to 1000, the visible 0-999 mother number maps 1:1 onto outcomes
     readonly record struct OutcomeDef(string Type, int Weight, int Multiplier, string[] Messages);
 
     static readonly OutcomeDef[] Outcomes =
     {
-        new("accepted",  35, 2,  new[]
-        {
-            "Node accepted {user} handshake. Packets returned doubled.",
-            "Connection established. Node amplified {user} signal. +{amount} Glossels.",
-            "Handshake successful. Network node returned {user} data with interest."
-        }),
-        new("unstable",  30, 1,  new[]
+        new("unstable",  500, 1, new[]
         {
             "Signal unstable. Packets retained, no change.",
             "Node acknowledged but refused to route. Glossels unchanged.",
             "Connection flickered. Data returned as sent. No loss, no gain."
         }),
-        new("rejected",  25, 0,  new[]
+        new("rejected",  165, 0, new[]
         {
             "Node rejected transmission. Packets corrupted. -{amount} Glossels.",
             "Handshake failed. Network firewall severed {user} connection. Data lost.",
             "Unknown node dropped {user} signal. Glossels absorbed into the void."
         }),
-        new("amplified",  8, 3,  new[]
-        {
-            ">> UNKNOWN NODE AMPLIFYING SIGNAL. 3x recovery. +{amount} Glossels.",
-            ">> CRITICAL: Node running unknown protocol. Packets tripled. This should not be possible.",
-            ">> ANOMALY DETECTED. Node returned 3x {user} original transmission."
-        }),
-        new("captured",   2, -1, new[]
+        new("captured",  165, -1, new[]
         {
             "Node partially captured {user} packets. Half recovered. -{amount} Glossels.",
             "WARNING: Intercepted mid-transfer. Partial data salvage.",
             "Hostile node detected. Packet capture partial. What remains has been returned."
         }),
-        new("drained",    1, 1,  new[]
+        new("accepted",  118, 2, new[]
+        {
+            "Node accepted {user} handshake. Packets returned doubled.",
+            "Connection established. Node amplified {user} signal. +{amount} Glossels.",
+            "Handshake successful. Network node returned {user} data with interest."
+        }),
+        new("amplified",  50, 3, new[]
+        {
+            ">> UNKNOWN NODE AMPLIFYING SIGNAL. 3x recovery. +{amount} Glossels.",
+            ">> CRITICAL: Node running unknown protocol. Packets tripled. This should not be possible.",
+            ">> ANOMALY DETECTED. Node returned 3x {user} original transmission."
+        }),
+        new("drained",     2, 1, new[]
         {
             ">> NETWORK CACHE DRAINED. All buffered packets recovered. +{amount} Glossels.",
             ">> CENTRAL CACHE SIPHONED. {user} retrieved every lost packet from the buffer.",
@@ -83,7 +85,9 @@ public class HandshakeService
         if (entry.Amount < amount)
             return new HandshakeOutcome { Type = "error", Message = $"Insufficient Glossels. Balance: {entry.Amount}" };
 
-        var outcome = RollOutcome();
+        // the mother number doubles as the weighted selector, one number, no reroll
+        int motherNumber = _rng.Next(1000);
+        var outcome = RollOutcome(motherNumber);
         string msgTemplate = outcome.Messages[_rng.Next(outcome.Messages.Length)];
         int displayAmount;
         // the shared network cache is where lost packets get buffered
@@ -138,7 +142,8 @@ public class HandshakeService
             Message = flavor,
             DisplayAmount = displayAmount,
             NewBalance = newBalance,
-            CacheBalance = ReadCache()
+            CacheBalance = ReadCache(),
+            MotherNumber = motherNumber
         };
     }
 
@@ -194,18 +199,15 @@ public class HandshakeService
 
     public int GetCacheBalance() => ReadCache();
 
-    OutcomeDef RollOutcome()
+    OutcomeDef RollOutcome(int motherNumber)
     {
-        int totalWeight = Outcomes.Sum(o => o.Weight);
-        int roll = _rng.Next(totalWeight);
-
+        int cursor = 0;
         foreach (var outcome in Outcomes)
         {
-            if (roll < outcome.Weight)
+            cursor += outcome.Weight;
+            if (motherNumber < cursor)
                 return outcome;
-            roll -= outcome.Weight;
         }
-
         return Outcomes[0];
     }
 
