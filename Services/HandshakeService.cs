@@ -219,9 +219,7 @@ public class HandshakeService
             {
                 string json = File.ReadAllText(_cachePath);
                 var cache = Newtonsoft.Json.JsonConvert.DeserializeObject<CacheStore>(json);
-                // the Twitch bot writes a lowercase "balance" key to this same file,
-                // so sum both keys to migrate the split into a single value
-                return (cache?.Balance ?? 0) + (cache?.BalanceLegacy ?? 0);
+                return cache?.Balance ?? 0;
             }
         }
         catch { }
@@ -252,9 +250,5 @@ public class HandshakeService
         // lowercase key, shared with the Twitch bot
         [Newtonsoft.Json.JsonProperty("balance")]
         public int Balance { get; set; }
-
-        // legacy uppercase key written before the unification, read only on migration
-        [Newtonsoft.Json.JsonProperty("Balance")]
-        public int? BalanceLegacy { get; set; }
     }
 }
