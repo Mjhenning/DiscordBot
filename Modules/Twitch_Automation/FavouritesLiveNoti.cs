@@ -156,8 +156,20 @@ public class FavouritesLiveNoti
     // builds and sends the themed go-live embed for a broadcaster.
     async Task PostLiveNotificationAsync(string broadcasterLogin)
     {
-        if (!_data.Entries.TryGetValue(broadcasterLogin, out string? messageTemplate))
+        if (!_data.Entries.TryGetValue(broadcasterLogin, out FavouritesEntry? entry))
             return;
+
+        // twitch only, skip discord notification
+        if (entry.Type == 2)
+            return;
+
+        string messageTemplate = entry.Message;
+
+        if (string.IsNullOrWhiteSpace(messageTemplate))
+        {
+            Logger.Log($"[FavNoti] Skipping {broadcasterLogin} (discord-only entry with empty message)");
+            return;
+        }
 
         Logger.Log($"[FavNoti] {broadcasterLogin} went live. fetching stream info");
 

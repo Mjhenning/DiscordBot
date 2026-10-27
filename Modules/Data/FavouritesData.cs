@@ -4,6 +4,9 @@
 
 namespace DiscordBot.Data;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+public record FavouritesEntry(string Message, int Type); // 0 both, 1 discord, 2 twitch
 
 public class FavouritesData
 {
@@ -23,8 +26,8 @@ public class FavouritesData
         { "Silbers_", "Scug?! The only one I know is Sticky! Go check out this amazing scug and her community (maybe drop a wawa in chat) whether it's {game} or something else!🩶" }
     };
 
-    // username -> live notification message template
-    public Dictionary<string, string> Entries { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    // username -> favourites entry
+    public Dictionary<string, FavouritesEntry> Entries { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
 
     public FavouritesData()
     {
@@ -35,20 +38,66 @@ public class FavouritesData
     {
         if (!File.Exists(FilePath)) // first run, seed the curated default list
         {
-            Entries = new Dictionary<string, string>(DefaultFavourites, StringComparer.OrdinalIgnoreCase);
+            Entries = new Dictionary<string, FavouritesEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in DefaultFavourites)
+                Entries[kv.Key] = new FavouritesEntry(kv.Value, 0);
             Save();
             return;
         }
 
         string json = File.ReadAllText(FilePath);
-        var loaded = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-        // re-wrap so lookups stay case-insensitive, Twitch logins are lowercase
-        Entries = new Dictionary<string, string>(loaded ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+        var raw = JsonConvert.DeserializeObject<JObject>(json);
+        Entries = new Dictionary<string, FavouritesEntry>(StringComparer.OrdinalIgnoreCase);
+
+        if (raw == null) return;
+
+        foreach (var prop in raw.Properties())
+        {
+            string username = prop.Name;
+            var token = prop.Value;
+
+            // old format: just the string
+            if (token.Type == JTokenType.String)
+            {
+                string msg = token.Value<string>() ?? "";
+                Entries[username] = new FavouritesEntry(msg, 0);
+                continue;
+            }
+
+            // new format: object { message, type }
+            if (token.Type == JTokenType.Object)
+            {
+                var obj = (JObject)token;
+                string msg = obj.Value<string>("message") ?? "";
+                int type = obj.Value<int?>("type") ?? 0;
+
+                if (type < 0 || type > 2) type = 0;
+
+                Entries[username] = new FavouritesEntry(msg, type);
+                continue;
+            }
+        }
     }
 
     public void Save() // serialize entries and write to file
     {
-        string json = JsonConvert.SerializeObject(Entries, Formatting.Indented);
+        var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in Entries)
+        {
+            string msg = kv.Value.Message ?? "";
+            int type = kv.Value.Type;
+
+            if (type < 0 || type > 2) type = 0;
+            if (type == 1 && string.IsNullOrWhiteSpace(msg))
+                msg = "[missing message for discord-only entry]";
+
+            if (type == 2 && msg == null)
+                msg = "";
+
+            dict[kv.Key] = new { message = msg, type };
+        }
+
+        string json = JsonConvert.SerializeObject(dict, Formatting.Indented);
         File.WriteAllText(FilePath, json);
     }
 

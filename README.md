@@ -23,7 +23,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
 ## Features
 
 - **Live Notifications** - Automatic go-live, offline, and mid-stream update embeds via Twitch EventSub websocket. Polls viewer count every 60s, updates thumbnails, and appends VOD links after stream ends.
-- **Favourite Streamer Alerts** - Watches a curated list of followed streamers and posts go-live notifications with custom messages to a dedicated channel.
+- **Favourite Streamer Alerts** - Watches a curated list of followed streamers and posts go-live notifications with custom messages to a dedicated channel. Supports per-entry routing: Discord only, Twitch only, or both via a `type` flag.
 - **Channel Point Redemptions** - Routes Twitch channel point rewards to Discord: viewer suggestions with an admin "Mark Complete" button, and quote submissions that save to a shared file for OBS overlay integration.
 - **Stream Schedule** - Manage your weekly stream schedule from Discord with add/remove/view/publish. Entries are automatically pushed to your Twitch channel schedule. Auto-resets weekly.
 - **Reaction Roles** - Interactive multi-step wizard for setting up toggle-based reaction roles on any message. Supports multiple roles per emoji with add/remove behavior. Uses a real Discord reaction capture step.
@@ -286,7 +286,7 @@ The `Data/` directory holds all runtime state and is fully gitignored. On first 
 | `Data/reactions.json` | Reaction role configurations (message ID, channel, emoji, roles) |
 | `Data/schedule.json` | Stream schedule entries, published message state, week tracking |
 | `Data/collabs.json` | Collaboration requests with participant statuses |
-| `Data/favourites.json` | Favourite streamer list with custom go-live alert messages |
+| `Data/favourites.json` | Favourite streamer list with custom go-live alert messages. Object format: `{ "username": { "message": "...", "type": 0 } }` where type `0` = both, `1` = Discord only (message required), `2` = Twitch only (message optional). Old string format is auto-migrated to objects on save. |
 | `Data/twitch_tokens.json` | Twitch OAuth access/refresh tokens (auto-refreshed at runtime) |
 | `Data/sevenTvPreferences.json` | Per-user 7TV channel, emote set, and image size preferences |
 | `Data/argData.json` | AETHER-OS terminal state (cwd, coherence, action history) |
