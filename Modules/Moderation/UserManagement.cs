@@ -747,8 +747,11 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             return;
         }
 
-        var members = Context.Guild.Users
-            .Where(u => u.Roles.Any(r => r.Id == roleId))
+        var members = new List<IGuildUser>();
+        await foreach (var batch in Context.Guild.GetUsersAsync())
+            members.AddRange(batch);
+        members = members
+            .Where(u => u.RoleIds.Contains(roleId))
             .OrderBy(u => u.Username)
             .ToList();
 
@@ -796,8 +799,11 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             return;
         }
 
-        var members = Context.Guild.Users
-            .Where(u => u.Roles.Any(r => r.Id == roleId))
+        var members = new List<IGuildUser>();
+        await foreach (var batch in Context.Guild.GetUsersAsync())
+            members.AddRange(batch);
+        members = members
+            .Where(u => u.RoleIds.Contains(roleId))
             .OrderBy(u => u.Username)
             .ToList();
 
