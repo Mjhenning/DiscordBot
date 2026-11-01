@@ -28,11 +28,39 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
 
     //-------------------------------------SLASH COMMAND-------------------------------------
 
-    [SlashCommand("user", "Warn, ban, kick, or add roles to one or more users")]
+    [SlashCommand("user", "Warn, ban, kick, or list members by role")]
     [RequireRole("\U0001f527 Processes")]
     public async Task UserMenu(string targets)
     {
         Session.Reset();
+
+        // role input detected by & in mention
+        if (targets.Contains("&") && MentionRegex.IsMatch(targets))
+        {
+            var match = MentionRegex.Match(targets);
+            if (match.Success && ulong.TryParse(match.Groups[1].Value, out ulong roleId))
+            {
+                Session.IsRoleMode = true;
+                Session.RoleId = roleId;
+                Session.Page = UmPage.Main;
+                await RespondAsync(
+                    embed: new EmbedBuilder()
+                        .WithAuthor("AETHER-OS // MODERATION", AuthorIcon)
+                        .WithTitle("Role Members")
+                        .WithDescription($"Role: <@&{roleId}>\n\nPress the button to list members with this role.")
+                        .WithColor(Color.Blue)
+                        .WithFooter(FooterText)
+                        .WithCurrentTimestamp()
+                        .Build(),
+                    components: new ComponentBuilder()
+                        .WithButton("\u2691\ufe0f List Members", "um:role_members", ButtonStyle.Primary)
+                        .WithButton("Back", "um:back")
+                        .Build(),
+                    ephemeral: true);
+                return;
+            }
+        }
+
         Session.SelectedUsers = ParseUserIds(targets);
 
         if (Session.SelectedUsers.Count == 0)
@@ -85,6 +113,13 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
     {
         await DeferAsync(ephemeral: true);
         Session.PendingAction = UmAction.RoleMembers;
+
+        if (Session.IsRoleMode && Session.RoleId != 0)
+        {
+            await RoleMembersSubmittedFromId(Session.RoleId);
+            return;
+        }
+
         await ShowRoleMembersModal();
     }
 
@@ -531,8 +566,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
                     .WithButton("\U0001f528 Ban", "um:ban", ButtonStyle.Danger)
                     .WithButton("\U0001f462 Kick", "um:kick", ButtonStyle.Danger)
                     .WithButton("\u2699\uFE0F Add Roles", "um:add_roles", ButtonStyle.Secondary)
-                    .WithButton("\u2699\uFE0F Remove Roles", "um:remove_roles", ButtonStyle.Secondary)
-                    .WithButton("\u2691\uFE0F List Members", "um:role_members", ButtonStyle.Secondary);
+                    .WithButton("\u2699\uFE0F Remove Roles", "um:remove_roles", ButtonStyle.Secondary);
+
                 break;
 
             case UmPage.Warn:
@@ -659,6 +694,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         public HashSet<ulong> SelectedUsers { get; set; } = new();
         public UmPage Page { get; set; }
         public UmAction PendingAction { get; set; }
+        public bool IsRoleMode { get; set; }
+        public ulong RoleId { get; set; }
         public string? Reason { get; set; }
 
         public void Reset()
@@ -667,7 +704,42 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             Reason = null;
             PendingAction = UmAction.None;
             Page = UmPage.Main;
+            IsRoleMode = false;
+            RoleId = 0;
         }
+    }
+
+    async Task RoleMembersSubmittedFromId(ulong roleId)
+    {
+        var role = Context.Guild.GetRole(roleId);
+        if (role == null)
+        {
+            await FollowupAsync("Role not found.", ephemeral: true);
+            Session.Reset();
+            return;
+        }
+
+        var members = Context.Guild.Users
+            .Where(u => u.Roles.Any(r => r.Id == roleId))
+            .OrderBy(u => u.Username)
+            .ToList();
+
+        string list = members.Count > 0
+            ? string.Join("\n", members.Take(30).Select(m => $"\u2022 <@{m.Id}>"))
+            + (members.Count > 30 ? $"\n... and {members.Count - 30} more" : "")
+            : "No members found with this role.";
+
+        await FollowupAsync(
+            embed: new EmbedBuilder()
+                .WithAuthor("AETHER-OS // MODERATION", AuthorIcon)
+                .WithTitle($"Members with {role.Name}")
+                .WithDescription(list)
+                .WithColor(Color.Blue)
+                .WithFooter(FooterText)
+                .WithCurrentTimestamp()
+                .Build(),
+            ephemeral: true);
+        Session.Reset();
     }
 
     async Task ShowRoleMembersModal()
