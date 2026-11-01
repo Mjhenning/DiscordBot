@@ -80,6 +80,14 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         await Refresh();
     }
 
+    [ComponentInteraction("um:role_members")]
+    public async Task RoleMembersEntry()
+    {
+        await DeferAsync(ephemeral: true);
+        Session.PendingAction = UmAction.RoleMembers;
+        await ShowRoleMembersModal();
+    }
+
     [ComponentInteraction("um:add_roles")]
     public async Task AddRolesEntry()
     {
@@ -523,7 +531,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
                     .WithButton("\U0001f528 Ban", "um:ban", ButtonStyle.Danger)
                     .WithButton("\U0001f462 Kick", "um:kick", ButtonStyle.Danger)
                     .WithButton("\u2699\uFE0F Add Roles", "um:add_roles", ButtonStyle.Secondary)
-                    .WithButton("\u2699\uFE0F Remove Roles", "um:remove_roles", ButtonStyle.Secondary);
+                    .WithButton("\u2699\uFE0F Remove Roles", "um:remove_roles", ButtonStyle.Secondary)
+                    .WithButton("\u2691\uFE0F List Members", "um:role_members", ButtonStyle.Secondary);
                 break;
 
             case UmPage.Warn:
@@ -641,7 +650,8 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
         Ban,
         Kick,
         AddRoles,
-        RemoveRoles
+        RemoveRoles,
+        RoleMembers
     }
 
      sealed class UmSession
@@ -659,6 +669,66 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             Page = UmPage.Main;
         }
     }
+
+    async Task ShowRoleMembersModal()
+    {
+        await RespondWithModalAsync<UmRoleModal>("um:role_submit");
+    }
+
+    [ModalInteraction("um:role_submit")]
+    public async Task RoleMembersSubmitted(UmRoleModal modal)
+    {
+        await DeferAsync(ephemeral: true);
+
+        var match = MentionRegex.Match(modal.RoleMention);
+        if (!match.Success || !ulong.TryParse(match.Groups[1].Value, out ulong roleId))
+        {
+            await FollowupAsync("No valid role mention found. Mention it like `@RoleName`.", ephemeral: true);
+            Session.Reset();
+            return;
+        }
+
+        var role = Context.Guild.GetRole(roleId);
+        if (role == null)
+        {
+            await FollowupAsync("Role not found in this server.", ephemeral: true);
+            Session.Reset();
+            return;
+        }
+
+        var members = Context.Guild.Users
+            .Where(u => u.Roles.Any(r => r.Id == roleId))
+            .OrderBy(u => u.Username)
+            .ToList();
+
+        string list = members.Count > 0
+            ? string.Join("\n", members.Take(30).Select(m => $"\u2022 <@{m.Id}>"))
+            + (members.Count > 30 ? $"\n... and {members.Count - 30} more" : "")
+            : "No members found with this role.";
+
+        await FollowupAsync(
+            embed: new EmbedBuilder()
+                .WithAuthor("AETHER-OS // MODERATION", AuthorIcon)
+                .WithTitle($"Members with {role.Name}")
+                .WithDescription(list)
+                .WithColor(Color.Blue)
+                .WithFooter(FooterText)
+                .WithCurrentTimestamp()
+                .Build(),
+            ephemeral: true);
+
+        Session.Reset();
+    }
+}
+
+public class UmRoleModal : IModal
+{
+    public string Title => "List Members by Role";
+
+    [InputLabel("Role (mention it)")]
+    [ModalTextInput("um_role_input", TextInputStyle.Short,
+        placeholder: "@RoleName", maxLength: 100)]
+    public string RoleMention { get; set; } = "";
 }
 
 public class UmReasonModal : IModal
