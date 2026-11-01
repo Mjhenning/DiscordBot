@@ -27,7 +27,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
 - **Channel Point Redemptions** - Routes Twitch channel point rewards to Discord: viewer suggestions with an admin "Mark Complete" button, and quote submissions that save to a shared file for OBS overlay integration.
 - **Stream Schedule** - Manage your weekly stream schedule from Discord with add/remove/view/publish. Entries are automatically pushed to your Twitch channel schedule. Auto-resets weekly.
 - **Reaction Roles** - Interactive multi-step wizard for setting up toggle-based reaction roles on any message. Supports multiple roles per emoji with add/remove behavior. Uses a real Discord reaction capture step.
-- **Live Guest Role** - Quickly grant or revoke a "live guest" voice channel role for stream collaborators, managed via the `/user` moderation menu. Automatically removed when a user leaves any voice channel.
+- **Live Guest Role** - Quickly grant or revoke a "live guest" voice channel role for stream collaborators, managed via the `/moderate` moderation menu. Automatically removed when a user leaves any voice channel.
 - **Collaboration Requests** - Create multi-person stream/event proposals with DM invitations, accept/decline flow, and live status tracking. Every participant's DM shows the live roster (statuses, `(you)` marker, external collaborators) while decline reasons stay host-only. Hosts and participants receive persistent DM updates.
 - **Moderation Logging** - Comprehensive audit logging: message edits/deletes (with before/after, attachment tracking, and moderator attribution), member joins/leaves/kicks/bans, nickname/role changes, and voice session summaries with duration tracking.
 - **7TV Emote Integration** - Search and send 7TV emotes directly in Discord with autocomplete. Per-user preferences for channel, emote set, and image size (1x–4x). Supports animated and static formats.
@@ -85,7 +85,7 @@ A feature-rich Discord bot built in C# for the channel **F0XTA1L**. Built with [
    - `AUTO_ROLE_ID` - Role assigned to new members on join
    - `TWITCH_NOTIFY_ROLE_ID` - Role pinged on go-live notifications
    - `SCHEDULE_NOTI_ROLE_ID` - Role pinged when schedule is published
-    - `LIVE_GUEST_ROLE_ID` - Voice channel guest role managed by `/user`
+    - `LIVE_GUEST_ROLE_ID` - Voice channel guest role managed by `/moderate`
    
    Twitch reward IDs:
    - `SUGGEST_REWARD_ID` - Channel point reward for suggestions
@@ -138,7 +138,7 @@ The bot will:
 | `/streamschedule` | Open the schedule menu: Add, Remove, View, or Publish the weekly stream schedule |
 | `/resetschedule` | Force-clear the published schedule and all entries |
 | `/reactionrole` | Open the reaction role wizard: Add or Remove reaction roles on any message |
-| `/user` | Open the user management menu: warn, ban, kick, manage roles, or assign live guest role (testing) |
+| `/moderate` | Open the user management menu: warn, ban, kick, manage roles, or assign live guest role (testing) |
 | `/collab` | Start a collaboration request: pick date, fill modal, invite collaborators, confirm and send DMs (requires "Proxy Hosts" and "🔧 Processes" roles) |
 | `/postlink` | Post the account linking embed with a "Link Twitch" button to the current channel |
 
@@ -188,19 +188,19 @@ Per-user emote preferences stored in `Data/sevenTvPreferences.json`. Emote searc
 In-character terminal with four persistent embeds: action log, terminal view (directory listing + buttons for Navigate, Read, Ping, Handshake), file viewer, and network handshake results. A virtual filesystem with a coherence percentage (0–100) gates file access - corrupted files show garbled content below 60% coherence. The Ping button increases coherence by 2%. The Handshake button initiates a weighted gambling system (ported from the TwitchBot) where users send Glossels into unknown network nodes. All users share a single session. A `CoherenceWatcher` monitors the state file on disk for external changes (e.g. from an overlay or external tool).
 
 ### Network Handshake (`Modules/ARG/HandshakeModule.cs` + `Services/HandshakeService.cs`)
-Gambling system shared with the TwitchBot via `../../TwitchBot/data/user_data.json` and `network_cache.json`. The Handshake button on the terminal embed opens an ephemeral choice screen with "Unknown Network" and "Other Connection". Unknown Network presents a modal where the user enters an amount of Glossels to gamble. A visible mother number roll (0 to 999) is revealed before each verdict and drives six weighted outcomes: unstable (50%, no change), rejected (16.5%, loss to cache), captured (16.5%, half lost to cache), accepted (11.8%, 2x return), amplified (5%, 3x return), drained (0.2%, drains entire network cache). Other Connection presents a native user picker of your guild; selecting a user who is linked to Twitch opens an amount modal to transfer Glossels, while unlinked users get an error explaining they're not linked yet. Results update the persistent Handshake embed and log to the action history. Requires a linked Twitch-Discord account with a positive Glossel balance. `LinkedAccountsData` re-reads `user_data.json` from disk before every balance lookup and mutating write, and also watches the data directory for the atomic rename the TwitchBot uses, so Glossel balances stay in sync with the TwitchBot without a restart. The `CoherenceWatcher` also watches `network_cache.json`, so the Network Cache shown on the Terminal embed live-updates when the TwitchBot changes it.
+Gambling system shared with the TwitchBot via `../../TwitchBot/data/moderate_data.json` and `network_cache.json`. The Handshake button on the terminal embed opens an ephemeral choice screen with "Unknown Network" and "Other Connection". Unknown Network presents a modal where the user enters an amount of Glossels to gamble. A visible mother number roll (0 to 999) is revealed before each verdict and drives six weighted outcomes: unstable (50%, no change), rejected (16.5%, loss to cache), captured (16.5%, half lost to cache), accepted (11.8%, 2x return), amplified (5%, 3x return), drained (0.2%, drains entire network cache). Other Connection presents a native user picker of your guild; selecting a user who is linked to Twitch opens an amount modal to transfer Glossels, while unlinked users get an error explaining they're not linked yet. Results update the persistent Handshake embed and log to the action history. Requires a linked Twitch-Discord account with a positive Glossel balance. `LinkedAccountsData` re-reads `user_data.json` from disk before every balance lookup and mutating write, and also watches the data directory for the atomic rename the TwitchBot uses, so Glossel balances stay in sync with the TwitchBot without a restart. The `CoherenceWatcher` also watches `network_cache.json`, so the Network Cache shown on the Terminal embed live-updates when the TwitchBot changes it.
 
 ### Moderation Logging (`Modules/Moderation/ModerationLogs.cs`)
 Auto-logs audit events to a Discord channel. Message logs include before/after content, attachment changes, and reply context. Member logs track joins (with account age), leaves, kicks (via audit log), bans/unbans, nickname/role changes. Reason fields are only shown when a reason was actually supplied, across all log types. Voice logs track sessions: when a channel empties, posts a summary with total duration and all participants. Each category independently toggleable via `Config` flags.
 
 ### User Management (`Modules/Moderation/UserManagement.cs`) - Testing
-`/user` slash command (requires "🔧 Processes" role). Opens an ephemeral menu with a user select picker, then offers: Warn (DMs the user), Ban, Kick, role management (add/remove any server role), and live guest role management. Also includes a role-member lookup action: input a role mention to get an ephemeral list of server members with that role (up to 30 shown). Includes a reason modal for moderation actions: set reasons appear in the target's DM and in audit-log entries, and the Reason field is omitted from logs when left empty. Automatically removes the live guest role when a user leaves any voice channel. This module is experimental and may have issues.
+`/moderate` slash command (requires "🔧 Processes" role). Opens an ephemeral menu with a user select picker, then offers: Warn (DMs the user), Ban, Kick, role management (add/remove any server role), and live guest role management. Also includes a role-member lookup action: input a role mention to get an ephemeral list of server members with that role (up to 30 shown). Includes a reason modal for moderation actions: set reasons appear in the target's DM and in audit-log entries, and the Reason field is omitted from logs when left empty. Automatically removes the live guest role when a user leaves any voice channel. This module is experimental and may have issues.
 
 ### Token Management (`Services/TokenManager.cs`)
 Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On startup, if a refresh token exists but the access token is expired, it silently refreshes without user interaction. On first run (no tokens at all), starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
 
 ### Twitch-Discord Account Linking (`Modules/Linking/` + `Services/TwitchChatService.cs` + `Services/LinkedAccountsData.cs`)
-A persistent embed posted via `/postlink` with a "Link Twitch" button. Clicking the button (ephemeral) generates a 5-character code valid for 20 seconds. The user types the code in Twitch chat, the bot matches it, deletes the Twitch message, looks up the user in the shared data file (`../../TwitchBot/data/user_data.json`), and writes their Discord user ID into the entry. Sends a DM on success, updates the ephemeral message and DM on expiry. Requires a configured Twitch bot account for IRC connection. `LinkedAccountsData` resolves the path relative to `AppContext.BaseDirectory`.
+A persistent embed posted via `/postlink` with a "Link Twitch" button. Clicking the button (ephemeral) generates a 5-character code valid for 20 seconds. The user types the code in Twitch chat, the bot matches it, deletes the Twitch message, looks up the user in the shared data file (`../../TwitchBot/data/moderate_data.json`), and writes their Discord user ID into the entry. Sends a DM on success, updates the ephemeral message and DM on expiry. Requires a configured Twitch bot account for IRC connection. `LinkedAccountsData` resolves the path relative to `AppContext.BaseDirectory`.
 
 ---
 
@@ -218,7 +218,7 @@ DiscordBot/
 │   │   └── Schedule.cs             # /streamschedule and /resetschedule
 │   ├── Moderation/
 │   │   ├── ModerationLogs.cs       # Audit event handler (messages, members, voice)
-│   │   └── UserManagement.cs       # /user moderation menu (testing)
+│   │   └── UserManagement.cs       # /moderate moderation menu (testing)
 │   ├── Collabs/
 │   │   ├── CollabModule.cs         # /collab slash command and UI flow
 │   │   ├── CollabData.cs           # JSON-backed collab persistence

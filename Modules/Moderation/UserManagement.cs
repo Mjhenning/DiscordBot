@@ -28,45 +28,73 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
 
     //-------------------------------------SLASH COMMAND-------------------------------------
 
-    [SlashCommand("user", "Warn, ban, kick, or list members by role")]
+    [SlashCommand("moderate", "Warn, ban, kick, or list members by role")]
     [RequireRole("\U0001f527 Processes")]
     public async Task UserMenu(string targets)
     {
         Session.Reset();
 
-        // role input detected by & in mention
-        if (targets.Contains("&") && MentionRegex.IsMatch(targets))
+        var ids = new HashSet<ulong>();
+        foreach (Match m in MentionRegex.Matches(targets))
+            if (ulong.TryParse(m.Groups[1].Value, out ulong id)) ids.Add(id);
+        foreach (string part in targets.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            if (ulong.TryParse(part, out ulong id)) ids.Add(id);
+
+        if (ids.Count == 0)
         {
-            var match = MentionRegex.Match(targets);
-            if (match.Success && ulong.TryParse(match.Groups[1].Value, out ulong roleId))
-            {
-                Session.IsRoleMode = true;
-                Session.RoleId = roleId;
-                Session.Page = UmPage.Main;
-                await RespondAsync(
-                    embed: new EmbedBuilder()
-                        .WithAuthor("AETHER-OS // MODERATION", AuthorIcon)
-                        .WithTitle("Role Members")
-                        .WithDescription($"Role: <@&{roleId}>\n\nPress the button to list members with this role.")
-                        .WithColor(Color.Blue)
-                        .WithFooter(FooterText)
-                        .WithCurrentTimestamp()
-                        .Build(),
-                    components: new ComponentBuilder()
-                        .WithButton("\u2691\ufe0f List Members", "um:role_members", ButtonStyle.Primary)
-                        .WithButton("Back", "um:back")
-                        .Build(),
-                    ephemeral: true);
-                return;
-            }
+            await RespondAsync("No valid users or roles found.", ephemeral: true);
+            return;
         }
 
-        Session.SelectedUsers = ParseUserIds(targets);
+        var userIds = new HashSet<ulong>();
+        var roleIds = new HashSet<ulong>();
+
+        foreach (ulong id in ids)
+        {
+            if (Context.Guild.GetUser(id) != null) userIds.Add(id);
+            else if (Context.Guild.GetRole(id) != null) roleIds.Add(id);
+        }
+
+        if (userIds.Count > 0 && roleIds.Count > 0)
+        {
+            await RespondAsync("Don't mix users and roles in one call. Use `/moderate` separately for each.", ephemeral: true);
+            return;
+        }
+
+        if (roleIds.Count > 0)
+        {
+            if (roleIds.Count > 1)
+            {
+                await RespondAsync("Only one role at a time.", ephemeral: true);
+                return;
+            }
+            ulong roleId = roleIds.First();
+            Session.IsRoleMode = true;
+            Session.RoleId = roleId;
+            Session.Page = UmPage.Main;
+            await RespondAsync(
+                embed: new EmbedBuilder()
+                    .WithAuthor("AETHER-OS // MODERATION", AuthorIcon)
+                    .WithTitle("Role Members")
+                    .WithDescription($"Role: <@&{roleId}>\n\nPress the button to list members with this role.")
+                    .WithColor(Color.Blue)
+                    .WithFooter(FooterText)
+                    .WithCurrentTimestamp()
+                    .Build(),
+                components: new ComponentBuilder()
+                    .WithButton("\u2691\ufe0f List Members", "um:role_members", ButtonStyle.Primary)
+                    .WithButton("Back", "um:back")
+                    .Build(),
+                ephemeral: true);
+            return;
+        }
+
+        Session.SelectedUsers = userIds;
 
         if (Session.SelectedUsers.Count == 0)
         {
             await RespondAsync(
-                "No valid users found. Mention them or provide their IDs, e.g. `/user @LayaVulpes 123456789`",
+                "No valid users found. Mention them or provide their IDs.",
                 ephemeral: true);
             return;
         }
@@ -649,7 +677,7 @@ public class UserManagementModule : InteractionModuleBase<SocketInteractionConte
             string userList = string.Join("\n", users.Select(id => $"\u2022 <@{id}>"));
 
             var builder = new EmbedBuilder()
-                .WithTitle($"{action} (via /user)")
+                .WithTitle($"{action} (via /moderate)")
                 .WithColor(color)
                 .WithCurrentTimestamp()
                 .AddField("Target(s)", userList)
