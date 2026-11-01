@@ -8,7 +8,7 @@ namespace DiscordBot.Modules.Moderation;
 public class UserManagementModule : InteractionModuleBase<SocketInteractionContext>
 {
      static readonly Dictionary<ulong, UmSession> Sessions = new();
-     static readonly Regex MentionRegex = new(@"<@!?(\d+)>", RegexOptions.Compiled);
+     static readonly Regex MentionRegex = new(@"<@(?:!|&)?(\d+)>", RegexOptions.Compiled);
 
      const string FooterText = "System Active \u2022 4/30/03, 3:00 AM";
      const string AuthorIcon = "https://images.icon-icons.com/183/PNG/256/Windows_Messenger_22559.png";
