@@ -63,9 +63,7 @@ public class FavouritesLiveNoti
         {
             var existing = await _twitchClient.ExecuteAsync(
                 TwitchProfile.Broadcaster,
-                api => api.Helix.EventSub.GetEventSubSubscriptionsAsync(
-                    type: "stream.online"
-                )
+                api => api.Helix.EventSub.GetEventSubSubscriptionsAsync(type: "stream.online")
             );
 
             foreach (var sub in existing.Subscriptions)
@@ -74,6 +72,7 @@ public class FavouritesLiveNoti
                 // channel, those belong to the old FavNoti watcher
                 if (sub.Type == "stream.online" &&
                     sub.Condition.TryGetValue("broadcaster_user_id", out string? uid) &&
+                    uid != null &&
                     uid != Config.TwitchUserId)
                 {
                     await _twitchClient.ExecuteAsync(
