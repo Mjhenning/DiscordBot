@@ -17,7 +17,7 @@ public class ScheduleData
     // -----------------------------------------
 
     readonly TwitchScheduleService _twitchSchedule;
-    Timer _resetTimer;
+    Timer? _resetTimer;
 
     public List<ScheduleEntry> ScheduleEntries { get;  set; } = new();
 
