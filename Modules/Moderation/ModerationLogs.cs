@@ -488,9 +488,9 @@ public class ModerationLogs
         {
             try
             {
-                var replied = await channel.GetMessageAsync(message.Reference.MessageId.Value);
+                var replied = await (channel != null ? channel.GetMessageAsync(message.Reference.MessageId.Value) : Task.FromResult<IMessage?>(null));
 
-                if (replied != null)
+                if (replied != null && replied.Author != null)
                 {
                     var text = $"{FormatUser(replied.Author)}";
 

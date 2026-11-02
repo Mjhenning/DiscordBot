@@ -384,6 +384,7 @@ public class ArgTerminalService
     
     public async Task<IUserMessage> SendNewEmbed(ITextChannel? channel, Embed embed)
     {
+        if (channel == null) return null!;
         return await channel.SendMessageAsync(embed: embed);
     }
     public async Task<IUserMessage> SendNewEmbedWButtons (ITextChannel? channel, Embed embed, Dictionary<String, String> Btns)
@@ -399,6 +400,7 @@ public class ArgTerminalService
             );
         }
 
+        if (channel == null) return null!;
         MessageComponent buttons = builder.Build();
         return await channel.SendMessageAsync(embed: embed, components: buttons);
     }

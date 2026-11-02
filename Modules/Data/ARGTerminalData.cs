@@ -241,5 +241,5 @@ public class TerminalStore
     public string ReadMessage { get; set; } = "";
     public string HandshakeContent { get; set; } = "";
     
-    public Queue<string> ActionHistory { get; set; }
+    public Queue<string> ActionHistory { get; set; } = new();
 }
