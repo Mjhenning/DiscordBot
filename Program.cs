@@ -12,6 +12,9 @@ using TwitchLib.EventSub.Websockets.Extensions;
 
 DotNetEnv.Env.Load();
 
+// Initialize todo data file
+// TodoService.Initialize();
+
 bool _ready = false;
 
 
@@ -182,7 +185,15 @@ client.Ready += async () =>
     if (_ready) return; // prevent re-running on reconnect
     _ready = true;
     
-    await interactions.AddModulesAsync(typeof(ReactionRolesModule).Assembly, services); // adds schedule and reaction roles because both derive from IInteractionModuleBase
+    try
+    {
+        // load all interaction modules from this assembly
+        await interactions.AddModulesAsync(System.Reflection.Assembly.GetExecutingAssembly(), services);
+    }
+    catch (Exception ex)
+    {
+        Logger.Log($"[Warning] Failed to add modules: {ex.Message}");
+    }
     
     // // use RegisterCommandsToGuildAsync(guildId) during development for instant updates
     // // switch to RegisterCommandsGloballyAsync() for production, up to 1hr propagation
