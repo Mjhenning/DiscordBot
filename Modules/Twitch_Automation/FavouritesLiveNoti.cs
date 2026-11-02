@@ -125,7 +125,7 @@ public class FavouritesLiveNoti
                 Logger.Log($"[FavNoti] Seeded with {_live.Count} favourite(s) already live");
 
                 foreach (string login in nowLive)
-                    await PostLiveNotificationAsync(login);
+                    await PostLiveNotificationAsync(login, checkRecentHistory: true);
 
                 return;
             }
@@ -134,7 +134,7 @@ public class FavouritesLiveNoti
             foreach (string login in nowLive)
             {
                 if (!_live.Contains(login))
-                    await PostLiveNotificationAsync(login);
+                    await PostLiveNotificationAsync(login, checkRecentHistory: false);
             }
 
             // replace the tracked set with this poll's snapshot so the users
@@ -154,7 +154,7 @@ public class FavouritesLiveNoti
 
     //-----POST LIVE NOTIFICATION-----
     // builds and sends the themed go-live embed for a broadcaster.
-    async Task PostLiveNotificationAsync(string broadcasterLogin)
+    async Task PostLiveNotificationAsync(string broadcasterLogin, bool checkRecentHistory = false)
     {
         if (!_data.Entries.TryGetValue(broadcasterLogin, out FavouritesEntry? entry))
             return;
@@ -169,6 +169,39 @@ public class FavouritesLiveNoti
         {
             Logger.Log($"[FavNoti] Skipping {broadcasterLogin} (discord-only entry with empty message)");
             return;
+        }
+
+        if (checkRecentHistory)
+        {
+            try
+            {
+                ITextChannel? channelCheck = _discordSocket.GetChannel(Config.FavouritesNotifyChannelId) as ITextChannel;
+                if (channelCheck != null)
+                {
+                    var messages = await channelCheck.GetMessagesAsync(20).FlattenAsync();
+                    foreach (var msg in messages)
+                    {
+                        if (msg.Author?.Id == _discordSocket.CurrentUser?.Id && msg.Embeds != null && msg.Embeds.Count > 0)
+                        {
+                            foreach (var embed in msg.Embeds)
+                            {
+                                var desc = embed.Description ?? "";
+                                if (desc.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase) ||
+                                    (embed.Author.HasValue && embed.Author.Value.Name?.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase) == true) ||
+                                    (embed.Url != null && embed.Url.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase)))
+                                {
+                                    Logger.Log($"[FavNoti] Found recent shoutout for {broadcasterLogin} in history, skipping on reboot");
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[FavNoti] History check failed for {broadcasterLogin}: {ex.Message}");
+            }
         }
 
         Logger.Log($"[FavNoti] {broadcasterLogin} went live. fetching stream info");
