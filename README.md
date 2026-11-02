@@ -196,6 +196,9 @@ Auto-logs audit events to a Discord channel. Message logs include before/after c
 ### User Management (`Modules/Moderation/UserManagement.cs`) - Testing
 `/moderate` slash command (requires "🔧 Processes" role). Opens an ephemeral menu with a user select picker, then offers: Warn (DMs the user), Ban, Kick, role management (add/remove any server role), and live guest role management. Also includes a role-member lookup action: input a role mention to get an ephemeral list of server members with that role (up to 30 shown). Includes a reason modal for moderation actions: set reasons appear in the target's DM and in audit-log entries, and the Reason field is omitted from logs when left empty. Automatically removes the live guest role when a user leaves any voice channel. This module is experimental and may have issues.
 
+### Todo System (`Modules/Todo/` + `Data/todos.json`)
+`/todo` slash command (requires "🔧 Processes" role). Opens ephemeral menu to create/view todos. Shared `Data/todos.json`; Discord manages fully, Twitch appends (`!todo`, `!todos`).
+
 ### Token Management (`Services/TokenManager.cs`)
 Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On startup, if a refresh token exists but the access token is expired, it silently refreshes without user interaction. On first run (no tokens at all), starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
 
