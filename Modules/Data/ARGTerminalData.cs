@@ -46,7 +46,7 @@ public class ArgTerminalData
     
     public HashSet<ulong> LoggedInUsers { get;  set; } = new();
 
-    public Queue<string> ActionHistory { get; set; } = new(); = new Queue<string>();
+    public Queue<string> ActionHistory { get; set; } = new Queue<string>();
     
     public TerminalInteractionMode InteractionMode { get; set; }
     
