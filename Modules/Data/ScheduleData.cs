@@ -209,7 +209,8 @@ public class ScheduleData
             }
 
             TimeSpan nextInterval = TimeSpan.FromDays(7);
-            _resetTimer.Change(nextInterval, TimeSpan.FromDays(7));
+            if (_resetTimer != null)
+                _resetTimer.Change(nextInterval, TimeSpan.FromDays(7));
         }, null, initialDelay, TimeSpan.FromDays(7));
 
         Logger.Log($"[Info] Reset timer scheduled — next reset at {nextReset:f}");

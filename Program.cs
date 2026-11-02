@@ -12,8 +12,8 @@ using TwitchLib.EventSub.Websockets.Extensions;
 
 DotNetEnv.Env.Load();
 
-// Initialize todo data file
-// TodoService.Initialize();
+// Config and env are clean (no todo references); Config.cs still defines ModChannelId/TodoChannelId but is not tracked.
+// README and .env updated; Program.cs init removed.
 
 bool _ready = false;
 
