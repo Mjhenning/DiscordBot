@@ -222,9 +222,21 @@ public class ScheduleData
             .AddHours(ResetHour)
             .AddMinutes(ResetMinute);
 
-        // if that time has already passed this week, jump to next week
         if (candidate <= from)
             candidate = candidate.AddDays(7);
+
+        return candidate;
+    }
+
+    static DateTime GetLastResetTime(DateTime from)
+    {
+        DateTime candidate = from.Date
+            .AddDays(((int)ResetDay - (int)from.DayOfWeek + 7) % 7)
+            .AddHours(ResetHour)
+            .AddMinutes(ResetMinute);
+
+        if (candidate > from)
+            candidate = candidate.AddDays(-7);
 
         return candidate;
     }
@@ -233,7 +245,6 @@ public class ScheduleData
     {
         string currentWeekStart = GetCurrentWeekStart().ToString("yyyy-MM-dd");
 
-        // no entries-week tracked yet, stamp it and bail, nothing to clear
         if (string.IsNullOrWhiteSpace(EntriesWeekStart))
         {
             EntriesWeekStart = currentWeekStart;
@@ -241,16 +252,21 @@ public class ScheduleData
             return;
         }
 
-        // entries belong to the current week so nothing to do
         if (EntriesWeekStart == currentWeekStart)
             return;
 
+        DateTime now = DateTime.Now;
+        DateTime lastReset = GetLastResetTime(now);
+
+        if (now < lastReset)
+        {
+            EntriesWeekStart = currentWeekStart;
+            Save();
+            return;
+        }
+
         Logger.Log("[Info] Week rollover detected — clearing previous schedule");
 
-        // fire-and-forget: runs from the sync Initialize() path at startup,
-        // so we can't await here. the Twitch segment deletes happen best-effort
-        // in the background. the local/Discord state clear still completes
-        // synchronously inside ClearPublishedAsync before the delete loop finishes.
         _ = ClearPublishedAsync(auto: true);
     }
 }
