@@ -12,9 +12,6 @@ using TwitchLib.EventSub.Websockets.Extensions;
 
 DotNetEnv.Env.Load();
 
-// Config and env are clean (no todo references); Config.cs still defines ModChannelId/TodoChannelId but is not tracked.
-// README and .env updated; Program.cs init removed.
-
 bool _ready = false;
 
 
@@ -55,6 +52,7 @@ ServiceProvider services = new ServiceCollection()
     .AddSingleton<ScheduleData>()
     .AddSingleton<CollabData>()
     .AddSingleton<FavouritesData>()
+    .AddSingleton<TodoCaptureData>()
     
     //-----twitch related-----
     .AddSingleton<TwitchAPI>()
@@ -115,6 +113,7 @@ ReactionsData reactionsData    = services.GetRequiredService<ReactionsData>();
 CoherenceWatcher watcher = services.GetRequiredService<CoherenceWatcher>();
 TokenManager tokenManager = services.GetRequiredService<TokenManager>();
 CollabCleanupService cleanup = services.GetRequiredService<CollabCleanupService>();
+TodoCaptureData todoCaptureData = services.GetRequiredService<TodoCaptureData>();
 
 //--------------------------------TWITCH TOKEN AUTH--------------------------------
 // refresh if expired, full OAuth if no refresh token.
@@ -185,6 +184,9 @@ client.Ready += async () =>
     if (_ready) return; // prevent re-running on reconnect
     _ready = true;
     
+    // initialize todo capture store
+    todoCaptureData.Initialize();
+
     try
     {
         // load all interaction modules from this assembly
@@ -294,6 +296,39 @@ client.UserJoined += async member =>
     }
 };
 
+//------------------------------TODO CAPTURE------------------------------
+// posts a public confirm/cancel prompt when a message appears in the capture channel
+
+client.MessageReceived += async message =>
+{
+    if (message.Author.IsBot) return;
+    if (message.Channel.Id != Config.TodoCaptureChannelId) return;
+    if (string.IsNullOrWhiteSpace(message.Content)) return;
+
+    try
+    {
+        var components = new ComponentBuilder()
+            .WithButton("✅ Create Todo", $"todo_capture_confirm:{message.Id}", ButtonStyle.Success)
+            .WithButton("❌ Cancel", $"todo_capture_cancel:{message.Id}", ButtonStyle.Danger)
+            .Build();
+
+        var embed = new EmbedBuilder()
+            .WithAuthor(message.Author.Username, message.Author.GetAvatarUrl())
+            .WithTitle("Create todo from this message?")
+            .WithDescription(message.Content.Length > 200 ? message.Content.Substring(0, 200) + "..." : message.Content)
+            .WithColor(Color.Gold)
+            .WithFooter("System Active • 4/30/03, 3:00 AM")
+            .WithCurrentTimestamp()
+            .Build();
+
+        await message.Channel.SendMessageAsync(embed: embed, components: components);
+    }
+    catch (Exception ex)
+    {
+        Logger.Log($"[Warning] TodoCapture prompt failed: {ex.Message}");
+    }
+};
+
 //------------------------------REACTION ADDED------------------------------
 //
 // handles two systems.
@@ -320,6 +355,36 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
 
     var guild = (guildChannel as SocketGuildChannel)?.Guild;
     if (guild == null) return;
+
+    //---------------todo capture reaction handling---------------
+    if (todoCaptureData.IsTracked(msg.Id))
+    {
+        string? capEmoji = reaction.Emote?.ToString();
+        if (capEmoji == "\u2705")
+        {
+            // strike through the whole message and remove reactions
+            try
+            {
+                await msg.ModifyAsync(m => m.Content = $"~~{msg.Content}~~");
+                await msg.RemoveAllReactionsAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"[Warning] TodoCapture strike failed: {ex.Message}");
+            }
+            todoCaptureData.Untrack(msg.Id);
+            return;
+        }
+        else if (capEmoji == "\u274C")
+        {
+            // delete the message
+            try { await msg.DeleteAsync(); } catch { }
+            todoCaptureData.Untrack(msg.Id);
+            return;
+        }
+        // ignore other reactions on tracked messages
+        return;
+    }
 
     //-----------------setup flow bridge, step 3 to step 4-----------------
     // capture emoji directly from real discord reaction.
