@@ -199,6 +199,13 @@ Auto-logs audit events to a Discord channel. Message logs include before/after c
 ### Token Management (`Services/TokenManager.cs`)
 Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refresh 5 minutes before expiry. On startup, if a refresh token exists but the access token is expired, it silently refreshes without user interaction. On first run (no tokens at all), starts a local HTTP callback server on port 17563 and prints an authorization URL for the user to complete the OAuth flow. Persists tokens to `Data/twitch_tokens.json`. Thread-safe via `SemaphoreSlim`. A retry wrapper detects 401 responses, refreshes, and retries once.
 
+### Todo Capture (`Modules/TodoCapture/` + `Modules/Data/TodoCaptureData.cs`)
+Monitors a configured channel (`TODO_CAPTURE_CHANNEL_ID`). When a user posts a message there, the bot replies with a public embed asking "Create todo from this message?" with ✅ Create Todo and ❌ Cancel buttons.
+- **Confirm**: deletes the prompt, adds ✅ and ❌ reactions to the original message, and starts tracking its ID.
+- **Cancel**: deletes the prompt, no further action.
+- **Tracked reactions**: anyone can press ✅ to strike through the message and remove all reactions, or ❌ to delete the message entirely. Both actions stop tracking the message ID.
+- Persists tracked IDs to `Data/todoCapture.json` so state survives restarts.
+
 ### Twitch-Discord Account Linking (`Modules/Linking/` + `Services/TwitchChatService.cs` + `Services/LinkedAccountsData.cs`)
 A persistent embed posted via `/postlink` with a "Link Twitch" button. Clicking the button (ephemeral) generates a 5-character code valid for 20 seconds. The user types the code in Twitch chat, the bot matches it, deletes the Twitch message, looks up the user in the shared data file (`../../TwitchBot/data/user_data.json`), and writes their Discord user ID into the entry. Sends a DM on success, updates the ephemeral message and DM on expiry. Requires a configured Twitch bot account for IRC connection. `LinkedAccountsData` resolves the path relative to `AppContext.BaseDirectory`.
 
@@ -244,10 +251,13 @@ DiscordBot/
 │   ├── ARG/
 │   │   ├── ARG.cs                  # /system login/logout and terminal UI
 │   │   └── HandshakeModule.cs      # Handshake button, Unknown Network choice, gamble modal
+│   ├── TodoCapture/
+│   │   └── TodoCaptureModule.cs    # Confirm/cancel prompt button handlers
 │   ├── Data/
 │   │   ├── ReactionsData.cs        # Reaction role data model and persistence
 │   │   ├── ScheduleData.cs         # Schedule data model with weekly reset timer
 │   │   ├── ARGTerminalData.cs      # ARG state persistence
+│   │   ├── TodoCaptureData.cs      # Message ID tracking for todo capture
 │   │   └── ARG_Helper.cs           # Virtual filesystem tree
 ├── Services/
 │   ├── Logger.cs                   # Static logger (console + logs/ + optional DM)
@@ -290,6 +300,7 @@ The `Data/` directory holds all runtime state and is fully gitignored. On first 
 | `Data/twitch_tokens.json` | Twitch OAuth access/refresh tokens (auto-refreshed at runtime) |
 | `Data/sevenTvPreferences.json` | Per-user 7TV channel, emote set, and image size preferences |
 | `Data/argData.json` | AETHER-OS terminal state (cwd, coherence, action history) |
+| `Data/todoCapture.json` | Message IDs currently tracked for todo capture |
 | `logs/` | Timestamped log files, one per bot start (`bot-log-YYYY-MM-DD-N.txt`) |
 
 ### External File
