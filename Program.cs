@@ -359,8 +359,9 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
     //---------------todo capture reaction handling---------------
     if (todoCaptureData.IsTracked(msg.Id))
     {
-        string? capEmoji = reaction.Emote?.ToString();
-        if (capEmoji == "\u2705")
+        // use emoji Name property to compare unicode emojis reliably
+        var capEmoji = reaction.Emote;
+        if (capEmoji != null && capEmoji.Name == "\u2705")
         {
             // strike through the whole message and remove reactions
             try
@@ -375,7 +376,7 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
             todoCaptureData.Untrack(msg.Id);
             return;
         }
-        else if (capEmoji == "\u274C")
+        else if (capEmoji != null && capEmoji.Name == "\u274C")
         {
             // delete the message
             try { await msg.DeleteAsync(); } catch { }
