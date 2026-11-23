@@ -25,6 +25,8 @@ public class TodoCaptureData
 
     public bool IsTracked(ulong messageId) => _tracked.Contains(messageId);
 
+    public IReadOnlyCollection<ulong> GetTrackedIds() => _tracked.ToList();
+
     public void Track(ulong messageId)
     {
         _tracked.Add(messageId);

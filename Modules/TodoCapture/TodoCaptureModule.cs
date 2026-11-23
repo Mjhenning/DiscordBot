@@ -16,7 +16,7 @@ public class TodoCaptureModule : InteractionModuleBase<SocketInteractionContext>
     }
 
     //-----CONFIRM-----
-    // deletes the prompt, adds check/cross reactions to the original message, tracks it
+    // deletes the prompt, reposts the message as a bot-authored todo, adds reactions, tracks new message
     [ComponentInteraction("todo_capture_confirm:*", ignoreGroupNames: true)]
     public async Task Confirm(string messageId)
     {
@@ -32,19 +32,49 @@ public class TodoCaptureModule : InteractionModuleBase<SocketInteractionContext>
         var original = await Context.Channel.GetMessageAsync(id) as IUserMessage;
         if (original == null) return;
 
+        SocketGuild guild = (Context.Guild as SocketGuild) ?? (Context.Channel as SocketGuildChannel)?.Guild!;
+        SocketGuildUser? guildUser = guild?.GetUser(original.Author.Id);
+        string displayName = guildUser?.DisplayName ?? original.Author.GlobalName ?? original.Author.Username;
+        string avatarUrl = guildUser?.GetDisplayAvatarUrl() ?? original.Author.GetDisplayAvatarUrl() ?? original.Author.GetAvatarUrl();
+
+        string content = original.Content ?? "";
+        if (content.Length > 4000) content = content.Substring(0, 3997) + "...";
+
+        Embed embed = new EmbedBuilder()
+            .WithAuthor(displayName, avatarUrl)
+            .WithTitle("Todo")
+            .WithColor(new Color(0x5865F2))
+            .WithDescription(content)
+            .WithFooter("System Active • 4/30/03, 3:00 AM")
+            .Build();
+
+        IUserMessage newMsg;
         try
         {
-            await original.AddReactionAsync(new Emoji("\u2705"));
-            await original.AddReactionAsync(new Emoji("\u274C"));
+            newMsg = await Context.Channel.SendMessageAsync(embed: embed, allowedMentions: AllowedMentions.None);
         }
         catch (Exception ex)
         {
-            Logger.Log($"[TodoCapture] Failed to add reactions to message {id}: {ex.Message}");
+            Logger.Log($"[TodoCapture] Failed to repost todo message {id}: {ex.Message}");
             return;
         }
 
-        _data.Track(id);
-        Logger.Log($"[TodoCapture] Tracked message {id} for {Context.User.Username}");
+        try
+        {
+            await newMsg.AddReactionAsync(new Emoji("\u2705"));
+            await newMsg.AddReactionAsync(new Emoji("\u274C"));
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[TodoCapture] Failed to add reactions to reposted message {newMsg.Id}: {ex.Message}");
+            try { await newMsg.DeleteAsync(); } catch { }
+            return;
+        }
+
+        try { await original.DeleteAsync(); } catch (Exception ex) { Logger.Log($"[TodoCapture] Failed to delete original message {id}: {ex.Message}"); }
+
+        _data.Track(newMsg.Id);
+        Logger.Log($"[TodoCapture] Tracked reposted message {newMsg.Id} (from {id}) for {Context.User.Username}");
     }
 
     //-----CANCEL-----

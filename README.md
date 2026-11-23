@@ -201,9 +201,9 @@ Manages Twitch OAuth2 tokens (Bot and Broadcaster profiles) with automatic refre
 
 ### Todo Capture (`Modules/TodoCapture/` + `Modules/Data/TodoCaptureData.cs`)
 Monitors a configured channel (`TODO_CAPTURE_CHANNEL_ID`). When a user posts a message there, the bot replies with a public embed asking "Create todo from this message?" with ✅ Create Todo and ❌ Cancel buttons.
-- **Confirm**: deletes the prompt, adds ✅ and ❌ reactions to the original message, and starts tracking its ID.
+- **Confirm**: deletes the prompt, deletes the original message, reposts it as a bot-authored embed (similar to suggestion embeds) with the author's server display name and avatar, the message content as the description, adds ✅ and ❌ reactions, and tracks the new message ID.
 - **Cancel**: deletes the prompt, no further action.
-- **Tracked reactions**: anyone can press ✅ to strike through the message and remove all reactions, or ❌ to delete the message entirely. Both actions stop tracking the message ID.
+- **Tracked reactions**: anyone can press ✅ to strike through the todo embed description and remove all reactions, or ❌ to delete it entirely. Both actions stop tracking the message ID.
 - Persists tracked IDs to `Data/todoCapture.json` so state survives restarts.
 
 ### Twitch-Discord Account Linking (`Modules/Linking/` + `Services/TwitchChatService.cs` + `Services/LinkedAccountsData.cs`)

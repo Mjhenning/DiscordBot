@@ -186,6 +186,7 @@ client.Ready += async () =>
     
     // initialize todo capture store
     todoCaptureData.Initialize();
+    await MigrateTodoCaptureMessagesAsync(todoCaptureData);
 
     try
     {
@@ -329,6 +330,76 @@ client.MessageReceived += async message =>
     }
 };
 
+//------------------------------TODO CAPTURE MIGRATION------------------------------
+// converts tracked messages that are not in the current embed todo format
+
+async Task MigrateTodoCaptureMessagesAsync(TodoCaptureData data)
+{
+    var trackedIds = data.GetTrackedIds().ToList();
+    if (trackedIds.Count == 0) return;
+
+    ITextChannel? channel = client.GetChannel(Config.TodoCaptureChannelId) as ITextChannel;
+    if (channel == null)
+    {
+        Logger.Log($"[TodoCapture] Migration skipped: capture channel {Config.TodoCaptureChannelId} not found");
+        return;
+    }
+
+    foreach (ulong id in trackedIds)
+    {
+        try
+        {
+            IMessage? raw = await channel.GetMessageAsync(id);
+            if (raw is not IUserMessage msg)
+            {
+                // message no longer exists, untrack
+                data.Untrack(id);
+                Logger.Log($"[TodoCapture] Migration untracked missing message {id}");
+                continue;
+            }
+
+            // already in correct format: bot-authored embed with Todo title
+            bool isBot = msg.Author.Id == client.CurrentUser.Id;
+            bool hasTodoEmbed = msg.Embeds != null && msg.Embeds.Any(e => string.Equals(e.Title, "Todo", StringComparison.OrdinalIgnoreCase));
+            if (isBot && hasTodoEmbed)
+                continue;
+
+            SocketGuild? guild = (channel as SocketGuildChannel)?.Guild;
+            SocketGuildUser? guildUser = guild?.GetUser(msg.Author.Id);
+            string displayName = guildUser?.DisplayName ?? msg.Author.GlobalName ?? msg.Author.Username;
+            string avatarUrl = guildUser?.GetDisplayAvatarUrl() ?? msg.Author.GetDisplayAvatarUrl() ?? msg.Author.GetAvatarUrl();
+
+            string content = msg.Content ?? "";
+            if (string.IsNullOrWhiteSpace(content) && msg.Embeds != null && msg.Embeds.Count > 0)
+                content = msg.Embeds.First().Description ?? "";
+            if (content.Length > 4000) content = content.Substring(0, 3997) + "...";
+
+            Embed embed = new EmbedBuilder()
+                .WithAuthor(displayName, avatarUrl)
+                .WithTitle("Todo")
+                .WithColor(new Color(0x5865F2))
+                .WithDescription(content)
+                .WithFooter("System Active • 4/30/03, 3:00 AM")
+                .Build();
+
+            IUserMessage newMsg = await channel.SendMessageAsync(embed: embed, allowedMentions: AllowedMentions.None);
+            await newMsg.AddReactionAsync(new Emoji("\u2705"));
+            await newMsg.AddReactionAsync(new Emoji("\u274C"));
+
+            try { await msg.DeleteAsync(); } catch { }
+
+            data.Untrack(id);
+            data.Track(newMsg.Id);
+
+            Logger.Log($"[TodoCapture] Migrated message {id} -> {newMsg.Id}");
+        }
+        catch (Exception ex)
+        {
+            Logger.Log($"[Warning] TodoCapture migration failed for {id}: {ex.Message}");
+        }
+    }
+}
+
 //------------------------------REACTION ADDED------------------------------
 //
 // handles two systems.
@@ -363,16 +434,42 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
         var capEmoji = reaction.Emote;
         if (capEmoji != null && capEmoji.Name == "\u2705")
         {
-            // strike through the whole message and remove reactions
+            // strike through the todo embed/message and remove reactions
             try
             {
-                await msg.ModifyAsync(m => m.Content = $"~~{msg.Content}~~");
+                if (msg.Embeds != null && msg.Embeds.Count > 0)
+                {
+                    var oldEmbed = msg.Embeds.First();
+                    string desc = oldEmbed.Description ?? "";
+                    string struck = desc.StartsWith("~~") ? desc : $"~~{desc}~~";
+                    if (struck.Length > 4096) struck = struck.Substring(0, 4093) + "...";
+
+                    var builder = new EmbedBuilder()
+                        .WithTitle(oldEmbed.Title ?? "Todo")
+                        .WithDescription(struck)
+                        .WithColor(oldEmbed.Color ?? new Color(0x5865F2))
+                        .WithFooter(oldEmbed.Footer?.Text ?? "System Active • 4/30/03, 3:00 AM");
+
+                    if (oldEmbed.Author.HasValue)
+                        builder.WithAuthor(oldEmbed.Author.Value.Name, oldEmbed.Author.Value.IconUrl, oldEmbed.Author.Value.Url);
+
+                    await msg.ModifyAsync(m => { m.Embed = builder.Build(); m.Content = ""; });
+                }
+                else
+                {
+                    string content = msg.Content ?? "";
+                    string struck = content.StartsWith("~~") ? content : $"~~{content}~~";
+                    if (struck.Length > 2000) struck = struck.Substring(0, 1997) + "...";
+                    await msg.ModifyAsync(m => m.Content = struck);
+                }
+
                 await msg.RemoveAllReactionsAsync();
             }
             catch (Exception ex)
             {
                 Logger.Log($"[Warning] TodoCapture strike failed: {ex.Message}");
             }
+
             todoCaptureData.Untrack(msg.Id);
             return;
         }
