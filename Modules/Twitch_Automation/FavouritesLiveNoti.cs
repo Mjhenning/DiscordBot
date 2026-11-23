@@ -250,6 +250,8 @@ public class FavouritesLiveNoti
             // build the message and replace placeholders
             string message = messageTemplate.Replace("{game}", gameName, StringComparison.OrdinalIgnoreCase);
 
+            string? ageWarning = BuildAgeWarning(entry.AgeRating);
+
             // resolve the notification channel
             ITextChannel? channel = _discordSocket.GetChannel(Config.FavouritesNotifyChannelId) as ITextChannel;
 
@@ -259,7 +261,7 @@ public class FavouritesLiveNoti
                 return;
             }
 
-            Embed embed = BuildLiveEmbed(userName, pfp, message, $"https://www.twitch.tv/{broadcasterLogin}", thumbnail);
+            Embed embed = BuildLiveEmbed(userName, pfp, message, $"https://www.twitch.tv/{broadcasterLogin}", thumbnail, ageWarning);
 
             await channel.SendMessageAsync(embed: embed);
             Logger.Log($"[FavNoti] Posted notification for {broadcasterLogin} to #{channel.Name}");
@@ -278,19 +280,33 @@ public class FavouritesLiveNoti
         string pfp,
         string customMsg,
         string url,
-        string thumbnailUrl
+        string thumbnailUrl,
+        string? ageWarning
     )
     {
         EmbedBuilder builder = new EmbedBuilder();
 
+        string description = "**---------------------------------------------------------------------** \n\n" + customMsg + "\n\n";
+        if (!string.IsNullOrWhiteSpace(ageWarning))
+            description += ageWarning + "\n\n";
+        description += $"[Click here to go spread the love 🫧]({url})" + "\n\n**---------------------------------------------------------------------**";
+
             builder
                 .WithAuthor($"AETHER-OS // {userName}'s Proxy is Active", pfp, url)
-                .WithDescription("**---------------------------------------------------------------------** \n\n" +customMsg + "\n\n" + $"[Click here to go spread the love 🫧]({url})" + "\n\n**---------------------------------------------------------------------**")
+                .WithDescription(description)
                 .WithColor(new Color(0x5865F2))
                 .WithFooter("System Active • 4/30/03, 3:00 AM")
                 .WithThumbnailUrl(thumbnailUrl);
 
 
         return builder.Build();
+    }
+
+    static string? BuildAgeWarning(string? ageRating)
+    {
+        if (string.IsNullOrWhiteSpace(ageRating)) return null;
+
+        string rating = ageRating.Trim();
+        return $"> ⚠️ **Mature Audience ({rating})**\n> This streamer's space is more mature and may not be welcoming to our community's younger audiences.";
     }
 }

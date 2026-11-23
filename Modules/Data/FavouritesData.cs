@@ -6,7 +6,7 @@ namespace DiscordBot.Data;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-public record FavouritesEntry(string Message, int Type); // 0 both, 1 discord, 2 twitch
+public record FavouritesEntry(string Message, int Type, string? AgeRating = null); // type: 0 both, 1 discord, 2 twitch; ageRating: "17+", "18+", etc.
 
 public class FavouritesData
 {
@@ -64,16 +64,18 @@ public class FavouritesData
                 continue;
             }
 
-            // new format: object { message, type }
+            // new format: object { message, type, ageRating? }
             if (token.Type == JTokenType.Object)
             {
                 var obj = (JObject)token;
                 string msg = obj.Value<string>("message") ?? "";
                 int type = obj.Value<int?>("type") ?? 0;
+                string? ageRating = obj.Value<string>("ageRating");
+                if (string.IsNullOrWhiteSpace(ageRating)) ageRating = null;
 
                 if (type < 0 || type > 2) type = 0;
 
-                Entries[username] = new FavouritesEntry(msg, type);
+                Entries[username] = new FavouritesEntry(msg, type, ageRating);
                 continue;
             }
         }
@@ -86,6 +88,7 @@ public class FavouritesData
         {
             string msg = kv.Value.Message ?? "";
             int type = kv.Value.Type;
+            string? ageRating = string.IsNullOrWhiteSpace(kv.Value.AgeRating) ? null : kv.Value.AgeRating.Trim();
 
             if (type < 0 || type > 2) type = 0;
             if (type == 1 && string.IsNullOrWhiteSpace(msg))
@@ -94,7 +97,7 @@ public class FavouritesData
             if (type == 2 && msg == null)
                 msg = "";
 
-            dict[kv.Key] = new { message = msg, type };
+            dict[kv.Key] = new { message = msg, type, ageRating };
         }
 
         string json = JsonConvert.SerializeObject(dict, Formatting.Indented);
