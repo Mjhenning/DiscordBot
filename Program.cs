@@ -363,16 +363,42 @@ client.ReactionAdded += async (msgRef, channelRef, reaction) =>
         var capEmoji = reaction.Emote;
         if (capEmoji != null && capEmoji.Name == "\u2705")
         {
-            // strike through the whole message and remove reactions
+            // strike through the todo embed/message and remove reactions
             try
             {
-                await msg.ModifyAsync(m => m.Content = $"~~{msg.Content}~~");
+                if (msg.Embeds != null && msg.Embeds.Count > 0)
+                {
+                    var oldEmbed = msg.Embeds.First();
+                    string desc = oldEmbed.Description ?? "";
+                    string struck = desc.StartsWith("~~") ? desc : $"~~{desc}~~";
+                    if (struck.Length > 4096) struck = struck.Substring(0, 4093) + "...";
+
+                    var builder = new EmbedBuilder()
+                        .WithTitle(oldEmbed.Title ?? "Todo")
+                        .WithDescription(struck)
+                        .WithColor(oldEmbed.Color ?? new Color(0x5865F2))
+                        .WithFooter(oldEmbed.Footer?.Text ?? "System Active • 4/30/03, 3:00 AM");
+
+                    if (oldEmbed.Author.HasValue)
+                        builder.WithAuthor(oldEmbed.Author.Value.Name, oldEmbed.Author.Value.IconUrl, oldEmbed.Author.Value.Url);
+
+                    await msg.ModifyAsync(m => { m.Embed = builder.Build(); m.Content = ""; });
+                }
+                else
+                {
+                    string content = msg.Content ?? "";
+                    string struck = content.StartsWith("~~") ? content : $"~~{content}~~";
+                    if (struck.Length > 2000) struck = struck.Substring(0, 1997) + "...";
+                    await msg.ModifyAsync(m => m.Content = struck);
+                }
+
                 await msg.RemoveAllReactionsAsync();
             }
             catch (Exception ex)
             {
                 Logger.Log($"[Warning] TodoCapture strike failed: {ex.Message}");
             }
+
             todoCaptureData.Untrack(msg.Id);
             return;
         }
