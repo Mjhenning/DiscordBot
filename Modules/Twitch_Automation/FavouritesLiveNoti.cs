@@ -109,10 +109,14 @@ public class FavouritesLiveNoti
             );
 
             HashSet<string> nowLive = new(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, DateTime> startedAtByLogin = new(StringComparer.OrdinalIgnoreCase);
             if (streamResult?.Streams != null)
             {
                 foreach (var stream in streamResult.Streams)
+                {
                     nowLive.Add(stream.UserLogin);
+                    startedAtByLogin[stream.UserLogin] = stream.StartedAt;
+                }
             }
 
             // first poll records who is already live and notifies for them,
@@ -124,7 +128,10 @@ public class FavouritesLiveNoti
                 Logger.Log($"[FavNoti] Seeded with {_live.Count} favourite(s) already live");
 
                 foreach (string login in nowLive)
-                    await PostLiveNotificationAsync(login, checkRecentHistory: true);
+                {
+                    startedAtByLogin.TryGetValue(login, out DateTime startedAt);
+                    await PostLiveNotificationAsync(login, checkRecentHistory: true, streamStartedAt: startedAt);
+                }
 
                 return;
             }
@@ -153,7 +160,7 @@ public class FavouritesLiveNoti
 
     //-----POST LIVE NOTIFICATION-----
     // builds and sends the themed go-live embed for a broadcaster.
-    async Task PostLiveNotificationAsync(string broadcasterLogin, bool checkRecentHistory = false)
+    async Task PostLiveNotificationAsync(string broadcasterLogin, bool checkRecentHistory = false, DateTime streamStartedAt = default)
     {
         if (!_data.Entries.TryGetValue(broadcasterLogin, out FavouritesEntry? entry))
             return;
@@ -177,21 +184,29 @@ public class FavouritesLiveNoti
                 ITextChannel? channelCheck = _discordSocket.GetChannel(Config.FavouritesNotifyChannelId) as ITextChannel;
                 if (channelCheck != null)
                 {
-                    var messages = await channelCheck.GetMessagesAsync(20).FlattenAsync();
+                    // only skip if we already posted for this stream session
+                    DateTimeOffset cutoff = streamStartedAt != default
+                        ? new DateTimeOffset(DateTime.SpecifyKind(streamStartedAt, DateTimeKind.Utc)).AddMinutes(-5)
+                        : DateTimeOffset.UtcNow.AddHours(-6);
+
+                    var messages = await channelCheck.GetMessagesAsync(50).FlattenAsync();
                     foreach (var msg in messages)
                     {
-                        if (msg.Author?.Id == _discordSocket.CurrentUser?.Id && msg.Embeds != null && msg.Embeds.Count > 0)
+                        if (msg.Timestamp < cutoff) continue;
+                        if (msg.Author?.Id != _discordSocket.CurrentUser?.Id || msg.Embeds == null || msg.Embeds.Count == 0)
+                            continue;
+
+                        foreach (var embed in msg.Embeds)
                         {
-                            foreach (var embed in msg.Embeds)
+                            var desc = embed.Description ?? "";
+                            bool matches = desc.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase) ||
+                                           (embed.Author.HasValue && embed.Author.Value.Name?.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase) == true) ||
+                                           (embed.Url != null && embed.Url.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase));
+
+                            if (matches)
                             {
-                                var desc = embed.Description ?? "";
-                                if (desc.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase) ||
-                                    (embed.Author.HasValue && embed.Author.Value.Name?.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase) == true) ||
-                                    (embed.Url != null && embed.Url.Contains(broadcasterLogin, StringComparison.OrdinalIgnoreCase)))
-                                {
-                                    Logger.Log($"[FavNoti] Found recent shoutout for {broadcasterLogin} in history, skipping on reboot");
-                                    return;
-                                }
+                                Logger.Log($"[FavNoti] Found shoutout for {broadcasterLogin} at {msg.Timestamp:u} (cutoff {cutoff:u}), skipping on reboot");
+                                return;
                             }
                         }
                     }
