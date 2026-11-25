@@ -322,6 +322,13 @@ public class FavouritesLiveNoti
         if (string.IsNullOrWhiteSpace(ageRating)) return null;
 
         string rating = ageRating.Trim();
+
+        // only 18+ and higher get a warning
+        int digits = 0;
+        while (digits < rating.Length && char.IsDigit(rating[digits])) digits++;
+        if (digits == 0 || !int.TryParse(rating.Substring(0, digits), out int minimumAge) || minimumAge < 18)
+            return null;
+
         return $"> ⚠️ **Mature Audience ({rating})**\n> This streamer's space is more mature and may not be welcoming to our community's younger audiences.";
     }
 }
